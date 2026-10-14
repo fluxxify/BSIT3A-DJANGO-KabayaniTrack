@@ -1,0 +1,347 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<style>
+  #crudModal .modal-content {
+    max-height: calc(100vh - var(--tblr-modal-margin, 1rem) * 2);
+  }
+  #crudModal .modal-content > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  #crudModal .modal-body {
+    overflow-y: auto;
+    min-height: 0;
+  }
+  #crudModal .modal-header,
+  #crudModal .modal-footer {
+    flex-shrink: 0;
+  }
+</style>
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <div class="d-flex align-items-center gap-3 flex-wrap d-none d-md-flex">
+            <h2 class="page-title mb-0">{{ page_title }}</h2>
+          </div>
+          <h2 class="page-title mb-0 d-md-none">{{ page_title }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-1">
+    <form method="GET" class="w-100" style="max-width: 460px;">
+      <div class="input-group">
+        <span class="input-group-text"><i class="ti ti-search"></i></span>
+        <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="{{ search_placeholder }}">
+        {% if query %}
+        <a href="{{ request.path }}" class="btn btn-outline-secondary">Clear</a>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Search</button>
+      </div>
+    </form>
+
+    <button type="button" class="btn btn-primary mt-n4" data-bs-toggle="modal" data-bs-target="#crudModal" data-mode="create">
+      <i class='fas fa-plus-circle me-2'></i> {{ add_label }}
+    </button>
+  </div>
+
+  <div class="toast-container position-fixed top-0 end-0 p-3" id="crudToastContainer" aria-live="polite" aria-atomic="true">
+    {% for message in messages %}
+    <div class="toast bg-info-lt" role="status" aria-atomic="true" data-bs-delay="4000" style="--tblr-toast-color: #000;">
+      <div class="d-flex">
+        <div class="toast-body">{{ message }}</div>
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="crudAlert" class="alert alert-danger d-none" role="alert"></div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">
+        All Records
+        {% if query %}
+        <span class="text-muted fw-normal">— search results for "{{ query }}"</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter table-hover card-table text-nowrap" id="crudTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            {% for col in columns %}<th>{{ col.label }}</th>{% endfor %}
+            <th class="w-1">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="crudTableBody">
+        {% for row in rows %}
+        <tr data-row-id="{{ row.id }}">
+            <td class="text-muted">{{ forloop.counter0|add:page_obj.start_index }}</td>
+            {% for cell in row.cells %}
+            <td>
+              {% if cell.badge %}
+              <span class="badge {{ cell.badge }}">{{ cell.html|safe }}</span>
+              {% else %}
+              {{ cell.html|safe }}
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td>
+              <div class="d-flex gap-1">
+                <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#crudModal" data-mode="edit" data-id="{{ row.id }}" title="Edit">
+                  <i class="fas fa-edit text-primary"></i>
+                </button>
+                <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#deleteCrudModal" data-id="{{ row.id }}" title="Delete">
+                  <i class="fas fa-trash-alt text-danger"></i>
+                </button>
+              </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="{{ colspan }}">
+                <div class="empty py-5">
+                    <div class="empty-icon">
+                        <i class="fas fa-folder-open fa-2x text-muted"></i>
+                    </div>
+                    <p class="empty-title">No records found</p>
+                    <p class="empty-subtitle">Try adjusting your search or add a new record.</p>
+                    <div class="empty-action">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crudModal" data-mode="create">
+                            <i class="fas fa-plus-circle me-2"></i> {{ add_label }}
+                        </button>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="card-footer d-flex align-items-center">
+      <p class="m-0 text-muted">
+        Showing <span class="fw-medium">{{ page_obj.start_index }}</span>
+        to <span class="fw-medium">{{ page_obj.end_index }}</span>
+        of <span class="fw-medium">{{ page_obj.paginator.count }}</span> records
+      </p>
+      <ul class="pagination m-0 ms-auto">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">
+            <i class="ti ti-chevron-left"></i> prev
+          </a>
+        </li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+          <a class="page-link" href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}">{{ num }}</a>
+        </li>
+        {% endfor %}
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}">
+            next <i class="ti ti-chevron-right"></i>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="modal modal-blur fade" id="crudModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="crudModalTitle">{{ add_label }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="crudForm">
+        {% csrf_token %}
+        <input type="hidden" name="id" id="crud_id">
+        <div class="modal-body">
+          <div id="crudFormError" class="alert alert-danger d-none"></div>
+          <div class="row g-3">
+            {% for f in form_fields %}
+            <div class="col-12 {% if f.kind == 'number' or f.kind == 'date' or f.kind == 'datetime-local' %}col-md-6{% endif %}">
+              <label class="form-label" for="crud_{{ f.name }}">
+                {{ f.label }}{% if f.required %} <span class="text-danger">*</span>{% endif %}
+              </label>
+              {% if f.kind == 'select' %}
+              <select name="{{ f.name }}" id="crud_{{ f.name }}" class="form-select" {% if f.required %}required{% endif %}>
+                {% for value, label in f.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select>
+              {% elif f.kind == 'textarea' %}
+              <textarea name="{{ f.name }}" id="crud_{{ f.name }}" class="form-control" rows="3" {% if f.required %}required{% endif %}></textarea>
+              {% elif f.kind == 'checkbox' %}
+              <div class="form-check form-switch mt-1">
+                <input type="checkbox" name="{{ f.name }}" id="crud_{{ f.name }}" class="form-check-input" value="on">
+              </div>
+              {% elif f.kind == 'file' %}
+              <input type="file" name="{{ f.name }}" id="crud_{{ f.name }}" class="form-control">
+              {% else %}
+              <input type="{{ f.kind }}" name="{{ f.name }}" id="crud_{{ f.name }}" class="form-control"
+                     {% if f.kind == 'number' %}step="any"{% endif %} {% if f.required %}required{% endif %}>
+              {% endif %}
+              {% if f.help %}<small class="form-hint">{{ f.help }}</small>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="crudSubmitBtn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal modal-blur fade" id="deleteCrudModal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete {{ entity }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete this {{ entity }}? This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteCrudBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ rows_json|json_script:"crud-data" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const base = "{{ request.path }}";
+  const SAVE_URL = base + "ajax/save/";
+  const DELETE_URL_BASE = base + "ajax/delete/";
+
+  const modalEl = document.getElementById('crudModal');
+  const deleteModalEl = document.getElementById('deleteCrudModal');
+  const form = document.getElementById('crudForm');
+  const alertBox = document.getElementById('crudAlert');
+  const formError = document.getElementById('crudFormError');
+  const title = document.getElementById('crudModalTitle');
+  const submitBtn = document.getElementById('crudSubmitBtn');
+  const rowData = JSON.parse(document.getElementById('crud-data').textContent);
+  let currentId = null;
+
+  document.querySelectorAll('#crudToastContainer .toast').forEach(function (el) {
+    bootstrap.Toast.getOrCreateInstance(el).show();
+  });
+
+  function showFormError(msg) {
+    formError.textContent = msg;
+    formError.classList.remove('d-none');
+  }
+  function clearFormError() {
+    formError.textContent = '';
+    formError.classList.add('d-none');
+  }
+
+  function fillForm(data) {
+    form.querySelectorAll('[name]').forEach(function (el) {
+      if (el.name === 'csrfmiddlewaretoken') return;
+      const val = data[el.name] !== undefined ? data[el.name] : '';
+      if (el.type === 'checkbox') {
+        el.checked = val === 'True' || val === 'true' || val === '1';
+      } else if (el.type === 'file') {
+        el.value = '';
+      } else {
+        el.value = val;
+      }
+    });
+  }
+
+  modalEl.addEventListener('show.bs.modal', function (event) {
+    clearFormError();
+    form.reset();
+    const button = event.relatedTarget;
+    const mode = button ? button.getAttribute('data-mode') : 'create';
+
+    if (mode === 'edit') {
+      currentId = button.getAttribute('data-id');
+      title.textContent = 'Edit {{ entity }}';
+      submitBtn.textContent = 'Update';
+      document.getElementById('crud_id').value = currentId;
+      fillForm(rowData[currentId] || {});
+    } else {
+      currentId = null;
+      title.textContent = '{{ add_label }}';
+      submitBtn.textContent = 'Save';
+    }
+  });
+
+  deleteModalEl.addEventListener('show.bs.modal', function (event) {
+    const button = event.relatedTarget;
+    if (button) {
+      currentId = button.getAttribute('data-id');
+    }
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearFormError();
+    submitBtn.disabled = true;
+
+    fetch(SAVE_URL, {
+      method: 'POST',
+      headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+      body: new FormData(form),
+    })
+      .then(async (resp) => {
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Something went wrong.');
+        return data;
+      })
+      .then(() => window.location.reload())
+      .catch((err) => showFormError(err.message))
+      .finally(() => { submitBtn.disabled = false; });
+  });
+
+  document.getElementById('confirmDeleteCrudBtn').addEventListener('click', function () {
+    if (!currentId) return;
+    const btn = this;
+    btn.disabled = true;
+
+    fetch(DELETE_URL_BASE + currentId + '/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+    })
+      .then(async (resp) => {
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Could not delete record.');
+        return data;
+      })
+      .then(() => window.location.reload())
+      .catch((err) => {
+        alertBox.textContent = err.message;
+        alertBox.classList.remove('d-none');
+      })
+      .finally(() => { btn.disabled = false; });
+  });
+})();
+</script>
+{% endblock %}
