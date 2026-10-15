@@ -2,37 +2,38 @@
 
 from datetime import timedelta
 
-from django.db.models import Count, Sum
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils import timezone
 
 from . import crud
 from .forms import (
     CheckInForm,
     ConcernForm,
+    EmergencyContactForm,
     MonitoringReportForm,
     OFWProfileForm,
-    SupportRecordForm,
     WelfareAssessmentForm,
 )
 from .models import (
     CheckIn,
     Concern,
+    EmergencyContact,
     MonitoringReport,
     OFWProfile,
     RiskLevel,
-    SupportRecord,
     WelfareAssessment,
     WelfareStatus,
 )
 
 _welfare_badge = {
     'active': 'bg-success-lt text-success',
-    'on_leave': 'bg-azure-lt text-azure',
     'needs_support': 'bg-warning-lt text-warning',
     'distressed': 'bg-danger-lt text-danger',
     'repatriated': 'bg-secondary-lt text-secondary',
     'missing': 'bg-dark-lt text-dark',
-    'deceased': 'bg-dark-lt text-dark',
 }
 
 _risk_badge = {
@@ -64,11 +65,17 @@ _condition_badge = {
     'unreachable': 'bg-secondary-lt text-secondary',
 }
 
-_support_status_badge = {
-    'pending': 'bg-warning-lt text-warning',
-    'approved': 'bg-azure-lt text-azure',
-    'released': 'bg-success-lt text-success',
-    'completed': 'bg-secondary-lt text-secondary',
+_contact_type_badge = {
+    'embassy': 'bg-azure-lt text-azure',
+    'polo': 'bg-indigo-lt text-indigo',
+    'owwa': 'bg-purple-lt text-purple',
+    'dmw': 'bg-cyan-lt text-cyan',
+    'police': 'bg-blue-lt text-blue',
+    'hospital': 'bg-red-lt text-red',
+    'agency': 'bg-teal-lt text-teal',
+    'employer': 'bg-orange-lt text-orange',
+    'family': 'bg-green-lt text-green',
+    'other': 'bg-secondary-lt text-secondary',
 }
 
 _report_status_badge = {
@@ -81,14 +88,14 @@ _profiles = crud.make_crud(
     model=OFWProfile,
     form_class=OFWProfileForm,
     columns=[
-        {'field': 'full_name', 'label': 'Name'},
+        {'field': 'full_name', 'label': 'Name', 'url_name': 'ofw:profile_detail'},
         {'field': 'passport_number', 'label': 'Passport'},
+        {'field': 'age', 'label': 'Age'},
         {'field': 'country', 'label': 'Country'},
         {'field': 'employer_name', 'label': 'Employer'},
         {'field': 'occupation', 'label': 'Occupation'},
         {'field': 'get_welfare_status_display', 'label': 'Welfare Status',
          'badge': _welfare_badge, 'raw_field': 'welfare_status'},
-        {'field': 'contract_end_date', 'label': 'Contract End', 'type': 'date'},
     ],
     search_fields=['first_name', 'last_name', 'passport_number', 'country',
                    'employer_name', 'occupation'],
@@ -97,6 +104,8 @@ _profiles = crud.make_crud(
     entity='OFW profile',
     add_label='Add OFW',
     search_placeholder='Search by name, passport, country, or employer...',
+    detail_url_name='ofw:profile_detail',
+    filters={'welfare_status': ('welfare_status__in', crud.csv_list)},
 )
 
 _assessments = crud.make_crud(
@@ -116,6 +125,10 @@ _assessments = crud.make_crud(
     entity='Welfare assessment',
     add_label='Add Assessment',
     search_placeholder='Search by OFW or assessor...',
+    filters={
+        'status': ('status__in', crud.csv_list),
+        'risk_level': ('risk_level__in', crud.csv_list),
+    },
 )
 
 _checkins = crud.make_crud(
@@ -123,18 +136,23 @@ _checkins = crud.make_crud(
     form_class=CheckInForm,
     columns=[
         {'field': 'ofw', 'label': 'OFW'},
-        {'field': 'checkin_date', 'label': 'Check-in', 'type': 'datetime'},
-        {'field': 'get_method_display', 'label': 'Method'},
-        {'field': 'get_condition_display', 'label': 'Condition', 'badge': _condition_badge,
+        {'field': 'checkin_date', 'label': 'Date & Time', 'type': 'datetime'},
+        {'field': 'get_method_display', 'label': 'How'},
+        {'field': 'get_condition_display', 'label': 'Status', 'badge': _condition_badge,
          'raw_field': 'condition'},
-        {'field': 'location', 'label': 'Location'},
-        {'field': 'contacted_person', 'label': 'Contacted'},
+        {'field': 'notes', 'label': 'Notes', 'truncate': 40},
     ],
-    search_fields=['ofw__first_name', 'ofw__last_name', 'location', 'contacted_person'],
+    search_fields=['ofw__first_name', 'ofw__last_name', 'notes'],
     title='Check-ins',
     entity='Check-in',
     add_label='Log Check-in',
-    search_placeholder='Search by OFW, location, or person...',
+    search_placeholder='Search by OFW or notes...',
+    detail_url_name='ofw:checkin_detail',
+    filters={
+        'condition': ('condition__in', crud.csv_list),
+        'date_from': ('checkin_date__date__gte', str),
+        'date_to': ('checkin_date__date__lte', str),
+    },
 )
 
 _concerns = crud.make_crud(
@@ -143,6 +161,7 @@ _concerns = crud.make_crud(
     columns=[
         {'field': 'ofw', 'label': 'OFW'},
         {'field': 'title', 'label': 'Concern'},
+        {'field': 'description', 'label': 'Description', 'truncate': 50},
         {'field': 'get_category_display', 'label': 'Category'},
         {'field': 'get_severity_display', 'label': 'Severity', 'badge': _severity_badge,
          'raw_field': 'severity'},
@@ -155,45 +174,82 @@ _concerns = crud.make_crud(
     entity='Concern',
     add_label='Report Concern',
     search_placeholder='Search by OFW, title, or description...',
+    detail_url_name='ofw:concern_detail',
+    filters={
+        'status': ('status__in', crud.csv_list),
+        'category': ('category__in', crud.csv_list),
+        'severity': ('severity__in', crud.csv_list),
+        'date_from': ('reported_date__gte', str),
+        'date_to': ('reported_date__lte', str),
+    },
 )
 
-_supports = crud.make_crud(
-    model=SupportRecord,
-    form_class=SupportRecordForm,
+def _contact_row_actions(obj):
+    """Call / Open-Website actions for an Emergency Contact row."""
+    actions = []
+    phone = (obj.phone or '').replace(' ', '')
+    if phone:
+        actions.append({
+            'title': f'Emergency hotline call: {obj.phone}',
+            'icon': 'fas fa-phone',
+            'icon_class': 'text-success',
+            'href': f'tel:{phone}',
+            'target': None,
+        })
+    url = obj.website_url()
+    if url:
+        actions.append({
+            'title': f'Open Website: {url}',
+            'icon': 'fas fa-globe',
+            'icon_class': 'text-primary',
+            'href': url,
+            'target': '_blank',
+        })
+    return actions
+
+
+_contacts = crud.make_crud(
+    model=EmergencyContact,
+    form_class=EmergencyContactForm,
     columns=[
-        {'field': 'ofw', 'label': 'OFW'},
-        {'field': 'title', 'label': 'Support'},
-        {'field': 'get_support_type_display', 'label': 'Type'},
-        {'field': 'provider', 'label': 'Provider'},
-        {'field': 'amount', 'label': 'Amount', 'type': 'money'},
-        {'field': 'date_provided', 'label': 'Date Provided', 'type': 'date'},
-        {'field': 'get_status_display', 'label': 'Status', 'badge': _support_status_badge,
-         'raw_field': 'status'},
+        {'field': 'name', 'label': 'Contact'},
+        {'field': 'get_contact_type_display', 'label': 'Type', 'badge': _contact_type_badge,
+         'raw_field': 'contact_type'},
+        {'field': 'country', 'label': 'Country'},
+        {'field': 'city', 'label': 'City'},
+        {'field': 'phone', 'label': 'Phone'},
+        {'field': 'email', 'label': 'Email'},
     ],
-    search_fields=['ofw__first_name', 'ofw__last_name', 'title', 'provider'],
-    title='Support Documentation',
-    entity='Support record',
-    add_label='Add Support',
-    search_placeholder='Search by OFW, support, or provider...',
+    search_fields=['name', 'country', 'city', 'phone', 'email'],
+    title='Emergency Contacts',
+    entity='Emergency contact',
+    add_label='Add Contact',
+    search_placeholder='Search by name, country, city, or phone...',
+    row_actions=_contact_row_actions,
+    filters={'contact_type': ('contact_type__in', crud.csv_list)},
 )
 
 _reports = crud.make_crud(
     model=MonitoringReport,
     form_class=MonitoringReportForm,
     columns=[
-        {'field': 'title', 'label': 'Report'},
+        {'field': 'title', 'label': 'Report Title'},
         {'field': 'get_report_type_display', 'label': 'Type'},
-        {'field': 'period_start', 'label': 'Period Start', 'type': 'date'},
-        {'field': 'period_end', 'label': 'Period End', 'type': 'date'},
+        {'field': 'period_start', 'label': 'From', 'type': 'date'},
+        {'field': 'period_end', 'label': 'To', 'type': 'date'},
         {'field': 'country', 'label': 'Country'},
         {'field': 'get_status_display', 'label': 'Status', 'badge': _report_status_badge,
          'raw_field': 'status'},
     ],
-    search_fields=['title', 'country', 'prepared_by'],
-    title='Monitoring Reports',
-    entity='Monitoring report',
+    search_fields=['title', 'country', 'summary'],
+    title='Reports',
+    entity='Report',
     add_label='Add Report',
-    search_placeholder='Search by title, country, or preparer...',
+    search_placeholder='Search by title or country...',
+    filters={
+        'status': ('status__in', crud.csv_list),
+        'report_type': ('report_type__in', crud.csv_list),
+    },
 )
 
 
@@ -215,6 +271,47 @@ def profile_save_ajax(request):
 
 def profile_delete_ajax(request, pk):
     return _profiles['delete_ajax'](request, pk)
+
+
+@login_required(login_url='login')
+def profile_detail(request, pk):
+    queryset = OFWProfile.objects.all() if request.user.is_superuser else OFWProfile.objects.filter(user=request.user)
+    profile = get_object_or_404(queryset, pk=pk)
+    context = {
+        'profile': profile,
+        'welfare_badge': _welfare_badge.get(profile.welfare_status, 'bg-secondary-lt text-secondary'),
+        'assessments': profile.assessments.all(),
+        'checkins': profile.checkins.all(),
+        'concerns': profile.concerns.all(),
+    }
+    return render(request, 'ofw/profile_detail.html', context)
+
+
+@login_required(login_url='login')
+def checkin_detail(request, pk):
+    checkin = get_object_or_404(crud._scoped(request.user, CheckIn), pk=pk)
+    context = {
+        'checkin': checkin,
+        'condition_badge': _condition_badge.get(
+            checkin.condition, 'bg-secondary-lt text-secondary'
+        ),
+    }
+    return render(request, 'ofw/checkin_detail.html', context)
+
+
+@login_required(login_url='login')
+def concern_detail(request, pk):
+    concern = get_object_or_404(crud._scoped(request.user, Concern), pk=pk)
+    context = {
+        'concern': concern,
+        'severity_badge': _severity_badge.get(
+            concern.severity, 'bg-secondary-lt text-secondary'
+        ),
+        'status_badge': _concern_status_badge.get(
+            concern.status, 'bg-secondary-lt text-secondary'
+        ),
+    }
+    return render(request, 'ofw/concern_detail.html', context)
 
 
 def assessment_list_page(request):
@@ -277,24 +374,24 @@ def concern_delete_ajax(request, pk):
     return _concerns['delete_ajax'](request, pk)
 
 
-def support_list_page(request):
-    return _supports['page'](request)
+def contact_list_page(request):
+    return _contacts['page'](request)
 
 
-def support_list_ajax(request):
-    return _supports['list_ajax'](request)
+def contact_list_ajax(request):
+    return _contacts['list_ajax'](request)
 
 
-def support_get_ajax(request, pk):
-    return _supports['get_ajax'](request, pk)
+def contact_get_ajax(request, pk):
+    return _contacts['get_ajax'](request, pk)
 
 
-def support_save_ajax(request):
-    return _supports['save_ajax'](request)
+def contact_save_ajax(request):
+    return _contacts['save_ajax'](request)
 
 
-def support_delete_ajax(request, pk):
-    return _supports['delete_ajax'](request, pk)
+def contact_delete_ajax(request, pk):
+    return _contacts['delete_ajax'](request, pk)
 
 
 def report_list_page(request):
@@ -322,7 +419,7 @@ def dashboard_stats(user):
     profiles = OFWProfile.objects.all() if user.is_superuser else OFWProfile.objects.filter(user=user)
     checkins = CheckIn.objects.all() if user.is_superuser else CheckIn.objects.filter(user=user)
     concerns = Concern.objects.all() if user.is_superuser else Concern.objects.filter(user=user)
-    supports = SupportRecord.objects.all() if user.is_superuser else SupportRecord.objects.filter(user=user)
+    contacts = EmergencyContact.objects.all() if user.is_superuser else EmergencyContact.objects.filter(user=user)
     reports = MonitoringReport.objects.all() if user.is_superuser else MonitoringReport.objects.filter(user=user)
 
     month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -334,9 +431,13 @@ def dashboard_stats(user):
     welfare_rows = profiles.values('welfare_status').annotate(total=Count('id'))
     welfare_labels = dict(WelfareStatus.choices)
     welfare_chart = [
-        {'label': welfare_labels.get(row['welfare_status'], row['welfare_status']), 'value': row['total']}
+        {
+            'key': row['welfare_status'],
+            'label': welfare_labels.get(row['welfare_status'], row['welfare_status']),
+            'value': row['total'],
+        }
         for row in welfare_rows
-    ] or [{'label': 'No data', 'value': 0}]
+    ] or [{'key': '', 'label': 'No data', 'value': 0}]
 
     category_labels = dict(Concern.Category.choices)
     category_rows = concerns.values('category').annotate(total=Count('id')).order_by('-total')[:6]
@@ -360,21 +461,35 @@ def dashboard_stats(user):
         for row in trend_rows
     ] or [{'label': 'No data', 'value': 0}]
 
-    total_support = supports.aggregate(total=Sum('amount'))['total']
-
     return {
         'kpi': {
             'ofw_total': profiles.count(),
             'ofw_at_risk': at_risk.count(),
             'checkins_month': checkins.filter(checkin_date__gte=month_start).count(),
             'open_concerns': open_concerns.count(),
-            'support_total': supports.count(),
-            'support_amount': total_support or 0,
+            'contacts_total': contacts.count(),
             'reports_total': reports.count(),
+        },
+        'links': {
+            'ofw_total': reverse('ofw:profile_list'),
+            'ofw_at_risk': (
+                reverse('ofw:profile_list')
+                + f'?welfare_status={WelfareStatus.DISTRESSED},{WelfareStatus.NEEDS_SUPPORT}'
+            ),
+            'checkins_month': (
+                reverse('ofw:checkin_list')
+                + f'?date_from={month_start.date()}&date_to={timezone.localdate()}'
+            ),
+            'open_concerns': (
+                reverse('ofw:concern_list')
+                + '?status=open,in_progress,escalated'
+            ),
+            'contacts_total': reverse('ofw:contact_list'),
+            'reports_total': reverse('ofw:report_list'),
+            'welfare_status': reverse('ofw:profile_list'),
         },
         'recent_checkins': checkins.select_related('ofw').order_by('-checkin_date')[:5],
         'recent_concerns': concerns.select_related('ofw').order_by('-reported_date')[:5],
-        'recent_supports': supports.select_related('ofw').order_by('-date_provided')[:5],
         'welfare_chart': welfare_chart,
         'concern_chart': concern_chart,
         'trend_chart': trend,

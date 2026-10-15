@@ -1,0 +1,61 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">Emergency Contacts</h2>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="alert alert-info">
+    <i class="fas fa-circle-info me-2"></i>
+    Keep these numbers handy. In an emergency, contact your embassy, POLO, OWWA or DMW office first.
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Directory</h3></div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Contact</th><th>Type</th><th>Location</th><th>Phone</th><th>Email</th><th class="w-1">Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for contact in contacts %}
+          <tr>
+            <td class="fw-medium">{{ contact.name }}</td>
+            <td>{{ contact.get_contact_type_display }}</td>
+            <td class="text-muted">
+              {{ contact.city }}{% if contact.city and contact.country %}, {% endif %}{{ contact.country }}
+            </td>
+            <td><a href="tel:{{ contact.phone|cut:' ' }}">{{ contact.phone }}</a></td>
+            <td class="text-muted">
+              {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                {% if contact.phone %}
+                <a href="tel:{{ contact.phone|cut:' ' }}" class="btn btn-ghost-secondary btn-icon btn-sm" title="Emergency hotline call">
+                  <i class="fas fa-phone text-success"></i>
+                </a>
+                {% endif %}
+                {% if contact.website_url %}
+                <a href="{{ contact.website_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Open Website">
+                  <i class="fas fa-globe text-primary"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-muted text-center">No emergency contacts available yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

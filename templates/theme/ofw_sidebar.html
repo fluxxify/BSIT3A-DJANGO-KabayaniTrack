@@ -1,0 +1,81 @@
+{% load static %}
+<aside class="navbar navbar-vertical navbar-expand-lg navbar-dark dh-sidebar">
+  <div class="container-fluid">
+    <div class="navbar-brand navbar-brand-autodark dh-brand">
+      <a href="{% url 'ofw:portal' %}" class="d-flex align-items-center gap-2 text-decoration-none">
+        <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack" class="dh-brand-logo">
+        <span class="lh-1">
+          <span class="dh-brand-name">KabayaniTrack</span>
+          <span class="dh-brand-sub">OFW Portal</span>
+        </span>
+      </a>
+    </div>
+
+    <button
+      class="navbar-toggler"
+      type="button"
+      data-bs-toggle="collapse"
+      data-bs-target="#sidebar-menu"
+      aria-controls="sidebar-menu"
+      aria-expanded="false"
+      aria-label="Toggle navigation"
+      >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="sidebar-menu">
+      <ul class="navbar-nav pt-lg-2 py-lg-2">
+
+        <li class="nav-item">
+          <span class="dh-nav-section">My Portal</span>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal' %}active{% endif %}" href="{% url 'ofw:portal' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="fa fa-home"></i></span>
+            <span class="nav-link-title">Home</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_profile' %}active{% endif %}" href="{% url 'ofw:portal_profile' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-id-card"></i></span>
+            <span class="nav-link-title">My Profile</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_checkins' %}active{% endif %}" href="{% url 'ofw:portal_checkins' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-clipboard-check"></i></span>
+            <span class="nav-link-title">My Check-ins</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_concerns' %}active{% endif %}" href="{% url 'ofw:portal_concerns' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-circle-exclamation"></i></span>
+            <span class="nav-link-title">My Concerns</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_contacts' %}active{% endif %}" href="{% url 'ofw:portal_contacts' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-address-book"></i></span>
+            <span class="nav-link-title">Emergency Contacts</span>
+          </a>
+        </li>
+
+        <li class="nav-item mt-auto dh-nav-sidebar-footer">
+          <div class="dh-user-card">
+            <span class="d-flex align-items-center gap-2 text-white min-w-0 w-100">
+              <span class="dh-avatar">{{ user.username|first|upper }}</span>
+              <span class="min-w-0 flex-grow-1">
+                <span class="dh-user-name">{{ user.get_full_name|default:user.username }}</span>
+                <span class="dh-user-role">OFW</span>
+              </span>
+            </span>
+            <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout">
+              <i class="fas fa-sign-out-alt"></i>
+            </a>
+          </div>
+        </li>
+
+      </ul>
+    </div>
+  </div>
+</aside>

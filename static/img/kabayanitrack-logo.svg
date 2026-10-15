@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="KabayaniTrack logo">
+  <defs>
+    <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDBA4B"/>
+      <stop offset="100%" stop-color="#F59F00"/>
+    </linearGradient>
+    <linearGradient id="m2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+    <linearGradient id="m3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#EA580C"/>
+      <stop offset="100%" stop-color="#C2410C"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#fff7ed"/>
+    </linearGradient>
+  </defs>
+
+  <!-- folded map -->
+  <path d="M7 17 L23 11 V47 L7 53 Z" fill="url(#m1)"/>
+  <path d="M23 11 L41 17 V53 L23 47 Z" fill="url(#m2)"/>
+  <path d="M41 17 L57 11 V47 L41 53 Z" fill="url(#m3)"/>
+
+  <!-- fold creases -->
+  <path d="M23 11 V47" stroke="#C2410C" stroke-opacity="0.22" stroke-width="0.8"/>
+  <path d="M41 17 V53" stroke="#C2410C" stroke-opacity="0.22" stroke-width="0.8"/>
+
+  <!-- road -->
+  <path d="M7 34 L23 28 L41 34 L57 28" fill="none" stroke="#ffffff" stroke-opacity="0.4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- location pin -->
+  <path d="M32 15c-4.7 0-8.5 3.8-8.5 8.5 0 6.3 8.5 14.6 8.5 14.6s8.5-8.3 8.5-14.6C40.5 18.8 36.7 15 32 15z" fill="url(#pin)"/>
+  <circle cx="32" cy="23.5" r="3.3" fill="#EA580C"/>
+</svg>

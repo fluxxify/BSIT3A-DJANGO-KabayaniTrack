@@ -1,12 +1,11 @@
+{% load static %}
 <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark dh-sidebar">
   <div class="container-fluid">
     <div class="navbar-brand navbar-brand-autodark dh-brand">
       <a href="." class="d-flex align-items-center gap-2 text-decoration-none">
-        <span class="dh-brand-mark">
-          <i class="fa-solid fa-shield-halved"></i>
-        </span>
+        <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack" class="dh-brand-logo">
         <span class="lh-1">
-          <span class="dh-brand-name">Project<span class="text-warning">V3</span></span>
+          <span class="dh-brand-name">KabayaniTrack</span>
           <span class="dh-brand-sub">Management System</span>
         </span>
       </a>
@@ -38,6 +37,60 @@
               <i class="fa fa-dashboard"></i>
             </span>
             <span class="nav-link-title">Dashboard</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <span class="dh-nav-section">
+            OFW Monitoring
+          </span>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'profile_list' %}active{% endif %}" href="{% url 'ofw:profile_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-passport"></i>
+            </span>
+            <span class="nav-link-title">OFW Profiles</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'assessment_list' %}active{% endif %}" href="{% url 'ofw:assessment_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-heart-pulse"></i>
+            </span>
+            <span class="nav-link-title">Welfare Status</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'checkin_list' %}active{% endif %}" href="{% url 'ofw:checkin_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-clipboard-check"></i>
+            </span>
+            <span class="nav-link-title">Check-ins</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'concern_list' %}active{% endif %}" href="{% url 'ofw:concern_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-circle-exclamation"></i>
+            </span>
+            <span class="nav-link-title">Reported Concerns</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'contact_list' %}active{% endif %}" href="{% url 'ofw:contact_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-address-book"></i>
+            </span>
+            <span class="nav-link-title">Emergency Contacts</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'report_list' %}active{% endif %}" href="{% url 'ofw:report_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-file-lines"></i>
+            </span>
+            <span class="nav-link-title">Reports</span>
           </a>
         </li>
 
@@ -77,7 +130,7 @@
               <span class="min-w-0 flex-grow-1">
                 <span class="dh-user-name">{{ user.username }}</span>
                 <span class="dh-user-role">
-                  {% if user.is_superuser %}Administrator{% elif user.is_authenticated %}Instructor{% endif %}
+                  {% if user.is_superuser %}Administrator{% elif user.is_authenticated %}Staff{% endif %}
                 </span>
               </span>
             </a>

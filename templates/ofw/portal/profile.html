@@ -1,0 +1,71 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">My Profile</h2>
+      </div>
+      {% if profile %}
+      <div class="col-auto ms-auto d-print-none">
+        <span class="badge {{ welfare_badge }} fs-5 px-3 py-2">{{ profile.get_welfare_status_display }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  <div class="row row-deck row-cards">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Personal &amp; Deployment Details</h3>
+        </div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="row g-3">
+              {% for field in form %}
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">
+                  {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ field }}
+                {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
+                {% for error in field.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+            <div class="mt-4 d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Save Profile
+              </button>
+              <a href="{% url 'ofw:portal' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Why keep this updated?</h3></div>
+        <div class="card-body text-muted">
+          <p class="mb-2">Your details are shared with the management team so they can reach you and monitor your welfare.</p>
+          <ul class="mb-0 ps-3">
+            <li>Keep your contact number and address current.</li>
+            <li>Record your employer, occupation and contract dates.</li>
+            <li>Your welfare status is managed and verified by the team.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

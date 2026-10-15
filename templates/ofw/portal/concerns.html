@@ -1,0 +1,68 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">My Concerns</h2>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="row row-deck row-cards">
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Report a Concern</h3></div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">
+                {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
+              </label>
+              {{ field }}
+              {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
+              {% for error in field.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-warning w-100">
+              <i class="fas fa-circle-exclamation me-2"></i>Submit Concern
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">My Reported Concerns</h3></div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead><tr><th>Concern</th><th>Severity</th><th>Status</th><th>Reported</th></tr></thead>
+            <tbody>
+              {% for row in concern_rows %}
+              <tr>
+                <td>{{ row.obj.title }}</td>
+                <td><span class="badge {{ row.severity_badge }}">{{ row.obj.get_severity_display }}</span></td>
+                <td><span class="badge {{ row.status_badge }}">{{ row.obj.get_status_display }}</span></td>
+                <td class="text-muted">{{ row.obj.reported_date|date:"M d, Y" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-muted text-center">No concerns reported yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

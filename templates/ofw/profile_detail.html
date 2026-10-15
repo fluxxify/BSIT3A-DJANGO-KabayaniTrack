@@ -1,0 +1,152 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Profiles</div>
+        <h2 class="page-title mb-0">
+          {{ profile.full_name }}
+          <span class="badge {{ welfare_badge }} ms-2">{{ profile.get_welfare_status_display }}</span>
+        </h2>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <a href="{% url 'ofw:profile_list' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i> Back to list
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="row row-deck row-cards">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Personal Information</h3></div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted">Full Name</dt>
+            <dd class="col-7">{{ profile.full_name }}</dd>
+            <dt class="col-5 text-muted">Sex</dt>
+            <dd class="col-7">{{ profile.get_sex_display|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Birth Date</dt>
+            <dd class="col-7">{{ profile.birth_date|date:"M d, Y"|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Age</dt>
+            <dd class="col-7">{{ profile.age|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Passport No.</dt>
+            <dd class="col-7">{{ profile.passport_number|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Contact Number</dt>
+            <dd class="col-7">{{ profile.contact_number|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Email</dt>
+            <dd class="col-7">{{ profile.email|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Permanent Address</dt>
+            <dd class="col-7">{{ profile.permanent_address|default:"—" }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Deployment Information</h3></div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted">Country</dt>
+            <dd class="col-7">{{ profile.country|default:"—" }}</dd>
+            <dt class="col-5 text-muted">City Abroad</dt>
+            <dd class="col-7">{{ profile.city_abroad|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Employer</dt>
+            <dd class="col-7">{{ profile.employer_name|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Occupation</dt>
+            <dd class="col-7">{{ profile.occupation|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Agency</dt>
+            <dd class="col-7">{{ profile.agency|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Deployment Date</dt>
+            <dd class="col-7">{{ profile.deployment_date|date:"M d, Y"|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Contract End</dt>
+            <dd class="col-7">{{ profile.contract_end_date|date:"M d, Y"|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Welfare Status</dt>
+            <dd class="col-7"><span class="badge {{ welfare_badge }}">{{ profile.get_welfare_status_display }}</span></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">Remarks</h3></div>
+    <div class="card-body text-muted">{{ profile.remarks|default:"—"|linebreaksbr }}</div>
+  </div>
+
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Welfare Assessments</h3></div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table table-sm">
+            <thead><tr><th>Date</th><th>Status</th><th>Risk</th><th>Assessor</th></tr></thead>
+            <tbody>
+              {% for a in assessments %}
+              <tr>
+                <td>{{ a.assessment_date|date:"M d, Y" }}</td>
+                <td>{{ a.get_status_display }}</td>
+                <td>{{ a.get_risk_level_display }}</td>
+                <td class="text-muted">{{ a.assessor|default:"—" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-muted text-center">No assessments.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Check-ins</h3></div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table table-sm">
+            <thead><tr><th>Date</th><th>How</th><th>Status</th><th>Notes</th></tr></thead>
+            <tbody>
+              {% for c in checkins %}
+              <tr>
+                <td>{{ c.checkin_date|date:"M d, Y H:i" }}</td>
+                <td>{{ c.get_method_display }}</td>
+                <td>{{ c.get_condition_display }}</td>
+                <td class="text-muted">{{ c.notes|default:"—" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="text-muted text-center">No check-ins.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header"><h3 class="card-title">Reported Concerns</h3></div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead><tr><th>Concern</th><th>Category</th><th>Severity</th><th>Status</th><th>Reported</th></tr></thead>
+        <tbody>
+          {% for concern in concerns %}
+          <tr>
+            <td>{{ concern.title }}</td>
+            <td>{{ concern.get_category_display }}</td>
+            <td>{{ concern.get_severity_display }}</td>
+            <td>{{ concern.get_status_display }}</td>
+            <td class="text-muted">{{ concern.reported_date|date:"M d, Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted text-center">No concerns reported.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

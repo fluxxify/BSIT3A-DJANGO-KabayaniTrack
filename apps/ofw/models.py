@@ -5,25 +5,21 @@ The system tracks five key areas:
   * periodic welfare assessments
   * periodic check-ins
   * reported concerns
-  * support documentation (assistance rendered)
+  * emergency contacts directory
   * monitoring reports
 """
 
-from decimal import Decimal
-
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
 class WelfareStatus(models.TextChoices):
-    ACTIVE = 'active', 'Active / Deployed'
-    ON_LEAVE = 'on_leave', 'On Leave'
-    NEEDS_SUPPORT = 'needs_support', 'Needs Support'
-    DISTRESSED = 'distressed', 'Distressed'
-    REPATRIATED = 'repatriated', 'Repatriated'
-    MISSING = 'missing', 'Missing'
-    DECEASED = 'deceased', 'Deceased'
+    ACTIVE = 'active', 'Okay / Working'
+    NEEDS_SUPPORT = 'needs_support', 'Needs Help'
+    DISTRESSED = 'distressed', 'At Risk / In Danger'
+    REPATRIATED = 'repatriated', 'Back in the Philippines'
+    MISSING = 'missing', 'Cannot Be Reached'
 
 
 class RiskLevel(models.TextChoices):
@@ -51,6 +47,11 @@ class OFWProfile(models.Model):
     last_name = models.CharField(max_length=120)
     passport_number = models.CharField(max_length=40, blank=True)
     birth_date = models.DateField(null=True, blank=True)
+    age = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(150)],
+    )
     sex = models.CharField(max_length=1, choices=Sex.choices, blank=True)
     contact_number = models.CharField(max_length=40, blank=True)
     email = models.EmailField(max_length=255, blank=True)
@@ -156,8 +157,6 @@ class CheckIn(models.Model):
         choices=Condition.choices,
         default=Condition.SAFE,
     )
-    location = models.CharField(max_length=200, blank=True)
-    contacted_person = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -227,76 +226,65 @@ class Concern(models.Model):
         return self.title
 
 
-class SupportRecord(models.Model):
-    """Documentation of support or assistance rendered to an OFW."""
+class EmergencyContact(models.Model):
+    """A directory entry for embassies, hotlines, or personal contacts."""
 
-    class SupportType(models.TextChoices):
-        FINANCIAL = 'financial', 'Financial Assistance'
-        LEGAL = 'legal', 'Legal Assistance'
-        MEDICAL = 'medical', 'Medical Assistance'
-        COUNSELING = 'counseling', 'Counseling'
-        REPATRIATION = 'repatriation', 'Repatriation'
-        TRAINING = 'training', 'Skills Training'
-        LIVELIHOOD = 'livelihood', 'Livelihood'
-        REFERRAL = 'referral', 'Referral'
+    class ContactType(models.TextChoices):
+        EMBASSY = 'embassy', 'Embassy / Consulate'
+        POLO = 'polo', 'POLO / Labor Office'
+        OWWA = 'owwa', 'OWWA'
+        DMW = 'dmw', 'DMW Hotline'
+        POLICE = 'police', 'Police'
+        HOSPITAL = 'hospital', 'Hospital / Medical'
+        AGENCY = 'agency', 'Recruitment Agency'
+        EMPLOYER = 'employer', 'Employer'
+        FAMILY = 'family', 'Family / Next of Kin'
         OTHER = 'other', 'Other'
 
-    class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        APPROVED = 'approved', 'Approved'
-        RELEASED = 'released', 'Released'
-        COMPLETED = 'completed', 'Completed'
-
-    ofw = models.ForeignKey(
-        OFWProfile,
-        related_name='supports',
-        on_delete=models.CASCADE,
-    )
-    concern = models.ForeignKey(
-        Concern,
-        related_name='supports',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name='support_records',
+        related_name='emergency_contacts',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
-    support_type = models.CharField(
+    name = models.CharField(max_length=200, help_text='Person or office to contact')
+    contact_type = models.CharField(
         max_length=20,
-        choices=SupportType.choices,
-        default=SupportType.OTHER,
+        choices=ContactType.choices,
+        default=ContactType.OTHER,
     )
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    provider = models.CharField(max_length=200, blank=True)
-    amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(Decimal('0'))],
+    country = models.CharField(max_length=120, blank=True)
+    city = models.CharField(max_length=120, blank=True)
+    phone = models.CharField(max_length=60)
+    email = models.EmailField(max_length=255, blank=True)
+    website = models.URLField(
+        max_length=255, blank=True,
+        help_text='Official website (leave blank to use the default for this type)',
     )
-    date_provided = models.DateField()
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.PENDING,
-    )
-    document = models.FileField(upload_to='support_docs/', null=True, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Fallback websites for contact types that usually have an official portal.
+    DEFAULT_WEBSITES = {
+        'embassy': 'https://dfa.gov.ph',
+        'polo': 'https://www.dmw.gov.ph',
+        'owwa': 'https://owwa.gov.ph',
+        'dmw': 'https://dmw.gov.ph',
+    }
+
     class Meta:
-        db_table = 'tblsupportrecord'
-        ordering = ['-date_provided', '-id']
+        db_table = 'tblemergencycontact'
+        ordering = ['contact_type', 'name']
 
     def __str__(self):
-        return self.title
+        return f'{self.name} ({self.get_contact_type_display()})'
+
+    def website_url(self):
+        """Return the resolved website, falling back to a type default."""
+        return self.website or self.DEFAULT_WEBSITES.get(self.contact_type, '')
 
 
 class MonitoringReport(models.Model):
@@ -330,13 +318,7 @@ class MonitoringReport(models.Model):
     period_start = models.DateField()
     period_end = models.DateField()
     country = models.CharField(max_length=120, blank=True)
-    total_ofws = models.PositiveIntegerField(default=0, blank=True)
-    total_concerns = models.PositiveIntegerField(default=0, blank=True)
-    total_support_cases = models.PositiveIntegerField(default=0, blank=True)
     summary = models.TextField(blank=True)
-    findings = models.TextField(blank=True)
-    recommendations = models.TextField(blank=True)
-    prepared_by = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     attachment = models.FileField(upload_to='reports/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -4,6 +4,9 @@
   --tblr-primary-active: color-mix(in srgb, var(--tblr-primary) 78%, #141733);
   --tblr-primary-lt: color-mix(in srgb, var(--tblr-primary) 12%, #ffffff);
   --tblr-accent: #f8b84e;
+  --kt-brand: #f97316;
+  --kt-brand-dark: #ea580c;
+  --kt-brand-light: #fb923c;
   --tblr-body-bg: #f3f4fb;
   --tblr-body-bg-rgb: 243, 244, 251;
   --tblr-body-color: #232741;
@@ -258,13 +261,25 @@ html {
   box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tblr-primary) 80%, transparent);
 }
 
+.dh-brand-logo {
+  width: 2.35rem;
+  height: 2.35rem;
+  flex-shrink: 0;
+  display: block;
+  filter: drop-shadow(0 6px 16px color-mix(in srgb, var(--kt-brand) 55%, transparent));
+}
+
 .dh-brand-name {
   display: block;
   font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: -0.02em;
-  color: #ffffff;
+  color: var(--kt-brand);
   line-height: 1.15;
+}
+
+.dh-brand-name.text-white {
+  color: var(--kt-brand);
 }
 
 .dh-brand-sub {

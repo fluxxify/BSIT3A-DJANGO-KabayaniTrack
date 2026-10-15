@@ -14,6 +14,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils.html import escape
 from django.views.decorators.http import require_POST
 
@@ -39,6 +40,29 @@ def _filter(qs, search_fields, query):
     return qs.filter(condition)
 
 
+def csv_list(value):
+    """Turn a comma-separated query value into a clean list (for ``__in`` filters)."""
+    return [item for item in value.split(',') if item]
+
+
+def _apply_filters(qs, filters, params):
+    """Apply configured query-string filters to a queryset.
+
+    ``filters`` maps a query parameter name to a ``(lookup, transform)`` tuple,
+    e.g. ``{'status': ('status__in', csv_list)}``.  Empty values are ignored.
+    """
+    for key, (lookup, transform) in (filters or {}).items():
+        raw = params.get(key)
+        if raw in (None, ''):
+            continue
+        try:
+            value = transform(raw)
+        except (TypeError, ValueError):
+            continue
+        qs = qs.filter(**{lookup: value})
+    return qs
+
+
 def _format_cell(value, column):
     if value is None or value == '':
         return '<span class="text-muted">—</span>'
@@ -52,7 +76,12 @@ def _format_cell(value, column):
             return escape(f'₱{Decimal(value):,.2f}')
         except (InvalidOperation, TypeError):
             return escape(str(value))
-    return escape(str(value))
+
+    text = str(value)
+    limit = column.get('truncate')
+    if limit and len(text) > limit:
+        return f'<span title="{escape(text)}">{escape(text[:limit].rstrip())}…</span>'
+    return escape(text)
 
 
 def _badge(value, column):
@@ -62,7 +91,7 @@ def _badge(value, column):
     return mapping.get(str(value))
 
 
-def _build_rows(objects, columns):
+def _build_rows(objects, columns, row_actions=None):
     rows = []
     for obj in objects:
         cells = []
@@ -79,8 +108,11 @@ def _build_rows(objects, columns):
             cells.append({
                 'html': _format_cell(value, column),
                 'badge': _badge(badge_value, column),
+                'url': reverse(column['url_name'], args=[obj.pk]) if column.get('url_name') else None,
             })
-        rows.append({'id': obj.pk, 'cells': cells})
+
+        actions = row_actions(obj) if row_actions else []
+        rows.append({'id': obj.pk, 'cells': cells, 'actions': actions})
     return rows
 
 
@@ -135,11 +167,17 @@ def describe_fields(form):
 
 def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
               title, pretitle='Overview', entity='Record', add_label='Add Record',
-              search_placeholder='Search...'):
+              search_placeholder='Search...', detail_url_name=None, filters=None,
+              row_actions=None):
     """Build the page + AJAX views for a single model.
 
     Returns a dict of view callables keyed by ``page``, ``list_ajax``,
     ``get_ajax``, ``save_ajax`` and ``delete_ajax``.
+
+    ``row_actions`` is an optional callable ``fn(obj) -> list[dict]`` that adds
+    extra action buttons to every row (e.g. a ``tel:`` call link or an external
+    website link).  Each action supports ``title``, ``icon``, ``icon_class``,
+    ``href`` and ``target``.
     """
     if order_by is None:
         order_by = model._meta.ordering or ['-pk']
@@ -148,6 +186,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
     def _base_queryset(request, query=''):
         qs = _scoped(request.user, model)
+        qs = _apply_filters(qs, filters, request.GET)
         qs = _filter(qs, search_fields, query)
         return qs.order_by(*order_by)
 
@@ -165,6 +204,14 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         paginator = Paginator(queryset, PER_PAGE)
         page_obj = paginator.get_page(request.GET.get('page', 1))
 
+        params = request.GET.copy()
+        params.pop('page', None)
+        filter_items = [
+            (key, request.GET.get(key))
+            for key in (filters or {})
+            if request.GET.get(key)
+        ]
+
         context = {
             'page_title': title,
             'page_pretitle': pretitle,
@@ -172,13 +219,16 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'entity': entity,
             'columns': columns,
             'form_fields': describe_fields(form_class(user=request.user)),
-            'rows': _build_rows(page_obj.object_list, columns),
+            'rows': _build_rows(page_obj.object_list, columns, row_actions),
             'rows_json': _row_data(page_obj.object_list),
             'page_obj': page_obj,
             'query': query,
+            'querystring': params.urlencode(),
+            'filter_items': filter_items,
             'search_placeholder': search_placeholder,
             'colspan': len(columns) + 2,
             'search_fields': search_fields,
+            'detail_url_name': detail_url_name,
         }
         return render(request, 'ofw/crud.html', context)
 
@@ -190,7 +240,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         paginator = Paginator(queryset, PER_PAGE)
         page_obj = paginator.get_page(request.GET.get('page', 1))
         return JsonResponse({
-            'data': _build_rows(page_obj.object_list, columns),
+            'data': _build_rows(page_obj.object_list, columns, row_actions),
             'has_next': page_obj.has_next(),
             'has_prev': page_obj.has_previous(),
             'page': page_obj.number,

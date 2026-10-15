@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>
-      ProjectV3
+      KabayaniTrack Management System
     </title>
     <link rel="icon" href="./favicon-dev.ico" type="image/x-icon"/>
     <link rel="shortcut icon" href="./favicon-dev.ico" type="image/x-icon"/>
@@ -28,7 +28,11 @@
     <div class="page">
 
         {% if request.user.is_authenticated %}
-            {% include 'theme/sidebar.html' %}
+            {% if request.user.is_superuser or request.user.is_staff %}
+                {% include 'theme/sidebar.html' %}
+            {% else %}
+                {% include 'theme/ofw_sidebar.html' %}
+            {% endif %}
         {% else %}
             {% include 'theme/public_sidebar.html' %}
         {% endif %}
@@ -36,6 +40,9 @@
         <div class="page-wrapper">
             <div class="page-body">
                 <div class="container-xl">
+                    {% if messages and not request.user.is_staff and not request.user.is_superuser %}
+                        {% include 'theme/messages.html' %}
+                    {% endif %}
                     {% block content %}
                     {% endblock %}
                 </div>

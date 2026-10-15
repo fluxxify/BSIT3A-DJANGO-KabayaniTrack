@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
   <title>
-    Sign in - Azuelo Technology
+    Sign in - KabayaniTrack
   </title>
   <link href="{% static 'libs/jsvectormap/dist/jsvectormap.css' %}" rel="stylesheet" />
   <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
@@ -16,6 +16,7 @@
   <link href="{% static 'css/tabler-vendors.css' %}" rel="stylesheet" />
   <link href="{% static 'css/tabler-marketing.css' %}" rel="stylesheet" />
   <link href="{% static 'css/tabler-themes.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/app-theme.css' %}" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 
@@ -27,9 +28,13 @@
      <div class="card card-md">
       <div class="card-body">
 
-        <center class="mt-n4">
-        <i class='far fa-calendar' style='font-size:40px'></i>
-        </center>
+        <div class="text-center mt-n4 mb-4">
+          <div class="d-flex justify-content-center mb-2">
+            <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack logo" class="dh-brand-logo" style="width:2.5rem; height:2.5rem;">
+          </div>
+          <div class="dh-brand-name lh-1" style="font-size: 2rem;">KabayaniTrack</div>
+          <div class="text-muted fw-semibold text-uppercase mt-1" style="font-size:.68rem; letter-spacing:.08em;">OFW Monitoring System</div>
+        </div>
         <h2 class="h3 text-center mb-4">Sign in to start your session</h2>
 
         <form method="post">
@@ -67,6 +72,10 @@
   Don't have an account?
   <a href="{% url 'register' %}" class="text-primary fw-bold">Register</a>
  </div> -->
+ <div class="text-center text-secondary mt-3">
+  OFW? Don't have an account yet?
+  <a href="{% url 'register' %}" class="text-primary fw-bold">Register here</a>
+ </div>
 </div>
 
 {% include 'theme/settings.html' %}

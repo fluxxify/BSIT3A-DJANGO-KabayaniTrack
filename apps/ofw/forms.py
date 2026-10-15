@@ -6,9 +6,9 @@ from django.core.exceptions import ValidationError
 from .models import (
     CheckIn,
     Concern,
+    EmergencyContact,
     MonitoringReport,
     OFWProfile,
-    SupportRecord,
     WelfareAssessment,
 )
 
@@ -21,10 +21,16 @@ class StyledModelForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         if user is not None and 'ofw' in self.fields:
-            self.fields['ofw'].queryset = OFWProfile.objects.filter(user=user)
+            if user.is_superuser:
+                self.fields['ofw'].queryset = OFWProfile.objects.all()
+            else:
+                self.fields['ofw'].queryset = OFWProfile.objects.filter(user=user)
 
         if user is not None and 'concern' in self.fields:
-            self.fields['concern'].queryset = Concern.objects.filter(user=user)
+            if user.is_superuser:
+                self.fields['concern'].queryset = Concern.objects.all()
+            else:
+                self.fields['concern'].queryset = Concern.objects.filter(user=user)
 
         for field in self.fields.values():
             widget = field.widget
@@ -47,7 +53,7 @@ class OFWProfileForm(StyledModelForm):
     class Meta:
         model = OFWProfile
         fields = [
-            'first_name', 'last_name', 'passport_number', 'birth_date', 'sex',
+            'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
             'city_abroad', 'employer_name', 'occupation', 'agency',
             'deployment_date', 'contract_end_date', 'welfare_status', 'remarks',
@@ -62,7 +68,8 @@ class WelfareAssessmentForm(StyledModelForm):
     def clean(self):
         cleaned = super().clean()
         ofw = cleaned.get('ofw')
-        if ofw is not None and self.user is not None and ofw.user_id != self.user.id:
+        if (ofw is not None and self.user is not None
+                and not self.user.is_superuser and ofw.user_id != self.user.id):
             raise ValidationError('You can only assess OFWs that belong to you.')
         return cleaned
 
@@ -70,12 +77,13 @@ class WelfareAssessmentForm(StyledModelForm):
 class CheckInForm(StyledModelForm):
     class Meta:
         model = CheckIn
-        fields = ['ofw', 'checkin_date', 'method', 'condition', 'location', 'contacted_person', 'notes']
+        fields = ['ofw', 'checkin_date', 'method', 'condition', 'notes']
 
     def clean(self):
         cleaned = super().clean()
         ofw = cleaned.get('ofw')
-        if ofw is not None and self.user is not None and ofw.user_id != self.user.id:
+        if (ofw is not None and self.user is not None
+                and not self.user.is_superuser and ofw.user_id != self.user.id):
             raise ValidationError('You can only log check-ins for OFWs that belong to you.')
         return cleaned
 
@@ -91,28 +99,27 @@ class ConcernForm(StyledModelForm):
     def clean(self):
         cleaned = super().clean()
         ofw = cleaned.get('ofw')
-        if ofw is not None and self.user is not None and ofw.user_id != self.user.id:
+        if (ofw is not None and self.user is not None
+                and not self.user.is_superuser and ofw.user_id != self.user.id):
             raise ValidationError('You can only report concerns for OFWs that belong to you.')
         return cleaned
 
 
-class SupportRecordForm(StyledModelForm):
-    class Meta:
-        model = SupportRecord
-        fields = [
-            'ofw', 'concern', 'support_type', 'title', 'description', 'provider',
-            'amount', 'date_provided', 'status', 'document',
-        ]
+class EmergencyContactForm(StyledModelForm):
+    # Declared explicitly so forms.URLField gets assume_scheme (models.URLField
+    # can't pass it, and Django 5.x warns when the scheme is left implicit).
+    website = forms.URLField(
+        required=False,
+        assume_scheme='https',
+        help_text='Official website (leave blank to use the default for this type)',
+    )
 
-    def clean(self):
-        cleaned = super().clean()
-        ofw = cleaned.get('ofw')
-        concern = cleaned.get('concern')
-        if ofw is not None and self.user is not None and ofw.user_id != self.user.id:
-            raise ValidationError('You can only document support for OFWs that belong to you.')
-        if concern is not None and ofw is not None and concern.ofw_id != ofw.id:
-            raise ValidationError('The selected concern does not belong to the selected OFW.')
-        return cleaned
+    class Meta:
+        model = EmergencyContact
+        fields = [
+            'name', 'contact_type', 'country', 'city', 'phone', 'email',
+            'website', 'address', 'notes',
+        ]
 
 
 class MonitoringReportForm(StyledModelForm):
@@ -120,8 +127,7 @@ class MonitoringReportForm(StyledModelForm):
         model = MonitoringReport
         fields = [
             'title', 'report_type', 'period_start', 'period_end', 'country',
-            'total_ofws', 'total_concerns', 'total_support_cases', 'summary',
-            'findings', 'recommendations', 'prepared_by', 'status', 'attachment',
+            'summary', 'status', 'attachment',
         ]
 
     def clean(self):
@@ -131,3 +137,36 @@ class MonitoringReportForm(StyledModelForm):
         if start and end and end < start:
             raise ValidationError('Period end must not be earlier than period start.')
         return cleaned
+
+
+class OFWPortalProfileForm(StyledModelForm):
+    """Fields an OFW may maintain on their own profile.
+
+    Welfare status and case remarks stay under management control, so they are
+    intentionally excluded here.
+    """
+
+    class Meta:
+        model = OFWProfile
+        fields = [
+            'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
+            'contact_number', 'email', 'permanent_address', 'country',
+            'city_abroad', 'employer_name', 'occupation', 'agency',
+            'deployment_date', 'contract_end_date',
+        ]
+
+
+class OFWSelfCheckInForm(StyledModelForm):
+    """Self-service check-in: the OFW reports their own condition."""
+
+    class Meta:
+        model = CheckIn
+        fields = ['method', 'condition', 'notes']
+
+
+class OFWSelfConcernForm(StyledModelForm):
+    """Self-service concern report submitted by an OFW."""
+
+    class Meta:
+        model = Concern
+        fields = ['title', 'category', 'severity', 'description']

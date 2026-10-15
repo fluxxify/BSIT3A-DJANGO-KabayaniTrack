@@ -3,9 +3,9 @@ from django.contrib import admin
 from .models import (
     CheckIn,
     Concern,
+    EmergencyContact,
     MonitoringReport,
     OFWProfile,
-    SupportRecord,
     WelfareAssessment,
 )
 
@@ -26,9 +26,9 @@ class WelfareAssessmentAdmin(admin.ModelAdmin):
 
 @admin.register(CheckIn)
 class CheckInAdmin(admin.ModelAdmin):
-    list_display = ('ofw', 'checkin_date', 'method', 'condition', 'location')
+    list_display = ('ofw', 'checkin_date', 'method', 'condition')
     list_filter = ('method', 'condition')
-    search_fields = ('ofw__first_name', 'ofw__last_name', 'location', 'contacted_person')
+    search_fields = ('ofw__first_name', 'ofw__last_name', 'notes')
 
 
 @admin.register(Concern)
@@ -38,15 +38,15 @@ class ConcernAdmin(admin.ModelAdmin):
     search_fields = ('title', 'description', 'ofw__first_name', 'ofw__last_name')
 
 
-@admin.register(SupportRecord)
-class SupportRecordAdmin(admin.ModelAdmin):
-    list_display = ('title', 'ofw', 'support_type', 'provider', 'amount', 'status', 'date_provided')
-    list_filter = ('support_type', 'status')
-    search_fields = ('title', 'provider', 'ofw__first_name', 'ofw__last_name')
+@admin.register(EmergencyContact)
+class EmergencyContactAdmin(admin.ModelAdmin):
+    list_display = ('name', 'contact_type', 'country', 'city', 'phone', 'email', 'website')
+    list_filter = ('contact_type', 'country')
+    search_fields = ('name', 'country', 'city', 'phone', 'email', 'website')
 
 
 @admin.register(MonitoringReport)
 class MonitoringReportAdmin(admin.ModelAdmin):
     list_display = ('title', 'report_type', 'period_start', 'period_end', 'country', 'status')
     list_filter = ('report_type', 'status')
-    search_fields = ('title', 'country', 'prepared_by')
+    search_fields = ('title', 'country', 'summary')

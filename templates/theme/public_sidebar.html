@@ -1,12 +1,11 @@
+{% load static %}
 <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark dh-sidebar">
   <div class="container-fluid">
     <div class="navbar-brand navbar-brand-autodark dh-brand">
       <a href="{% url 'login' %}" class="d-flex align-items-center gap-2 text-decoration-none">
-        <span class="dh-brand-mark">
-          <i class="fa-solid fa-earth-asia"></i>
-        </span>
+        <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack" class="dh-brand-logo">
         <span class="lh-1">
-          <span class="dh-brand-name">Kabayani<span class="text-warning">Track</span></span>
+          <span class="dh-brand-name">KabayaniTrack</span>
           <span class="dh-brand-sub">OFW Monitoring System</span>
         </span>
       </a>

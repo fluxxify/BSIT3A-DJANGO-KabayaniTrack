@@ -16,9 +16,189 @@
   </div>
   <br>
 
-  <div class="card">
-    <div class="card-body text-muted">
-      Dashboard
+  <div class="row row-deck row-cards">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">Registered OFWs</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ stats.kpi.ofw_total }}</div>
+            <i class="fas fa-users text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.ofw_total }}" class="text-decoration-none">
+            View all <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">OFWs At Risk</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2 text-danger">{{ stats.kpi.ofw_at_risk }}</div>
+            <i class="fas fa-triangle-exclamation text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.ofw_at_risk }}" class="text-decoration-none">
+            View at-risk OFWs <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">Check-ins This Month</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ stats.kpi.checkins_month }}</div>
+            <i class="fas fa-clipboard-check text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.checkins_month }}" class="text-decoration-none">
+            View this month <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">Open Concerns</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2 text-warning">{{ stats.kpi.open_concerns }}</div>
+            <i class="fas fa-circle-exclamation text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.open_concerns }}" class="text-decoration-none">
+            View open concerns <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">Emergency Contacts</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ stats.kpi.contacts_total }}</div>
+            <i class="fas fa-address-book text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.contacts_total }}" class="text-decoration-none">
+            View directory <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">Reports</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ stats.kpi.reports_total }}</div>
+            <i class="fas fa-file-lines text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.reports_total }}" class="text-decoration-none">
+            View reports <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader mb-2">Welfare Distribution</div>
+          {% for item in stats.welfare_chart %}
+          <div class="d-flex justify-content-between">
+            {% if item.key %}
+            <a href="{{ stats.links.welfare_status }}?welfare_status={{ item.key }}" class="text-muted text-decoration-none">{{ item.label }}</a>
+            {% else %}
+            <span class="text-muted">{{ item.label }}</span>
+            {% endif %}
+            <span class="fw-medium">{{ item.value }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="card-footer d-flex">
+          <a href="{{ stats.links.welfare_status }}" class="text-decoration-none">
+            View all OFWs <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Recent Check-ins</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr><th>OFW</th><th>Date</th><th>Condition</th></tr>
+            </thead>
+            <tbody>
+              {% for checkin in stats.recent_checkins %}
+              <tr>
+                <td>{{ checkin.ofw }}</td>
+                <td class="text-muted">{{ checkin.checkin_date|date:"M d, Y H:i" }}</td>
+                <td>{{ checkin.get_condition_display }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-muted text-center">No check-ins yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Recent Concerns</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr><th>Concern</th><th>OFW</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {% for concern in stats.recent_concerns %}
+              <tr>
+                <td>{{ concern.title }}</td>
+                <td class="text-muted">{{ concern.ofw }}</td>
+                <td>{{ concern.get_status_display }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-muted text-center">No concerns reported.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 

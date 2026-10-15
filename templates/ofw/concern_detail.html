@@ -1,0 +1,66 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">Reported Concerns</div>
+        <h2 class="page-title mb-0">
+          {{ concern.title }}
+          <span class="badge {{ severity_badge }} ms-2">{{ concern.get_severity_display }}</span>
+          <span class="badge {{ status_badge }} ms-1">{{ concern.get_status_display }}</span>
+        </h2>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <a href="{% url 'ofw:concern_list' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i> Back to list
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="row row-deck row-cards">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Concern Details</h3></div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted">OFW</dt>
+            <dd class="col-7">
+              <a href="{% url 'ofw:profile_detail' concern.ofw.pk %}">{{ concern.ofw.full_name }}</a>
+            </dd>
+            <dt class="col-5 text-muted">Category</dt>
+            <dd class="col-7">{{ concern.get_category_display }}</dd>
+            <dt class="col-5 text-muted">Severity</dt>
+            <dd class="col-7"><span class="badge {{ severity_badge }}">{{ concern.get_severity_display }}</span></dd>
+            <dt class="col-5 text-muted">Status</dt>
+            <dd class="col-7"><span class="badge {{ status_badge }}">{{ concern.get_status_display }}</span></dd>
+            <dt class="col-5 text-muted">Reported Date</dt>
+            <dd class="col-7">{{ concern.reported_date|date:"M d, Y" }}</dd>
+            <dt class="col-5 text-muted">Resolved Date</dt>
+            <dd class="col-7">{{ concern.resolved_date|date:"M d, Y"|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Reported By</dt>
+            <dd class="col-7">{{ concern.user.username|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Recorded</dt>
+            <dd class="col-7">{{ concern.created_at|date:"M d, Y H:i" }}</dd>
+            <dt class="col-5 text-muted">Last Updated</dt>
+            <dd class="col-7">{{ concern.updated_at|date:"M d, Y H:i" }}</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Description</h3></div>
+        <div class="card-body text-muted">{{ concern.description|default:"—"|linebreaksbr }}</div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">Actions Taken</h3></div>
+        <div class="card-body text-muted">{{ concern.actions_taken|default:"—"|linebreaksbr }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

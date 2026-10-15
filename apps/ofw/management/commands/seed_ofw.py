@@ -16,10 +16,10 @@ from django.utils import timezone
 from apps.ofw.models import (
     CheckIn,
     Concern,
+    EmergencyContact,
     MonitoringReport,
     OFWProfile,
     RiskLevel,
-    SupportRecord,
     WelfareAssessment,
     WelfareStatus,
 )
@@ -79,7 +79,7 @@ class Command(BaseCommand):
         return user
 
     def _clear(self, user):
-        for model in (SupportRecord, Concern, CheckIn, WelfareAssessment, MonitoringReport, OFWProfile):
+        for model in (EmergencyContact, Concern, CheckIn, WelfareAssessment, MonitoringReport, OFWProfile):
             model.objects.filter(user=user).delete()
 
     @transaction.atomic
@@ -89,7 +89,7 @@ class Command(BaseCommand):
             'assessments': 0,
             'checkins': 0,
             'concerns': 0,
-            'supports': 0,
+            'contacts': 0,
             'reports': 0,
         }
 
@@ -118,7 +118,7 @@ class Command(BaseCommand):
             )
             counts['assessments'] += int(created)
 
-        for ofw_key, days_ago, method, condition, location, person, notes in self._checkin_data():
+        for ofw_key, days_ago, method, condition, notes in self._checkin_data():
             _, created = CheckIn.objects.get_or_create(
                 ofw=profiles[ofw_key],
                 checkin_date=_dt(days_ago),
@@ -126,8 +126,6 @@ class Command(BaseCommand):
                     'user': user,
                     'method': method,
                     'condition': condition,
-                    'location': location,
-                    'contacted_person': person,
                     'notes': notes,
                 },
             )
@@ -152,22 +150,12 @@ class Command(BaseCommand):
             concerns[title] = concern
             counts['concerns'] += int(created)
 
-        for ofw_key, concern_title, support_type, title, description, provider, amount, days_ago, status in self._support_data():
-            _, created = SupportRecord.objects.get_or_create(
-                ofw=profiles[ofw_key],
-                title=title,
-                defaults={
-                    'user': user,
-                    'concern': concerns.get(concern_title),
-                    'support_type': support_type,
-                    'description': description,
-                    'provider': provider,
-                    'amount': amount,
-                    'date_provided': _date(days_ago),
-                    'status': status,
-                },
+        for data in self._contact_data():
+            _, created = EmergencyContact.objects.get_or_create(
+                name=data['name'],
+                defaults={**data, 'user': user},
             )
-            counts['supports'] += int(created)
+            counts['contacts'] += int(created)
 
         for data in self._report_data():
             defaults = {**data, 'user': user}
@@ -186,6 +174,7 @@ class Command(BaseCommand):
             {
                 'first_name': 'Juan', 'last_name': 'Dela Cruz',
                 'passport_number': 'P1234567A', 'birth_date': _date(13800),
+                'age': 38,
                 'sex': 'M', 'contact_number': '+966 50 123 4567',
                 'email': 'juan.delacruz@example.com',
                 'permanent_address': '123 Rizal St., Cebu City, Cebu',
@@ -200,6 +189,7 @@ class Command(BaseCommand):
             {
                 'first_name': 'Maria', 'last_name': 'Santos',
                 'passport_number': 'P2233445B', 'birth_date': _date(13100),
+                'age': 36,
                 'sex': 'F', 'contact_number': '+852 9123 4567',
                 'email': 'maria.santos@example.com',
                 'permanent_address': '45 Mabini Ave., Iloilo City, Iloilo',
@@ -208,12 +198,13 @@ class Command(BaseCommand):
                 'occupation': 'Domestic Helper',
                 'agency': 'Bright Future Recruitment',
                 'deployment_date': _date(800), 'contract_end_date': _date(120),
-                'welfare_status': WelfareStatus.ON_LEAVE,
+                'welfare_status': WelfareStatus.ACTIVE,
                 'remarks': 'On home leave until next month.',
             },
             {
                 'first_name': 'Pedro', 'last_name': 'Reyes',
                 'passport_number': 'P3344556C', 'birth_date': _date(14500),
+                'age': 40,
                 'sex': 'M', 'contact_number': '+974 3345 6789',
                 'email': 'pedro.reyes@example.com',
                 'permanent_address': '78 Bonifacio St., Dagupan, Pangasinan',
@@ -228,6 +219,7 @@ class Command(BaseCommand):
             {
                 'first_name': 'Ana', 'last_name': 'Villanueva',
                 'passport_number': 'P4455667D', 'birth_date': _date(12500),
+                'age': 34,
                 'sex': 'F', 'contact_number': '+971 55 987 6543',
                 'email': 'ana.villanueva@example.com',
                 'permanent_address': '210 Katipunan Rd., Quezon City',
@@ -242,6 +234,7 @@ class Command(BaseCommand):
             {
                 'first_name': 'Jose', 'last_name': 'Ramos',
                 'passport_number': 'P5566778E', 'birth_date': _date(16000),
+                'age': 44,
                 'sex': 'M', 'contact_number': '+965 5566 7788',
                 'email': 'jose.ramos@example.com',
                 'permanent_address': '9 Poblacion, Batangas City, Batangas',
@@ -259,7 +252,7 @@ class Command(BaseCommand):
         return [
             ('Dela Cruz', WelfareStatus.ACTIVE, RiskLevel.LOW, 20, 'Case Officer R. Lim',
              'Stable employment; remits regularly.'),
-            ('Santos', WelfareStatus.ON_LEAVE, RiskLevel.LOW, 35, 'Case Officer R. Lim',
+            ('Santos', WelfareStatus.ACTIVE, RiskLevel.LOW, 35, 'Case Officer R. Lim',
              'On approved leave; in good spirits.'),
             ('Reyes', WelfareStatus.NEEDS_SUPPORT, RiskLevel.HIGH, 12, 'Case Officer M. Tan',
              'Salaries unpaid for 2 months; for legal referral.'),
@@ -271,19 +264,19 @@ class Command(BaseCommand):
 
     def _checkin_data(self):
         return [
-            ('Dela Cruz', 3, 'call', 'safe', 'Riyadh, Saudi Arabia', 'Juan Dela Cruz',
+            ('Dela Cruz', 3, 'call', 'safe',
              'Doing well at work; no concerns.'),
-            ('Dela Cruz', 33, 'app', 'safe', 'Riyadh, Saudi Arabia', 'Juan Dela Cruz',
+            ('Dela Cruz', 33, 'app', 'safe',
              'Confirmed receipt of remittance.'),
-            ('Santos', 8, 'video', 'safe', 'Iloilo City, Philippines', 'Maria Santos',
+            ('Santos', 8, 'video', 'safe',
              'Currently vacationing with family.'),
-            ('Reyes', 6, 'sms', 'needs_assistance', 'Doha, Qatar', 'Pedro Reyes',
+            ('Reyes', 6, 'sms', 'needs_assistance',
              'Requesting help regarding unpaid wages.'),
-            ('Villanueva', 2, 'call', 'distressed', 'Dubai, UAE', 'Ana Villanueva',
+            ('Villanueva', 2, 'call', 'distressed',
              'Distressed over working conditions; wants repatriation.'),
-            ('Ramos', 15, 'in_person', 'safe', 'Batangas City, Philippines', 'Jose Ramos',
+            ('Ramos', 15, 'in_person', 'safe',
              'Post-repatriation follow-up; attending training.'),
-            ('Reyes', 2, 'call', 'unreachable', 'Doha, Qatar', '',
+            ('Reyes', 2, 'call', 'unreachable',
              'No answer; will retry tomorrow.'),
         ]
 
@@ -306,66 +299,114 @@ class Command(BaseCommand):
              'Enrolled in livelihood program.', 20),
         ]
 
-    def _support_data(self):
+    def _contact_data(self):
         return [
-            ('Reyes', 'Delayed salary for two months', 'legal', 'Legal assistance for wage claim',
-             'Assisted in filing a wage claim with POLO Qatar.',
-             'POLO Qatar', None, 8, 'approved'),
-            ('Villanueva', 'Contract substitution by employer', 'legal', 'Legal counsel for contract substitution',
-             'Provided legal counsel and documentation support.',
-             'DMW Legal Assistance', None, 3, 'released'),
-            ('Villanueva', None, 'financial', 'Financial assistance (calamity/emergency)',
-             'Emergency financial aid for repatriation costs.',
-             'OWWA', 15000.00, 3, 'released'),
-            ('Reyes', None, 'financial', 'Financial assistance for dependent family',
-             'Interim financial support while case is pending.',
-             'OWWA', 10000.00, 6, 'completed'),
-            ('Santos', 'Delay in passport renewal', 'referral', 'Referral to embassy services',
-             'Referral for expedited passport renewal.',
-             'Philippine Embassy HK', None, 38, 'completed'),
-            ('Ramos', 'Reintegration livelihood support', 'livelihood', 'Livelihood starter kit',
-             'Provided sari-sari store starter kit and training.',
-             'OWWA', 25000.00, 30, 'completed'),
-            ('Ramos', None, 'counseling', 'Post-repatriation counseling',
-             'Psychosocial counseling sessions.',
-             'DMW Reintegration Unit', None, 25, 'completed'),
-            ('Dela Cruz', None, 'training', 'Occupational safety training',
-             'Enrolled in safety training program.',
-             'TESDA', None, 12, 'pending'),
+            {
+                'name': 'Philippine Embassy — Riyadh',
+                'contact_type': 'embassy',
+                'country': 'Saudi Arabia', 'city': 'Riyadh',
+                'phone': '+966 11 488 8001',
+                'email': 'riyadh.pe@dfa.gov.ph',
+                'address': 'Diplomatic Quarter, Riyadh',
+                'notes': 'Assistance to nationals: 24/7.',
+            },
+            {
+                'name': 'POLO Riyadh',
+                'contact_type': 'polo',
+                'country': 'Saudi Arabia', 'city': 'Riyadh',
+                'phone': '+966 11 480 9000',
+                'email': 'polo.riyadh@dmw.gov.ph',
+                'address': 'Diplomatic Quarter, Riyadh',
+                'notes': 'Labor concerns, wage claims, repatriation.',
+            },
+            {
+                'name': 'OWWA Welfare Office — Riyadh',
+                'contact_type': 'owwa',
+                'country': 'Saudi Arabia', 'city': 'Riyadh',
+                'phone': '+966 11 488 8866',
+                'email': 'owwa.riyadh@owwa.gov.ph',
+                'address': 'Diplomatic Quarter, Riyadh',
+                'notes': 'Welfare and repatriation assistance.',
+            },
+            {
+                'name': 'DMW Action Center Hotline',
+                'contact_type': 'dmw',
+                'country': 'Philippines', 'city': 'Mandaluyong',
+                'phone': '1348',
+                'email': 'actioncenter@dmw.gov.ph',
+                'address': 'DMW Building, EDSA corner Ortigas Ave.',
+                'notes': 'National hotline, available 24/7.',
+            },
+            {
+                'name': 'Philippine Consulate — Hong Kong',
+                'contact_type': 'embassy',
+                'country': 'Hong Kong', 'city': 'Central',
+                'phone': '+852 2823 8500',
+                'email': 'hongkong.pcg@dfa.gov.ph',
+                'address': '14/F United Centre, Admiralty',
+                'notes': 'Consular and welfare assistance.',
+            },
+            {
+                'name': 'Dubai Police Emergency',
+                'contact_type': 'police',
+                'country': 'United Arab Emirates', 'city': 'Dubai',
+                'phone': '999',
+                'email': '',
+                'address': '',
+                'notes': 'Nationwide emergency number.',
+            },
+            {
+                'name': 'Rashid Hospital',
+                'contact_type': 'hospital',
+                'country': 'United Arab Emirates', 'city': 'Dubai',
+                'phone': '+971 4 219 2000',
+                'email': '',
+                'address': 'Oud Metha Road, Dubai',
+                'notes': 'Government hospital with emergency care.',
+            },
+            {
+                'name': 'AJ & Sons Household (Employer)',
+                'contact_type': 'employer',
+                'country': 'Hong Kong', 'city': 'Mid-Levels',
+                'phone': '+852 9123 0000',
+                'email': '',
+                'address': 'Mid-Levels, Hong Kong',
+                'notes': 'Emergency contact for employer.',
+            },
+            {
+                'name': 'Maria Santos (Spouse)',
+                'contact_type': 'family',
+                'country': 'Philippines', 'city': 'Iloilo City',
+                'phone': '+63 917 000 0001',
+                'email': '',
+                'address': '45 Mabini Ave., Iloilo City',
+                'notes': 'Next of kin.',
+            },
         ]
 
     def _report_data(self):
         return [
             {
-                'title': 'Monthly Monitoring Report — October 2026',
+                'title': 'Monthly Monitoring Report – October 2026',
                 'report_type': 'monthly', 'start_days': 31, 'end_days': 1,
                 'country': 'Middle East',
-                'total_ofws': 12, 'total_concerns': 5, 'total_support_cases': 4,
-                'summary': 'Overall welfare of monitored OFWs remained stable. 5 concerns were logged, '
-                           'with 2 escalated for legal assistance.',
-                'findings': 'Wage-related concerns are the most common, followed by contract violations.',
-                'recommendations': 'Strengthen pre-departure orientation on contract verification.',
-                'prepared_by': 'Case Officer R. Lim', 'status': 'submitted',
+                'summary': 'Overall welfare of monitored OFWs remained stable. Wage-related concerns are the most common. '
+                           'Strengthen pre-departure orientation on contract verification.',
+                'status': 'submitted',
             },
             {
-                'title': 'Quarterly Welfare Report — Q3 2026',
+                'title': 'Quarterly Welfare Report – Q3 2026',
                 'report_type': 'quarterly', 'start_days': 120, 'end_days': 10,
                 'country': 'All Regions',
-                'total_ofws': 34, 'total_concerns': 18, 'total_support_cases': 15,
-                'summary': 'Q3 saw a 12% increase in monitored OFWs. Support was rendered in 15 cases.',
-                'findings': 'Domestic workers report more health and abuse-related concerns.',
-                'recommendations': 'Expand shelter and counseling partnerships in host countries.',
-                'prepared_by': 'Case Officer M. Tan', 'status': 'approved',
+                'summary': 'Q3 saw a 12% increase in monitored OFWs. Domestic workers report more health and abuse-related concerns. '
+                           'Expand shelter and counseling partnerships.',
+                'status': 'approved',
             },
             {
-                'title': 'Incident Report — Contract Substitution (Villanueva)',
-                'report_type': 'incident', 'start_days': 5, 'end_days': 1,
-                'country': 'United Arab Emirates',
-                'total_ofws': 1, 'total_concerns': 1, 'total_support_cases': 2,
-                'summary': 'OFW Ana Villanueva reported contract substitution upon arrival in Dubai. '
-                           'Two support cases were opened and escalated.',
-                'findings': 'Employer replaced the approved contract with a lower-paying one.',
-                'recommendations': 'Coordinate with DMW for possible disciplinary action against the employer.',
-                'prepared_by': 'Case Officer M. Tan', 'status': 'draft',
+                'title': 'Incident Report – Contract Substitution (Villanueva)',
+                'report_type': 'incident', 'start_days': 6, 'end_days': 2,
+                'country': 'UAE',
+                'summary': 'Signed contract replaced on arrival. Referred to POLO and legal assistance provider.',
+                'status': 'submitted',
             },
         ]

@@ -1,3 +1,4 @@
+{% load static %}
 <!--  BEGIN FOOTER  -->
 <footer class="footer footer-transparent dh-footer d-print-none">
   <div class="container-xl">
@@ -5,8 +6,8 @@
       <div class="col-lg-auto ms-lg-auto">
         <ul class="list-inline list-inline-dots mb-0">
           <li class="list-inline-item">
-            <a href="{% url 'dashboard' %}" class="link-secondary text-decoration-none">
-              <i class="fas fa-shield-halved me-1"></i> ProjectV3
+            <a href="{% url 'dashboard' %}" class="link-secondary text-decoration-none d-inline-flex align-items-center">
+              <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack logo" class="me-1" style="width:1.25rem; height:1.25rem;"> KabayaniTrack
             </a>
           </li>
         </ul>
@@ -15,7 +16,7 @@
         <ul class="list-inline list-inline-dots mb-0">
           <li class="list-inline-item">
             Copyright &copy; 2026
-            <a href="." class="link-secondary text-decoration-none">Azuelo Technology</a>. All rights reserved.
+            <a href="." class="link-secondary text-decoration-none">The Errors</a>. All rights reserved.
           </li>
         </ul>
       </div>

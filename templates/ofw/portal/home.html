@@ -1,0 +1,152 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">Welcome back, {{ user.first_name|default:user.username }}</h2>
+      </div>
+      {% if profile %}
+      <div class="col-auto ms-auto d-print-none">
+        <span class="badge {{ welfare_badge }} fs-5 px-3 py-2">{{ profile.get_welfare_status_display }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <br>
+
+  {% if not profile %}
+  <div class="alert alert-warning">
+    <i class="fas fa-triangle-exclamation me-2"></i>
+    You have not set up your profile yet.
+    <a href="{% url 'ofw:portal_profile' %}" class="alert-link">Complete your profile</a>
+    so your information reaches the management team.
+  </div>
+  {% else %}
+  <div class="row row-deck row-cards">
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">My Check-ins</div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ checkin_count }}</div>
+            <i class="fas fa-clipboard-check text-muted"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Open Concerns</div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2 text-warning">{{ open_concerns }}</div>
+            <i class="fas fa-circle-exclamation text-muted"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Total Concerns</div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ concern_count }}</div>
+            <i class="fas fa-list text-muted"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Latest Welfare</div>
+          <div class="mt-1">
+            {% if latest_assessment %}
+            <span class="badge {{ welfare_badge }}">{{ latest_assessment.get_status_display }}</span>
+            <div class="text-muted small mt-1">{{ latest_assessment.assessment_date|date:"M d, Y" }}</div>
+            {% else %}
+            <span class="text-muted">No assessment yet</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-12 col-md-4">
+          <a href="{% url 'ofw:portal_checkins' %}" class="btn btn-primary w-100">
+            <i class="fas fa-clipboard-check me-2"></i>Log a Check-in
+          </a>
+        </div>
+        <div class="col-12 col-md-4">
+          <a href="{% url 'ofw:portal_concerns' %}" class="btn btn-outline-warning w-100">
+            <i class="fas fa-circle-exclamation me-2"></i>Report a Concern
+          </a>
+        </div>
+        <div class="col-12 col-md-4">
+          <a href="{% url 'ofw:portal_profile' %}" class="btn btn-outline-primary w-100">
+            <i class="fas fa-id-card me-2"></i>Update My Profile
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Recent Check-ins</h3>
+          <a href="{% url 'ofw:portal_checkins' %}" class="ms-auto small">View all</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead><tr><th>Date</th><th>Status</th><th>Notes</th></tr></thead>
+            <tbody>
+              {% for row in checkin_rows %}
+              <tr>
+                <td class="text-muted">{{ row.obj.checkin_date|date:"M d, Y H:i" }}</td>
+                <td><span class="badge {{ row.badge }}">{{ row.obj.get_condition_display }}</span></td>
+                <td class="text-muted">{{ row.obj.notes|default:"—" }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-muted text-center">No check-ins yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">My Concerns</h3>
+          <a href="{% url 'ofw:portal_concerns' %}" class="ms-auto small">View all</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead><tr><th>Concern</th><th>Severity</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for row in concern_rows %}
+              <tr>
+                <td>{{ row.obj.title }}</td>
+                <td><span class="badge {{ row.severity_badge }}">{{ row.obj.get_severity_display }}</span></td>
+                <td><span class="badge {{ row.status_badge }}">{{ row.obj.get_status_display }}</span></td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-muted text-center">No concerns reported.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

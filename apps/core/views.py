@@ -51,6 +51,13 @@ def _set_lock_state(request):
     return int(LOCK_DURATION.total_seconds())
 
 
+def _home_url_name(user):
+    """Send OFW accounts to their portal and management users to the dashboard."""
+    from apps.ofw.roles import is_ofw
+
+    return 'ofw:portal' if is_ofw(user) else 'dashboard'
+
+
 def _validate_registration_data(data):
     errors = {}
 
@@ -102,7 +109,7 @@ def _validate_registration_data(data):
 @require_http_methods(['GET', 'POST'])
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('dashboard')
+        return redirect(_home_url_name(request.user))
 
     failed_attempts, remaining = _get_lock_state(request)
     if remaining is not None:
@@ -119,7 +126,7 @@ def login_view(request):
     if user is not None:
         _reset_lock_state(request)
         login(request, user)
-        return redirect('dashboard')
+        return redirect(_home_url_name(user))
 
     failed_attempts += 1
     request.session['failed_attempts'] = failed_attempts
@@ -140,7 +147,14 @@ def logout_view(request):
 
 @login_required(login_url='login')
 def home(request):
-    return render(request, 'home.html')
+    from apps.ofw.roles import is_ofw
+
+    if is_ofw(request.user):
+        return redirect('ofw:portal')
+
+    from apps.ofw.views import dashboard_stats
+
+    return render(request, 'home.html', {'stats': dashboard_stats(request.user)})
 
 
 @require_http_methods(['GET', 'POST'])
@@ -171,5 +185,17 @@ def register_view(request):
         email=form_data['email'].strip(),
         password=form_data['password'],
     )
+
+    from apps.ofw.models import OFWProfile
+    from apps.ofw.roles import mark_as_ofw
+
+    mark_as_ofw(user)
+    OFWProfile.objects.create(
+        user=user,
+        first_name=form_data['first_name'].strip(),
+        last_name=form_data['last_name'].strip(),
+        email=form_data['email'].strip(),
+    )
+
     login(request, user)
-    return redirect('dashboard')
+    return redirect('ofw:portal')

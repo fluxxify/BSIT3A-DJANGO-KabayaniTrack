@@ -24,6 +24,7 @@ urlpatterns = [
     path('', include('apps.core.urls')),
     path('users/', include('apps.users.urls')),
     path('info/', include('apps.info.urls')),
+    path('ofw/', include('apps.ofw.urls')),
 ]
 
 if settings.DEBUG:
