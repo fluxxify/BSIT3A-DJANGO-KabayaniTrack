@@ -2,11 +2,13 @@
 
 from datetime import timedelta
 
-from django.contrib.auth.decorators import login_required
-from django.db.models import Count
-from django.shortcuts import get_object_or_404, render
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Case, Count, IntegerField, Value, When
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from . import crud
 from .forms import (
@@ -21,12 +23,14 @@ from .models import (
     CheckIn,
     Concern,
     EmergencyContact,
+    EmergencyContactRequest,
     MonitoringReport,
     OFWProfile,
     RiskLevel,
     WelfareAssessment,
     WelfareStatus,
 )
+from .roles import is_management
 
 _welfare_badge = {
     'active': 'bg-success-lt text-success',
@@ -82,6 +86,12 @@ _report_status_badge = {
     'draft': 'bg-secondary-lt text-secondary',
     'submitted': 'bg-warning-lt text-warning',
     'approved': 'bg-success-lt text-success',
+}
+
+_request_status_badge = {
+    'pending': 'bg-warning-lt text-warning',
+    'approved': 'bg-success-lt text-success',
+    'rejected': 'bg-danger-lt text-danger',
 }
 
 _profiles = crud.make_crud(
@@ -275,7 +285,11 @@ def profile_delete_ajax(request, pk):
 
 @login_required(login_url='login')
 def profile_detail(request, pk):
-    queryset = OFWProfile.objects.all() if request.user.is_superuser else OFWProfile.objects.filter(user=request.user)
+    queryset = (
+        OFWProfile.objects.all()
+        if request.user.is_superuser or request.user.is_staff
+        else OFWProfile.objects.filter(user=request.user)
+    )
     profile = get_object_or_404(queryset, pk=pk)
     context = {
         'profile': profile,
@@ -414,13 +428,106 @@ def report_delete_ajax(request, pk):
     return _reports['delete_ajax'](request, pk)
 
 
+@login_required(login_url='login')
+@user_passes_test(is_management, login_url='dashboard')
+def contact_request_list_page(request):
+    """Review queue for family emergency-contact requests submitted by OFWs."""
+    status = request.GET.get('status', '').strip()
+    requests_qs = EmergencyContactRequest.objects.select_related('user', 'ofw')
+
+    if status in ('pending', 'approved', 'rejected'):
+        requests_qs = requests_qs.filter(status=status)
+    else:
+        status = ''
+
+    pending_first = Case(
+        When(status=EmergencyContactRequest.Status.PENDING, then=Value(0)),
+        When(status=EmergencyContactRequest.Status.APPROVED, then=Value(1)),
+        default=Value(2),
+        output_field=IntegerField(),
+    )
+    request_rows = [
+        {
+            'obj': r,
+            'status_badge': _request_status_badge.get(
+                r.status, 'bg-secondary-lt text-secondary'
+            ),
+        }
+        for r in requests_qs.annotate(_order=pending_first).order_by(
+            '_order', '-created_at', '-id'
+        )
+    ]
+
+    return render(request, 'ofw/contact_requests.html', {
+        'request_rows': request_rows,
+        'active_status': status,
+        'counts': {
+            'all': EmergencyContactRequest.objects.count(),
+            'pending': EmergencyContactRequest.objects.filter(
+                status=EmergencyContactRequest.Status.PENDING
+            ).count(),
+            'approved': EmergencyContactRequest.objects.filter(
+                status=EmergencyContactRequest.Status.APPROVED
+            ).count(),
+            'rejected': EmergencyContactRequest.objects.filter(
+                status=EmergencyContactRequest.Status.REJECTED
+            ).count(),
+        },
+    })
+
+
+@login_required(login_url='login')
+@user_passes_test(is_management, login_url='dashboard')
+@require_POST
+def contact_request_decide(request, pk):
+    """Approve or reject a family contact request; approval creates the contact."""
+    contact_request = get_object_or_404(EmergencyContactRequest, pk=pk)
+
+    if contact_request.status != EmergencyContactRequest.Status.PENDING:
+        messages.info(request, 'This request has already been reviewed.')
+        return redirect('ofw:contact_request_list')
+
+    action = request.POST.get('action')
+    contact_request.reviewed_at = timezone.now()
+    contact_request.reviewed_by = request.user
+    contact_request.review_notes = request.POST.get('review_notes', '').strip()
+
+    if action == 'approve':
+        EmergencyContact.objects.create(
+            user=contact_request.user,
+            name=contact_request.name,
+            contact_type=EmergencyContact.ContactType.FAMILY,
+            phone=contact_request.phone,
+            email=contact_request.email,
+            address=contact_request.address,
+            notes=contact_request.notes,
+        )
+        contact_request.status = EmergencyContactRequest.Status.APPROVED
+        messages.success(
+            request,
+            f'Approved. "{contact_request.name}" is now a family emergency contact.',
+        )
+    elif action == 'reject':
+        contact_request.status = EmergencyContactRequest.Status.REJECTED
+        messages.warning(
+            request, f'Request for "{contact_request.name}" was rejected.'
+        )
+    else:
+        messages.error(request, 'Unknown action; nothing was changed.')
+        return redirect('ofw:contact_request_list')
+
+    contact_request.save()
+    return redirect('ofw:contact_request_list')
+
+
 def dashboard_stats(user):
     """Aggregate monitoring metrics shown on the dashboard."""
-    profiles = OFWProfile.objects.all() if user.is_superuser else OFWProfile.objects.filter(user=user)
-    checkins = CheckIn.objects.all() if user.is_superuser else CheckIn.objects.filter(user=user)
-    concerns = Concern.objects.all() if user.is_superuser else Concern.objects.filter(user=user)
-    contacts = EmergencyContact.objects.all() if user.is_superuser else EmergencyContact.objects.filter(user=user)
-    reports = MonitoringReport.objects.all() if user.is_superuser else MonitoringReport.objects.filter(user=user)
+    sees_all = user.is_superuser or user.is_staff
+    profiles = OFWProfile.objects.all() if sees_all else OFWProfile.objects.filter(user=user)
+    checkins = CheckIn.objects.all() if sees_all else CheckIn.objects.filter(user=user)
+    concerns = Concern.objects.all() if sees_all else Concern.objects.filter(user=user)
+    contacts = EmergencyContact.objects.all() if sees_all else EmergencyContact.objects.filter(user=user)
+    reports = MonitoringReport.objects.all() if sees_all else MonitoringReport.objects.filter(user=user)
 
     month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     at_risk = profiles.filter(

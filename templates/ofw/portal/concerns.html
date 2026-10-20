@@ -16,7 +16,7 @@
       <div class="card">
         <div class="card-header"><h3 class="card-title">Report a Concern</h3></div>
         <div class="card-body">
-          <form method="post" novalidate>
+          <form method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}
             <div class="alert alert-danger">{{ form.non_field_errors }}</div>
@@ -46,17 +46,39 @@
         <div class="card-header"><h3 class="card-title">My Reported Concerns</h3></div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
-            <thead><tr><th>Concern</th><th>Severity</th><th>Status</th><th>Reported</th></tr></thead>
+            <thead><tr><th>Concern</th><th>Severity</th><th>Status</th><th>Proof</th><th>Reported</th></tr></thead>
             <tbody>
               {% for row in concern_rows %}
               <tr>
                 <td>{{ row.obj.title }}</td>
                 <td><span class="badge {{ row.severity_badge }}">{{ row.obj.get_severity_display }}</span></td>
                 <td><span class="badge {{ row.status_badge }}">{{ row.obj.get_status_display }}</span></td>
+                <td>
+                  {% with proofs=row.obj.proofs.all %}
+                  {% if proofs %}
+                  <div class="d-flex gap-1 flex-wrap">
+                    {% for proof in proofs %}
+                    {% if proof.is_video %}
+                    <a href="{{ proof.file.url }}" target="_blank" class="badge bg-purple-lt text-purple" title="{{ proof.display_name }}">
+                      <i class="fas fa-video me-1"></i>Video
+                    </a>
+                    {% else %}
+                    <a href="{{ proof.file.url }}" target="_blank" title="{{ proof.display_name }}">
+                      <img src="{{ proof.file.url }}" alt="{{ proof.display_name }}"
+                           class="rounded border" style="width:34px;height:34px;object-fit:cover;">
+                    </a>
+                    {% endif %}
+                    {% endfor %}
+                  </div>
+                  {% else %}
+                  <span class="text-muted">—</span>
+                  {% endif %}
+                  {% endwith %}
+                </td>
                 <td class="text-muted">{{ row.obj.reported_date|date:"M d, Y" }}</td>
               </tr>
               {% empty %}
-              <tr><td colspan="4" class="text-muted text-center">No concerns reported yet.</td></tr>
+              <tr><td colspan="5" class="text-muted text-center">No concerns reported yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>

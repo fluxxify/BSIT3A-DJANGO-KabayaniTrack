@@ -1,13 +1,26 @@
+import shutil
+import tempfile
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.ofw.forms import CheckInForm
-from apps.ofw.models import CheckIn, Concern, EmergencyContact, OFWProfile
+from apps.ofw.models import (
+    CheckIn,
+    Concern,
+    ConcernProof,
+    EmergencyContact,
+    EmergencyContactRequest,
+    OFWProfile,
+)
 from apps.ofw.roles import mark_as_ofw
 
 User = get_user_model()
+
+TEMP_MEDIA_DIR = tempfile.mkdtemp(prefix='kabayani_test_media_')
 
 
 class OFWCrudTests(TestCase):
@@ -126,6 +139,29 @@ class OFWPortalTests(TestCase):
                 response = self.client.get(reverse(f'ofw:{name}'))
                 self.assertEqual(response.status_code, 200)
 
+    def test_profile_page_has_country_and_city_choices(self):
+        response = self.client.get(reverse('ofw:portal_profile'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="country-options"')
+        self.assertContains(response, 'id="city-options"')
+        self.assertContains(response, 'list="country-options"')
+        self.assertContains(response, 'list="city-options"')
+        self.assertContains(response, 'Saudi Arabia')
+        self.assertContains(response, 'Kuwait City')
+
+    def test_profile_accepts_country_outside_choices(self):
+        response = self.client.post(reverse('ofw:portal_profile'), {
+            'first_name': 'Ana',
+            'last_name': 'Reyes',
+            'country': 'Somewhereland',
+            'city_abroad': 'Imaginary City',
+            'email': 'ana@example.com',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.country, 'Somewhereland')
+        self.assertEqual(self.profile.city_abroad, 'Imaginary City')
+
     def test_profile_update_saves_to_own_profile(self):
         response = self.client.post(reverse('ofw:portal_profile'), {
             'first_name': 'Ana',
@@ -160,6 +196,88 @@ class OFWPortalTests(TestCase):
         concern = Concern.objects.filter(ofw=self.profile, user=self.user).first()
         self.assertIsNotNone(concern)
         self.assertEqual(concern.status, Concern.Status.OPEN)
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+class ConcernProofUploadTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='ofwproof', password='Passw0rd!23')
+        self.profile = OFWProfile.objects.create(
+            user=self.user, first_name='Lia', last_name='Cruz', country='Hong Kong',
+        )
+        self.client.force_login(self.user)
+
+    def test_concern_with_photo_and_video_proof(self):
+        photo = SimpleUploadedFile('proof.jpg', b'\xff\xd8\xff fakejpg', 'image/jpeg')
+        video = SimpleUploadedFile('proof.mp4', b'\x00\x00\x00 fakemp4', 'video/mp4')
+        response = self.client.post(reverse('ofw:portal_concerns'), {
+            'title': 'Being hurt by employer',
+            'category': 'abuse',
+            'severity': 'critical',
+            'description': 'Physically harmed at work',
+            'proof_files': [photo, video],
+        })
+        self.assertEqual(response.status_code, 302)
+        concern = Concern.objects.get(ofw=self.profile, title='Being hurt by employer')
+        proofs = concern.proofs.all()
+        self.assertEqual(proofs.count(), 2)
+        self.assertTrue(any(p.is_image for p in proofs))
+        self.assertTrue(any(p.is_video for p in proofs))
+        for p in proofs:
+            self.assertTrue(p.file.name.startswith('concern_proofs/'))
+            self.assertTrue(p.file.storage.exists(p.file.name))
+
+    def test_rejects_disallowed_file_type(self):
+        bad = SimpleUploadedFile('notes.exe', b'MZ binary', 'application/octet-stream')
+        response = self.client.post(reverse('ofw:portal_concerns'), {
+            'title': 'Suspicious demand',
+            'category': 'other',
+            'severity': 'low',
+            'description': 'Agency asked for payment',
+            'proof_files': [bad],
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'not an accepted file type')
+        self.assertFalse(Concern.objects.filter(title='Suspicious demand').exists())
+
+    def test_concern_without_proof_still_works(self):
+        response = self.client.post(reverse('ofw:portal_concerns'), {
+            'title': 'No proof concern',
+            'category': 'health',
+            'severity': 'medium',
+            'description': 'Just text',
+        })
+        self.assertEqual(response.status_code, 302)
+        concern = Concern.objects.get(title='No proof concern')
+        self.assertEqual(concern.proofs.count(), 0)
+
+    def test_portal_page_renders_with_proof_field(self):
+        response = self.client.get(reverse('ofw:portal_concerns'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'enctype="multipart/form-data"')
+        self.assertContains(response, 'name="proof_files"')
+
+    def test_management_detail_shows_proofs(self):
+        concern = Concern.objects.create(
+            ofw=self.profile, user=self.user, title='Abuse case',
+            category='abuse', severity='high', status='open',
+            reported_date=timezone.localdate(), description='Hurt by employer',
+        )
+        ConcernProof.objects.create(
+            concern=concern,
+            file=SimpleUploadedFile('evidence.png', b'\x89PNG fakepng', 'image/png'),
+            original_name='evidence.png',
+        )
+        staff = User.objects.create_user(
+            username='mgrproof', password='Passw0rd!23', is_staff=True
+        )
+        concern.user = staff
+        concern.save(update_fields=['user'])
+        self.client.force_login(staff)
+        response = self.client.get(reverse('ofw:concern_detail', args=[concern.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Photo / Video Proof')
+        self.assertContains(response, 'evidence.png')
 
     def test_management_user_redirected_from_portal(self):
         staff = User.objects.create_user(
@@ -203,6 +321,53 @@ class OFWPortalTests(TestCase):
             'condition': 'safe',
         })
         self.assertEqual(response.status_code, 200)
+
+
+class StaffFullAccessTests(TestCase):
+    """Staff accounts (non-superuser) see every OFW record, like an admin."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='stafffull', password='Passw0rd!23', is_staff=True
+        )
+        self.ofw_user = User.objects.create_user(
+            username='ofwfull', password='Passw0rd!23'
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Nena', last_name='Diaz', country='Qatar',
+        )
+        self.concern = Concern.objects.create(
+            ofw=self.profile, user=self.ofw_user, title='Withheld wages',
+            category='salary', severity='high', status='open',
+            reported_date=timezone.localdate(),
+        )
+
+    def test_staff_can_open_another_users_profile(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:profile_detail', args=[self.profile.pk]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_staff_can_open_another_users_concern(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:concern_detail', args=[self.concern.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Withheld wages')
+
+    def test_staff_list_ajax_includes_other_users_records(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:concern_list_ajax'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Withheld wages')
+
+    def test_staff_form_queryset_lists_all_ofws(self):
+        form = CheckInForm(user=self.staff)
+        self.assertIn(self.profile, form.fields['ofw'].queryset)
+
+    def test_staff_redirected_away_from_ofw_portal(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:portal'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('dashboard'))
 
 
 class DashboardDrilldownTests(TestCase):
@@ -390,3 +555,165 @@ class EmergencyContactActionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'tel:+63285511545')
         self.assertContains(response, 'https://owwa.gov.ph')
+
+
+class LocationHotlineTests(TestCase):
+    """The portal shows hotlines automatically for the OFW's deployment country."""
+
+    def setUp(self):
+        self.ofw = User.objects.create_user(
+            username='hotline_ofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw, first_name='Ana', last_name='Cruz',
+            country='Qatar', city_abroad='Doha',
+        )
+        EmergencyContact.objects.create(
+            name='Philippine Embassy — Doha', contact_type='embassy',
+            country='Qatar', city='Doha', phone='+974 4400 0000', user=None,
+        )
+        EmergencyContact.objects.create(
+            name='POLO Doha', contact_type='polo',
+            country='Qatar', city='Doha', phone='+974 4400 1111', user=None,
+        )
+        EmergencyContact.objects.create(
+            name='DMW Action Center', contact_type='dmw',
+            country='Philippines', city='Mandaluyong', phone='1348', user=None,
+        )
+        EmergencyContact.objects.create(
+            name='Hong Kong Consulate', contact_type='embassy',
+            country='Hong Kong', city='Central', phone='+852 2823 8500', user=None,
+        )
+        self.client.force_login(self.ofw)
+
+    def test_location_hotlines_shown_automatically(self):
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertContains(response, 'Hotlines for Qatar')
+        self.assertContains(response, 'Philippine Embassy — Doha')
+        self.assertContains(response, 'POLO Doha')
+
+    def test_national_hotline_always_shown(self):
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertContains(response, 'National Hotlines')
+        self.assertContains(response, 'DMW Action Center')
+
+    def test_other_country_hotline_not_shown(self):
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertNotContains(response, 'Hong Kong Consulate')
+
+    def test_personal_family_contact_hidden_from_hotlines(self):
+        other = User.objects.create_user(username='other_ofw', password='Passw0rd!23')
+        mark_as_ofw(other)
+        EmergencyContact.objects.create(
+            name='Other Family Member', contact_type='family',
+            country='Qatar', phone='+63 917 000 0000',
+            user=other,
+        )
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertNotContains(response, 'Other Family Member')
+
+
+class FamilyContactRequestTests(TestCase):
+    """OFWs request a family contact; management approves or rejects it."""
+
+    def setUp(self):
+        self.ofw = User.objects.create_user(
+            username='req_ofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw, first_name='Rico', last_name='Bautista', country='Kuwait',
+        )
+        self.staff = User.objects.create_user(
+            username='req_staff', password='Passw0rd!23', is_staff=True
+        )
+
+    def _submit_request(self):
+        self.client.force_login(self.ofw)
+        return self.client.post(reverse('ofw:portal_contacts'), {
+            'name': 'Liza Bautista',
+            'relationship': 'Spouse',
+            'phone': '+63 917 555 1234',
+            'email': '',
+            'address': '10 Rizal St., Cebu City',
+            'notes': '',
+        })
+
+    def test_ofw_submits_pending_request(self):
+        response = self._submit_request()
+        self.assertEqual(response.status_code, 302)
+        req = EmergencyContactRequest.objects.get()
+        self.assertEqual(req.status, 'pending')
+        self.assertEqual(req.user, self.ofw)
+        self.assertEqual(req.ofw, self.profile)
+
+    def test_management_sees_pending_request(self):
+        self._submit_request()
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:contact_request_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Liza Bautista')
+
+    def test_ofw_cannot_open_management_queue(self):
+        self.client.force_login(self.ofw)
+        response = self.client.get(reverse('ofw:contact_request_list'))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse('dashboard')))
+
+    def test_approval_creates_family_contact(self):
+        self._submit_request()
+        req = EmergencyContactRequest.objects.get()
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('ofw:contact_request_decide', args=[req.pk]),
+            {'action': 'approve'},
+        )
+        self.assertEqual(response.status_code, 302)
+        req.refresh_from_db()
+        self.assertEqual(req.status, 'approved')
+        self.assertIsNotNone(req.reviewed_at)
+        contact = EmergencyContact.objects.get(user=self.ofw, contact_type='family')
+        self.assertEqual(contact.name, 'Liza Bautista')
+        self.assertEqual(contact.phone, '+63 917 555 1234')
+
+    def test_approved_contact_appears_in_ofw_portal(self):
+        self._submit_request()
+        req = EmergencyContactRequest.objects.get()
+        self.client.force_login(self.staff)
+        self.client.post(
+            reverse('ofw:contact_request_decide', args=[req.pk]),
+            {'action': 'approve'},
+        )
+        self.client.force_login(self.ofw)
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertContains(response, 'Liza Bautista')
+
+    def test_rejection_does_not_create_contact(self):
+        self._submit_request()
+        req = EmergencyContactRequest.objects.get()
+        self.client.force_login(self.staff)
+        self.client.post(
+            reverse('ofw:contact_request_decide', args=[req.pk]),
+            {'action': 'reject', 'review_notes': 'Duplicate entry'},
+        )
+        req.refresh_from_db()
+        self.assertEqual(req.status, 'rejected')
+        self.assertEqual(req.review_notes, 'Duplicate entry')
+        self.assertFalse(EmergencyContact.objects.filter(user=self.ofw).exists())
+
+    def test_reviewed_request_cannot_be_decided_twice(self):
+        self._submit_request()
+        req = EmergencyContactRequest.objects.get()
+        self.client.force_login(self.staff)
+        self.client.post(
+            reverse('ofw:contact_request_decide', args=[req.pk]),
+            {'action': 'approve'},
+        )
+        self.client.post(
+            reverse('ofw:contact_request_decide', args=[req.pk]),
+            {'action': 'reject'},
+        )
+        req.refresh_from_db()
+        self.assertEqual(req.status, 'approved')
+        self.assertEqual(EmergencyContact.objects.filter(user=self.ofw).count(), 1)

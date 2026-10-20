@@ -9,6 +9,8 @@ The system tracks five key areas:
   * monitoring reports
 """
 
+import os
+
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -226,6 +228,44 @@ class Concern(models.Model):
         return self.title
 
 
+class ConcernProof(models.Model):
+    """A photo or video file submitted as proof for a reported concern."""
+
+    IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp')
+    VIDEO_EXTENSIONS = ('.mp4', '.mov', '.webm', '.m4v', '.avi', '.mkv', '.3gp')
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB per file
+    MAX_FILES = 5
+
+    concern = models.ForeignKey(
+        Concern,
+        related_name='proofs',
+        on_delete=models.CASCADE,
+    )
+    file = models.FileField(upload_to='concern_proofs/%Y/%m/')
+    original_name = models.CharField(max_length=255, blank=True)
+    caption = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tblconcernproof'
+        ordering = ['uploaded_at', 'id']
+
+    @property
+    def is_video(self):
+        return os.path.splitext(self.file.name)[1].lower() in self.VIDEO_EXTENSIONS
+
+    @property
+    def is_image(self):
+        return os.path.splitext(self.file.name)[1].lower() in self.IMAGE_EXTENSIONS
+
+    @property
+    def display_name(self):
+        return self.original_name or os.path.basename(self.file.name)
+
+    def __str__(self):
+        return f'Proof for {self.concern}: {self.display_name}'
+
+
 class EmergencyContact(models.Model):
     """A directory entry for embassies, hotlines, or personal contacts."""
 
@@ -275,6 +315,10 @@ class EmergencyContact(models.Model):
         'dmw': 'https://dmw.gov.ph',
     }
 
+    # Types treated as public hotlines (shown to every OFW based on country),
+    # as opposed to personal contacts (family, employer, agency) that stay private.
+    PUBLIC_TYPES = ('embassy', 'polo', 'owwa', 'dmw', 'police', 'hospital')
+
     class Meta:
         db_table = 'tblemergencycontact'
         ordering = ['contact_type', 'name']
@@ -285,6 +329,58 @@ class EmergencyContact(models.Model):
     def website_url(self):
         """Return the resolved website, falling back to a type default."""
         return self.website or self.DEFAULT_WEBSITES.get(self.contact_type, '')
+
+
+class EmergencyContactRequest(models.Model):
+    """A request by an OFW to add a family emergency contact.
+
+    The management team reviews each request; approving one creates a
+    matching :class:`EmergencyContact` owned by the requesting OFW.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='contact_requests',
+        on_delete=models.CASCADE,
+    )
+    ofw = models.ForeignKey(
+        OFWProfile,
+        related_name='contact_requests',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    name = models.CharField(max_length=200, help_text='Family member to contact')
+    relationship = models.CharField(max_length=120, blank=True)
+    phone = models.CharField(max_length=60)
+    email = models.EmailField(max_length=255, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='reviewed_contact_requests',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    review_notes = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'tblemergencycontactrequest'
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f'{self.name} ({self.get_status_display()})'
 
 
 class MonitoringReport(models.Model):

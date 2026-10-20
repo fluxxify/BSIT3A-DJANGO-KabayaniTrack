@@ -16,32 +16,34 @@
     Keep these numbers handy. In an emergency, contact your embassy, POLO, OWWA or DMW office first.
   </div>
 
-  <div class="card">
-    <div class="card-header"><h3 class="card-title">Directory</h3></div>
+  {% if location_country %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-location-dot me-2 text-primary"></i>
+        Hotlines for {{ location_country }}{% if location_city %} · {{ location_city }}{% endif %}
+      </h3>
+      <div class="card-actions">
+        <span class="text-muted small">Matched automatically from your profile</span>
+      </div>
+    </div>
     <div class="table-responsive">
       <table class="table table-vcenter card-table">
         <thead>
-          <tr><th>Contact</th><th>Type</th><th>Location</th><th>Phone</th><th>Email</th><th class="w-1">Actions</th></tr>
+          <tr><th>Office</th><th>Type</th><th>City</th><th>Phone</th><th class="w-1">Actions</th></tr>
         </thead>
         <tbody>
-          {% for contact in contacts %}
+          {% for contact in local_hotlines %}
           <tr>
             <td class="fw-medium">{{ contact.name }}</td>
             <td>{{ contact.get_contact_type_display }}</td>
-            <td class="text-muted">
-              {{ contact.city }}{% if contact.city and contact.country %}, {% endif %}{{ contact.country }}
-            </td>
+            <td class="text-muted">{{ contact.city|default:'—' }}</td>
             <td><a href="tel:{{ contact.phone|cut:' ' }}">{{ contact.phone }}</a></td>
-            <td class="text-muted">
-              {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}
-            </td>
             <td>
               <div class="d-flex gap-1">
-                {% if contact.phone %}
-                <a href="tel:{{ contact.phone|cut:' ' }}" class="btn btn-ghost-secondary btn-icon btn-sm" title="Emergency hotline call">
-                  <i class="fas fa-phone text-success"></i>
+                <a href="tel:{{ contact.phone|cut:' ' }}" class="btn btn-ghost-success btn-icon btn-sm" title="Emergency hotline call">
+                  <i class="fas fa-phone"></i>
                 </a>
-                {% endif %}
                 {% if contact.website_url %}
                 <a href="{{ contact.website_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Open Website">
                   <i class="fas fa-globe text-primary"></i>
@@ -51,10 +53,161 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="6" class="text-muted text-center">No emergency contacts available yet.</td></tr>
+          <tr>
+            <td colspan="5" class="text-muted text-center">
+              No hotlines are on file for {{ location_country }} yet. Please contact the management team.
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    <i class="fas fa-triangle-exclamation me-2"></i>
+    Set your <strong>country of deployment</strong> in your profile to see the hotlines for your area.
+    <a href="{% url 'ofw:portal_profile' %}" class="alert-link">Update my profile</a>
+  </div>
+  {% endif %}
+
+  {% if national_hotlines %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-flag me-2 text-danger"></i>
+        National Hotlines (Philippines · 24/7)
+      </h3>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Office</th><th>Phone</th><th>Email</th><th class="w-1">Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for contact in national_hotlines %}
+          <tr>
+            <td class="fw-medium">{{ contact.name }}</td>
+            <td><a href="tel:{{ contact.phone|cut:' ' }}">{{ contact.phone }}</a></td>
+            <td class="text-muted">
+              {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="tel:{{ contact.phone|cut:' ' }}" class="btn btn-ghost-success btn-icon btn-sm" title="Call">
+                  <i class="fas fa-phone"></i>
+                </a>
+                {% if contact.website_url %}
+                <a href="{{ contact.website_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Open Website">
+                  <i class="fas fa-globe text-primary"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-people-roof me-2 text-success"></i>My Family Emergency Contacts</h3>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Name</th><th>Relationship</th><th>Phone</th><th>Email</th><th>Address</th></tr>
+        </thead>
+        <tbody>
+          {% for contact in my_contacts %}
+          <tr>
+            <td class="fw-medium">{{ contact.name }}</td>
+            <td>{{ contact.get_contact_type_display }}</td>
+            <td><a href="tel:{{ contact.phone|cut:' ' }}">{{ contact.phone }}</a></td>
+            <td class="text-muted">
+              {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}
+            </td>
+            <td class="text-muted">{{ contact.address|default:'—' }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-muted text-center">
+              You have no family emergency contact on file yet. Send a request below.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row row-deck row-cards">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-paper-plane me-2 text-primary"></i>Request a Family Emergency Contact</h3>
+        </div>
+        <div class="card-body">
+          <p class="text-muted">
+            Add the contact details of a family member. The management team will review your
+            request and add it to your emergency contacts once approved.
+          </p>
+          {% if form.errors %}
+          <div class="alert alert-danger">Please fix the errors below.</div>
+          {% endif %}
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="row g-3">
+              {% for field in form %}
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">
+                  {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ field }}
+                {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
+                {% for error in field.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </div>
+            <div class="mt-3">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane me-2"></i>Submit Request
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-clock-rotate-left me-2 text-secondary"></i>My Requests</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr><th>Family Member</th><th>Phone</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {% for row in request_rows %}
+              <tr>
+                <td class="fw-medium">{{ row.obj.name }}</td>
+                <td>{{ row.obj.phone }}</td>
+                <td><span class="badge {{ row.status_badge }}">{{ row.obj.get_status_display }}</span></td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="text-muted text-center">No requests submitted yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>

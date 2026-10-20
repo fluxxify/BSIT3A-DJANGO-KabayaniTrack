@@ -129,3 +129,11 @@ LOGOUT_REDIRECT_URL = '/'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Concern proof uploads (photos/videos from the OFW portal)
+# DATA_UPLOAD_MAX_MEMORY_SIZE caps the whole request body; without raising it
+# any video larger than the 2.5 MB Django default is rejected with a 400.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 512 * 1024 * 1024  # 512 MB
+# Files above this threshold spill to a temp file on disk instead of RAM.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+DATA_UPLOAD_MAX_NUMBER_FILES = 20

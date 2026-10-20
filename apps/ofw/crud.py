@@ -24,9 +24,10 @@ PER_PAGE = 10
 def _scoped(user, model):
     """Return the queryset of records the user is allowed to see.
 
-    Superusers see everything; regular users only their own records.
+    Management users (staff and superusers) see everything; OFW accounts only
+    their own records.
     """
-    if user.is_superuser:
+    if user.is_superuser or user.is_staff:
         return model.objects.all()
     return model.objects.filter(user=user)
 

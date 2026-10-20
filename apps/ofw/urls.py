@@ -54,6 +54,10 @@ urlpatterns = [
     path('contacts/ajax/save/', views.contact_save_ajax, name='contact_save_ajax'),
     path('contacts/ajax/delete/<int:pk>/', views.contact_delete_ajax, name='contact_delete_ajax'),
 
+    # Family emergency-contact requests (OFW submits, management reviews)
+    path('contact-requests/', views.contact_request_list_page, name='contact_request_list'),
+    path('contact-requests/<int:pk>/decide/', views.contact_request_decide, name='contact_request_decide'),
+
     # Monitoring reports
     path('reports/', views.report_list_page, name='report_list'),
     path('reports/ajax/list/', views.report_list_ajax, name='report_list_ajax'),

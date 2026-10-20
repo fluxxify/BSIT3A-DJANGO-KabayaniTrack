@@ -9,13 +9,19 @@ from django.db import IntegrityError
 from django.db.models import Q
 
 
-def _is_superuser(user):
+def _is_admin(user):
+    """Only administrators (superusers) may manage accounts."""
     return user.is_superuser
+
+
+def _can_touch(actor, target):
+    """A non-superuser staff member must never modify a superuser account."""
+    return actor.is_superuser or not target.is_superuser
 
 
 # PAGE
 @login_required(login_url='login')
-@user_passes_test(_is_superuser, login_url='dashboard')
+@user_passes_test(_is_admin, login_url='dashboard')
 def user_list_page(request):
     query = request.GET.get('q', '').strip()
 
@@ -41,7 +47,7 @@ def user_list_page(request):
 
 # LIST USERS (AJAX)
 @login_required(login_url='login')
-@user_passes_test(_is_superuser, login_url='dashboard')
+@user_passes_test(_is_admin, login_url='dashboard')
 def user_list_ajax(request):
     users_list = User.objects.all().order_by('-date_joined')
     paginator = Paginator(users_list, 10)
@@ -69,9 +75,11 @@ def user_list_ajax(request):
 
 # GET SINGLE USER (AJAX)
 @login_required(login_url='login')
-@user_passes_test(_is_superuser, login_url='dashboard')
+@user_passes_test(_is_admin, login_url='dashboard')
 def user_get_ajax(request, pk):
     user = get_object_or_404(User, pk=pk)
+    if not _can_touch(request.user, user):
+        return JsonResponse({"error": "You cannot manage a superuser account."}, status=403)
     return JsonResponse({
         "id":         user.id,
         "username":   user.username,
@@ -85,13 +93,15 @@ def user_get_ajax(request, pk):
 
 # CREATE / UPDATE USER (AJAX)
 @login_required(login_url='login')
-@user_passes_test(_is_superuser, login_url='dashboard')
+@user_passes_test(_is_admin, login_url='dashboard')
 @require_POST
 def user_save_ajax(request):
     user_id = request.POST.get("id")
 
     if user_id:
         user = get_object_or_404(User, pk=user_id)
+        if not _can_touch(request.user, user):
+            return JsonResponse({"error": "You cannot manage a superuser account."}, status=403)
         is_update = True
     else:
         user = User()
@@ -148,12 +158,14 @@ def user_save_ajax(request):
 
 # DELETE USER (AJAX)
 @login_required(login_url='login')
-@user_passes_test(_is_superuser, login_url='dashboard')
+@user_passes_test(_is_admin, login_url='dashboard')
 @require_POST
 def user_delete_ajax(request, pk):
     user = get_object_or_404(User, pk=pk)
     if request.user == user:
         return JsonResponse({"error": "You cannot delete yourself"}, status=400)
+    if not _can_touch(request.user, user):
+        return JsonResponse({"error": "You cannot manage a superuser account."}, status=403)
     username = user.username
     user.delete()
     return JsonResponse({

@@ -49,6 +49,11 @@
               <a href="{% url 'ofw:portal' %}" class="btn btn-outline-secondary">Cancel</a>
             </div>
           </form>
+
+          <datalist id="country-options">
+            {% for country in country_options %}<option value="{{ country }}"></option>{% endfor %}
+          </datalist>
+          <datalist id="city-options"></datalist>
         </div>
       </div>
     </div>
@@ -68,4 +73,30 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var CITIES_BY_COUNTRY = {{ cities_by_country_json|safe }};
+    var countryField = document.getElementById('id_country');
+    var cityField = document.getElementById('id_city_abroad');
+    var cityList = document.getElementById('city-options');
+    if (!countryField || !cityField || !cityList) return;
+
+    function refreshCities() {
+      var cities = CITIES_BY_COUNTRY[countryField.value] || [];
+      cityList.innerHTML = '';
+      cities.forEach(function (city) {
+        var option = document.createElement('option');
+        option.value = city;
+        cityList.appendChild(option);
+      });
+    }
+
+    countryField.addEventListener('input', refreshCities);
+    countryField.addEventListener('change', refreshCities);
+    refreshCities();
+  })();
+</script>
 {% endblock %}

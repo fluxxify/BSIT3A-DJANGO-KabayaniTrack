@@ -48,8 +48,22 @@
           {% endfor %}
           {% endif %}
           <div class="mb-3">
+            <label class="form-label required">Account type</label>
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="fas fa-user-shield text-secondary"></i>
+              </span>
+              <select class="form-select" name="account_type" required {% if locked %}disabled{% endif %}>
+                <option value="" disabled {% if not selected_type %}selected{% endif %}>Select the account you are signing in as</option>
+                {% for value, label in account_types %}
+                <option value="{{ value }}" {% if value == selected_type %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">Username</label>
-            <input type="text" class="form-control" name="username" autocomplete="off" {% if locked %}disabled{% endif %}>
+            <input type="text" class="form-control" name="username" autocomplete="off" value="{{ username|default:'' }}" {% if locked %}disabled{% endif %}>
           </div>
           <div class="mb-2">
             <label class="form-label">

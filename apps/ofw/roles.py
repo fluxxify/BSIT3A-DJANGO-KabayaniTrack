@@ -9,6 +9,30 @@ from django.contrib.auth.models import Group
 
 OFW_GROUP_NAME = 'OFW'
 
+ACCOUNT_ADMIN = 'admin'
+ACCOUNT_OFW = 'ofw'
+ACCOUNT_STAFF = 'staff'
+
+ACCOUNT_TYPE_CHOICES = [
+    (ACCOUNT_ADMIN, 'Administrator'),
+    (ACCOUNT_OFW, 'OFW'),
+    (ACCOUNT_STAFF, 'Staff'),
+]
+
+
+def account_role(user):
+    """Return the account-type key ('admin', 'staff' or 'ofw') for a user."""
+    if user.is_superuser:
+        return ACCOUNT_ADMIN
+    if user.is_staff:
+        return ACCOUNT_STAFF
+    return ACCOUNT_OFW
+
+
+def account_role_label(role):
+    """Return the human-readable label for an account-type key."""
+    return dict(ACCOUNT_TYPE_CHOICES).get(role, 'account')
+
 
 def is_ofw(user):
     """Return True when the user should land in the OFW self-service portal."""
@@ -24,6 +48,13 @@ def is_management(user):
     if not getattr(user, 'is_authenticated', False):
         return False
     return user.is_superuser or user.is_staff
+
+
+def can_access_info(user):
+    """Info records: administrators see all, OFWs see their own, staff is blocked."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return user.is_superuser or not user.is_staff
 
 
 def mark_as_ofw(user):

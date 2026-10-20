@@ -3,7 +3,9 @@ from django.contrib import admin
 from .models import (
     CheckIn,
     Concern,
+    ConcernProof,
     EmergencyContact,
+    EmergencyContactRequest,
     MonitoringReport,
     OFWProfile,
     WelfareAssessment,
@@ -31,11 +33,18 @@ class CheckInAdmin(admin.ModelAdmin):
     search_fields = ('ofw__first_name', 'ofw__last_name', 'notes')
 
 
+class ConcernProofInline(admin.TabularInline):
+    model = ConcernProof
+    extra = 0
+    readonly_fields = ('uploaded_at',)
+
+
 @admin.register(Concern)
 class ConcernAdmin(admin.ModelAdmin):
     list_display = ('title', 'ofw', 'category', 'severity', 'status', 'reported_date')
     list_filter = ('category', 'severity', 'status')
     search_fields = ('title', 'description', 'ofw__first_name', 'ofw__last_name')
+    inlines = [ConcernProofInline]
 
 
 @admin.register(EmergencyContact)
@@ -43,6 +52,14 @@ class EmergencyContactAdmin(admin.ModelAdmin):
     list_display = ('name', 'contact_type', 'country', 'city', 'phone', 'email', 'website')
     list_filter = ('contact_type', 'country')
     search_fields = ('name', 'country', 'city', 'phone', 'email', 'website')
+
+
+@admin.register(EmergencyContactRequest)
+class EmergencyContactRequestAdmin(admin.ModelAdmin):
+    list_display = ('name', 'relationship', 'phone', 'user', 'status', 'created_at')
+    list_filter = ('status',)
+    search_fields = ('name', 'relationship', 'phone', 'user__username')
+    readonly_fields = ('created_at', 'reviewed_at', 'reviewed_by')
 
 
 @admin.register(MonitoringReport)

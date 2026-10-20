@@ -60,6 +60,40 @@
         <div class="card-header"><h3 class="card-title">Actions Taken</h3></div>
         <div class="card-body text-muted">{{ concern.actions_taken|default:"—"|linebreaksbr }}</div>
       </div>
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">Photo / Video Proof</h3></div>
+        <div class="card-body">
+          {% if concern.proofs.all %}
+          <div class="row g-2">
+            {% for proof in concern.proofs.all %}
+            <div class="col-6 col-md-4">
+              {% if proof.is_video %}
+              <video src="{{ proof.file.url }}" controls preload="metadata"
+                     class="rounded border w-100" style="max-height:220px;object-fit:contain;"></video>
+              <div class="text-muted small mt-1 text-truncate" title="{{ proof.display_name }}">
+                <i class="fas fa-video me-1"></i>{{ proof.display_name }}
+              </div>
+              {% elif proof.is_image %}
+              <a href="{{ proof.file.url }}" target="_blank">
+                <img src="{{ proof.file.url }}" alt="{{ proof.display_name }}"
+                     class="rounded border w-100" style="height:160px;object-fit:cover;">
+              </a>
+              <div class="text-muted small mt-1 text-truncate" title="{{ proof.display_name }}">
+                <i class="fas fa-image me-1"></i>{{ proof.display_name }}
+              </div>
+              {% else %}
+              <a href="{{ proof.file.url }}" target="_blank" class="btn btn-outline-secondary w-100">
+                <i class="fas fa-file me-1"></i>{{ proof.display_name }}
+              </a>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">No proof files were attached to this concern.</p>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
 </div>

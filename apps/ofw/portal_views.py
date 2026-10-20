@@ -7,18 +7,34 @@ check-ins, assessments and concerns logged by management against an OFW's
 profile are surfaced back here because they are linked through the profile.
 """
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from .forms import OFWPortalProfileForm, OFWSelfCheckInForm, OFWSelfConcernForm
-from .models import CheckIn, Concern, EmergencyContact, OFWProfile, WelfareAssessment
+from .forms import (
+    FamilyContactRequestForm,
+    OFWPortalProfileForm,
+    OFWSelfCheckInForm,
+    OFWSelfConcernForm,
+)
+from .locations import CITIES_BY_COUNTRY, COUNTRY_CHOICES
+from .models import (
+    CheckIn,
+    Concern,
+    ConcernProof,
+    EmergencyContact,
+    EmergencyContactRequest,
+    OFWProfile,
+    WelfareAssessment,
+)
 from .roles import is_ofw
 from .views import (
     _concern_status_badge,
     _condition_badge,
+    _request_status_badge,
     _severity_badge,
     _welfare_badge,
 )
@@ -107,6 +123,8 @@ def portal_profile(request):
             _welfare_badge.get(profile.welfare_status, 'bg-secondary-lt text-secondary')
             if profile else 'bg-secondary-lt text-secondary'
         ),
+        'country_options': COUNTRY_CHOICES,
+        'cities_by_country_json': json.dumps(CITIES_BY_COUNTRY),
     })
 
 
@@ -158,7 +176,7 @@ def portal_concerns(request):
         return redirect('ofw:portal_profile')
 
     if request.method == 'POST':
-        form = OFWSelfConcernForm(request.POST)
+        form = OFWSelfConcernForm(request.POST, request.FILES)
         if form.is_valid():
             concern = form.save(commit=False)
             concern.ofw = profile
@@ -166,12 +184,34 @@ def portal_concerns(request):
             concern.reported_date = timezone.localdate()
             concern.status = Concern.Status.OPEN
             concern.save()
-            messages.success(request, 'Your concern has been submitted to the management team.')
+            proof_files = form.cleaned_data.get('proof_files') or []
+            for uploaded in proof_files:
+                ConcernProof.objects.create(
+                    concern=concern,
+                    file=uploaded,
+                    original_name=uploaded.name,
+                )
+            if proof_files:
+                messages.success(
+                    request,
+                    'Your concern has been submitted to the management team '
+                    f'with {len(proof_files)} proof file'
+                    f'{"s" if len(proof_files) > 1 else ""} attached.',
+                )
+            else:
+                messages.success(
+                    request, 'Your concern has been submitted to the management team.'
+                )
             return redirect('ofw:portal_concerns')
     else:
         form = OFWSelfConcernForm()
 
-    concerns = Concern.objects.filter(ofw__user=request.user).order_by('-reported_date', '-id')
+    concerns = (
+        Concern.objects
+        .filter(ofw__user=request.user)
+        .prefetch_related('proofs')
+        .order_by('-reported_date', '-id')
+    )
     concern_rows = [
         {
             'obj': c,
@@ -193,9 +233,66 @@ def portal_contacts(request):
     if guard:
         return guard
 
-    contacts = (
+    profile = _profile_for(request.user)
+    location_country = profile.country.strip() if profile and profile.country else ''
+    location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
+
+    if request.method == 'POST':
+        form = FamilyContactRequestForm(request.POST)
+        if form.is_valid():
+            contact_request = form.save(commit=False)
+            contact_request.user = request.user
+            contact_request.ofw = profile
+            contact_request.save()
+            messages.success(
+                request,
+                'Your request has been submitted. The management team will review it shortly.',
+            )
+            return redirect('ofw:portal_contacts')
+    else:
+        form = FamilyContactRequestForm()
+
+    # Public hotlines: the OFW's deployment country plus the national Philippine
+    # hotlines (DMW / OWWA) that apply wherever they are posted.
+    hotline_countries = {'Philippines'}
+    if location_country:
+        hotline_countries.add(location_country)
+
+    hotlines = (
         EmergencyContact.objects
-        .filter(Q(user=request.user) | Q(user__isnull=True))
+        .filter(
+            contact_type__in=EmergencyContact.PUBLIC_TYPES,
+            country__in=sorted(hotline_countries),
+        )
+        .order_by('country', 'contact_type', 'name')
+    )
+    local_hotlines = [
+        c for c in hotlines if location_country and c.country == location_country
+    ]
+    national_hotlines = [c for c in hotlines if c.country == 'Philippines']
+
+    my_contacts = (
+        EmergencyContact.objects
+        .filter(user=request.user)
         .order_by('contact_type', 'name')
     )
-    return render(request, 'ofw/portal/contacts.html', {'contacts': contacts})
+    request_rows = [
+        {
+            'obj': r,
+            'status_badge': _request_status_badge.get(
+                r.status, 'bg-secondary-lt text-secondary'
+            ),
+        }
+        for r in EmergencyContactRequest.objects.filter(user=request.user)
+    ]
+
+    return render(request, 'ofw/portal/contacts.html', {
+        'profile': profile,
+        'location_country': location_country,
+        'location_city': location_city,
+        'local_hotlines': local_hotlines,
+        'national_hotlines': national_hotlines,
+        'my_contacts': my_contacts,
+        'request_rows': request_rows,
+        'form': form,
+    })
