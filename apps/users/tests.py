@@ -66,3 +66,20 @@ class UserManagementAccessTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertTrue(User.objects.filter(pk=self.admin.pk).exists())
+
+    def test_admin_can_change_user_password(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:user_save_ajax'), {
+            'id': self.ofw.pk,
+            'username': self.ofw.username,
+            'first_name': self.ofw.first_name,
+            'last_name': self.ofw.last_name,
+            'email': self.ofw.email,
+            'password': 'NewPassw0rd!23',
+            'is_active': 'true',
+            'is_staff': 'false',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.ofw.refresh_from_db()
+        self.assertTrue(self.ofw.check_password('NewPassw0rd!23'))
+        self.assertFalse(self.ofw.check_password('Passw0rd!23'))
