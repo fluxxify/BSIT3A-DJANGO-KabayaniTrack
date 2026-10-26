@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 
@@ -19,6 +20,7 @@ from apps.ofw.models import (
     Concern,
     ConcernProof,
     EmergencyContact,
+    MonitoringReport,
     Notification,
     OFWProfile,
 )
@@ -385,6 +387,121 @@ class ConcernProofUploadTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(CheckIn.objects.get().contact_person, 'Kuya Ben')
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+class RecordCleanupTests(TestCase):
+    """Deleting records must also remove their files and stale notifications."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='cleanup_ofw', password='Passw0rd!23'
+        )
+        self.staff = User.objects.create_user(
+            username='cleanup_staff', password='Passw0rd!23', is_staff=True
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user,
+            first_name='Cleanup',
+            last_name='Test',
+            country='Qatar',
+        )
+
+    def test_deleting_concern_removes_proof_files_and_notifications(self):
+        concern = Concern.objects.create(
+            ofw=self.profile,
+            user=self.user,
+            title='Concern with proof',
+            category='other',
+            severity='low',
+            status='open',
+            reported_date=timezone.localdate(),
+        )
+        proof = ConcernProof.objects.create(
+            concern=concern,
+            file=SimpleUploadedFile('proof.png', b'\x89PNG fakepng', 'image/png'),
+            original_name='proof.png',
+        )
+        notification = Notification.objects.create(
+            recipient=self.staff,
+            title='New concern',
+            url=reverse('ofw:concern_detail', args=[concern.pk]),
+        )
+        proof_path = proof.file.path
+        self.assertTrue(os.path.exists(proof_path))
+
+        concern.delete()
+
+        self.assertFalse(os.path.exists(proof_path))
+        self.assertFalse(Notification.objects.filter(pk=notification.pk).exists())
+
+    def test_deleting_checkin_removes_notifications(self):
+        checkin = CheckIn.objects.create(
+            ofw=self.profile,
+            user=self.user,
+            checkin_date=timezone.now(),
+            method=CheckIn.Method.APP,
+            condition=CheckIn.Condition.SAFE,
+        )
+        notification = Notification.objects.create(
+            recipient=self.staff,
+            title='New check-in',
+            url=reverse('ofw:checkin_detail', args=[checkin.pk]),
+        )
+
+        checkin.delete()
+
+        self.assertFalse(Notification.objects.filter(pk=notification.pk).exists())
+
+    def test_deleting_profile_removes_picture_and_notifications(self):
+        self.profile.profile_picture.save(
+            'profile.png',
+            SimpleUploadedFile('profile.png', b'\x89PNG fakepng', 'image/png'),
+        )
+        picture_path = self.profile.profile_picture.path
+        notification = Notification.objects.create(
+            recipient=self.staff,
+            title='New OFW',
+            url=reverse('ofw:profile_detail', args=[self.profile.pk]),
+        )
+        self.assertTrue(os.path.exists(picture_path))
+
+        self.profile.delete()
+
+        self.assertFalse(os.path.exists(picture_path))
+        self.assertFalse(Notification.objects.filter(pk=notification.pk).exists())
+
+    def test_replacing_profile_picture_removes_old_file(self):
+        self.profile.profile_picture.save(
+            'old.png',
+            SimpleUploadedFile('old.png', b'\x89PNG oldpng', 'image/png'),
+        )
+        old_path = self.profile.profile_picture.path
+        self.assertTrue(os.path.exists(old_path))
+
+        self.profile.profile_picture.save(
+            'new.png',
+            SimpleUploadedFile('new.png', b'\x89PNG newpng', 'image/png'),
+        )
+        new_path = self.profile.profile_picture.path
+
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(new_path))
+
+    def test_deleting_report_removes_attachment(self):
+        report = MonitoringReport.objects.create(
+            user=self.user,
+            title='Monthly report',
+            period_start=timezone.localdate(),
+            period_end=timezone.localdate(),
+            attachment=SimpleUploadedFile('report.pdf', b'%PDF fake', 'application/pdf'),
+        )
+        attachment_path = report.attachment.path
+        self.assertTrue(os.path.exists(attachment_path))
+
+        report.delete()
+
+        self.assertFalse(os.path.exists(attachment_path))
 
 
 class StaffFullAccessTests(TestCase):

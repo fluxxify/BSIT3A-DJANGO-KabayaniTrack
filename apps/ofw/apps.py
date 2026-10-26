@@ -6,3 +6,6 @@ class OfwConfig(AppConfig):
     name = 'apps.ofw'
     label = 'kabayan'
     verbose_name = 'OFW Monitoring & Support'
+
+    def ready(self):
+        from . import signals  # noqa: F401
