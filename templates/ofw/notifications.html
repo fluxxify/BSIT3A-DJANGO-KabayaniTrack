@@ -67,7 +67,12 @@
               <i class="far fa-clock me-1"></i>{{ row.obj.created_at|date:"M d, Y H:i" }}
             </div>
           </div>
-          <div class="d-flex gap-1">
+          <div class="d-flex gap-1 flex-wrap justify-content-end">
+            <a href="{% url 'ofw:notification_open' row.obj.pk %}"
+               class="btn btn-sm btn-outline-primary"
+               title="View notification">
+              <i class="far fa-eye me-1"></i>View
+            </a>
             {% if not row.obj.is_read %}
             <form method="post" action="{% url 'ofw:notification_mark_read' row.obj.pk %}">
               {% csrf_token %}

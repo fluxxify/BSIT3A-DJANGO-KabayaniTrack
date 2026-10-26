@@ -1238,6 +1238,7 @@ class NotificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Staff alert')
         self.assertNotContains(response, 'OFW alert')
+        self.assertContains(response, 'title="View notification"')
         self.assertEqual(response.context['unread_count'], 1)
 
     def test_notification_open_marks_read_and_redirects(self):
