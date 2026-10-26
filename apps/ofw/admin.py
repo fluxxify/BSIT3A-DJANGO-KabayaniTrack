@@ -5,8 +5,8 @@ from .models import (
     Concern,
     ConcernProof,
     EmergencyContact,
-    EmergencyContactRequest,
     MonitoringReport,
+    Notification,
     OFWProfile,
     WelfareAssessment,
 )
@@ -54,16 +54,16 @@ class EmergencyContactAdmin(admin.ModelAdmin):
     search_fields = ('name', 'country', 'city', 'phone', 'email', 'website')
 
 
-@admin.register(EmergencyContactRequest)
-class EmergencyContactRequestAdmin(admin.ModelAdmin):
-    list_display = ('name', 'relationship', 'phone', 'user', 'status', 'created_at')
-    list_filter = ('status',)
-    search_fields = ('name', 'relationship', 'phone', 'user__username')
-    readonly_fields = ('created_at', 'reviewed_at', 'reviewed_by')
-
-
 @admin.register(MonitoringReport)
 class MonitoringReportAdmin(admin.ModelAdmin):
     list_display = ('title', 'report_type', 'period_start', 'period_end', 'country', 'status')
     list_filter = ('report_type', 'status')
     search_fields = ('title', 'country', 'summary')
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ('title', 'recipient', 'level', 'is_read', 'created_at')
+    list_filter = ('level', 'is_read', 'created_at')
+    search_fields = ('title', 'message', 'recipient__username')
+    readonly_fields = ('created_at',)

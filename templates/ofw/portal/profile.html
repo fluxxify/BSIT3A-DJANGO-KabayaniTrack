@@ -23,13 +23,36 @@
           <h3 class="card-title">Personal &amp; Deployment Details</h3>
         </div>
         <div class="card-body">
-          <form method="post" novalidate>
+          <form method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}
             <div class="alert alert-danger">{{ form.non_field_errors }}</div>
             {% endif %}
             <div class="row g-3">
               {% for field in form %}
+              {% if field.name == 'profile_picture' %}
+              <div class="col-12">
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                  {% if profile.profile_picture %}
+                  <img src="{{ profile.profile_picture.url }}" alt="Profile picture"
+                       class="rounded border" style="width:96px;height:96px;object-fit:cover;">
+                  {% else %}
+                  <span class="d-inline-flex align-items-center justify-content-center rounded border bg-light text-muted"
+                        style="width:96px;height:96px;">
+                    <i class="fas fa-user fa-2x"></i>
+                  </span>
+                  {% endif %}
+                  <div class="flex-grow-1" style="min-width:220px;">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}
+                    <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+              {% else %}
               <div class="col-12 col-md-6">
                 <label class="form-label" for="{{ field.id_for_label }}">
                   {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
@@ -40,6 +63,7 @@
                 <div class="text-danger small mt-1">{{ error }}</div>
                 {% endfor %}
               </div>
+              {% endif %}
               {% endfor %}
             </div>
             <div class="mt-4 d-flex gap-2">
@@ -78,14 +102,17 @@
 {% block extra_js %}
 <script>
   (function () {
-    var CITIES_BY_COUNTRY = {{ cities_by_country_json|safe }};
+    var citiesUrl = "{% url 'ofw:portal_cities' %}";
     var countryField = document.getElementById('id_country');
     var cityField = document.getElementById('id_city_abroad');
     var cityList = document.getElementById('city-options');
     if (!countryField || !cityField || !cityList) return;
 
-    function refreshCities() {
-      var cities = CITIES_BY_COUNTRY[countryField.value] || [];
+    var cache = {};
+    var pending = 0;
+    var timer = null;
+
+    function render(cities) {
       cityList.innerHTML = '';
       cities.forEach(function (city) {
         var option = document.createElement('option');
@@ -94,8 +121,37 @@
       });
     }
 
-    countryField.addEventListener('input', refreshCities);
-    countryField.addEventListener('change', refreshCities);
+    function refreshCities() {
+      var country = countryField.value.trim();
+      if (!country) {
+        cityList.innerHTML = '';
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(cache, country)) {
+        render(cache[country]);
+        return;
+      }
+      var requestId = ++pending;
+      fetch(citiesUrl + '?country=' + encodeURIComponent(country), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function (response) { return response.ok ? response.json() : { cities: [] }; })
+        .then(function (data) {
+          if (requestId !== pending) return;  // a newer country is being typed
+          cache[country] = data.cities || [];
+          render(cache[country]);
+        })
+        .catch(function () { /* keep the previous suggestions on network errors */ });
+    }
+
+    countryField.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(refreshCities, 250);
+    });
+    countryField.addEventListener('change', function () {
+      clearTimeout(timer);
+      refreshCities();
+    });
     refreshCities();
   })();
 </script>

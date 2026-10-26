@@ -1,4 +1,29 @@
 {% extends "theme/base.html" %}
+{% load static %}
+{% block extra_css %}
+<style>
+  .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  #deployment-map {
+    background: radial-gradient(circle at 50% 38%, #0d2347 0%, #071224 55%, #030712 100%);
+    border-radius: .5rem;
+    overflow: hidden;
+    cursor: grab;
+  }
+  #deployment-map:active {
+    cursor: grabbing;
+  }
+  #deployment-map canvas {
+    outline: none;
+  }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -110,24 +135,6 @@
     <div class="col-sm-6 col-lg-3">
       <div class="card">
         <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="subheader">Reports</div>
-          </div>
-          <div class="d-flex align-items-baseline">
-            <div class="h1 mb-0 me-2">{{ stats.kpi.reports_total }}</div>
-            <i class="fas fa-file-lines text-muted"></i>
-          </div>
-        </div>
-        <div class="card-footer">
-          <a href="{{ stats.links.reports_total }}" class="text-decoration-none">
-            View reports <i class="ti ti-arrow-right ms-1"></i>
-          </a>
-        </div>
-      </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-      <div class="card">
-        <div class="card-body">
           <div class="subheader mb-2">Welfare Distribution</div>
           {% for item in stats.welfare_chart %}
           <div class="d-flex justify-content-between">
@@ -144,6 +151,65 @@
           <a href="{{ stats.links.welfare_status }}" class="text-decoration-none">
             View all OFWs <i class="ti ti-arrow-right ms-1"></i>
           </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="fas fa-earth-asia me-2 text-primary"></i>OFW Deployment Map
+            <span class="badge bg-blue-lt ms-2">3D Globe</span>
+          </h3>
+          <div class="card-actions">
+            <div class="input-icon">
+              <span class="input-icon-addon">
+                <i class="fas fa-magnifying-glass"></i>
+              </span>
+              <input type="text" id="deployment-search" class="form-control form-control-sm"
+                     placeholder="Search country or OFW..." autocomplete="off"
+                     {% if not stats.map_markers %}disabled{% endif %}>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if stats.map_markers %}
+          <div class="row">
+            <div class="col-lg-8">
+              <div id="deployment-map" style="width: 100%; height: 460px;"></div>
+              <div class="d-flex flex-wrap gap-3 mt-2 small text-muted">
+                <span><span class="legend-dot" style="background:linear-gradient(90deg,#4dd0e1,#ffd43b)"></span> Country height &amp; shading = number of OFWs</span>
+                <span><span class="legend-dot" style="background:#ff6b6b"></span> Dot = individual OFW (click to open)</span>
+                <span><i class="fas fa-hand-pointer me-1"></i>Drag to rotate &middot; scroll to zoom</span>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="subheader mb-2">Assignments by Country</div>
+              <div class="table-responsive" id="deployment-country-list">
+                <table class="table table-vcenter card-table table-sm">
+                  <thead>
+                    <tr><th>Country</th><th class="text-end w-1">OFWs</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for row in stats.deployment_countries %}
+                    <tr class="deployment-country-row" data-country="{{ row.country }}">
+                      <td><a href="{{ row.link }}" class="text-decoration-none">{{ row.country }}</a></td>
+                      <td class="text-end"><span class="badge bg-blue-lt text-blue">{{ row.count }}</span></td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="text-muted text-center py-4">
+            No OFWs have been assigned a country of deployment yet.
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -203,4 +269,236 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if stats.map_markers %}
+<script src="{% static 'libs/globe.gl/globe.gl.min.js' %}"></script>
+<script>
+  (function () {
+    function initDeploymentMap() {
+      if (typeof Globe === 'undefined') {
+        return false;
+      }
+      var el = document.getElementById('deployment-map');
+      if (!el) {
+        return false;
+      }
+      var regions = {{ stats.map_regions_json|safe }};
+      var ofws = {{ stats.map_ofws_json|safe }};
+      var countryLinks = {{ stats.country_links_json|safe }};
+
+      var geoUrl = '{% static "data/countries.geojson" %}';
+      var earthUrl = '{% static "data/earth-night.jpg" %}';
+
+      function esc(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      var isoByCountry = {};
+      var coordsByCountry = {};
+      var countryByIso = {};
+      ofws.forEach(function (o) {
+        isoByCountry[o.country] = o.iso2;
+        if (!coordsByCountry[o.country]) {
+          coordsByCountry[o.country] = { lat: o.lat, lng: o.lng };
+        }
+        if (o.iso2 && !countryByIso[o.iso2]) {
+          countryByIso[o.iso2] = o.country;
+        }
+      });
+
+      var counts = Object.keys(regions).map(function (key) { return regions[key]; });
+      var maxCount = Math.max.apply(null, counts.concat([1]));
+
+      function colorFor(count) {
+        if (!count) {
+          return 'rgba(110, 150, 200, 0.10)';
+        }
+        var t = maxCount <= 1 ? 0.75 : Math.log(count) / Math.log(maxCount);
+        var from = [77, 208, 225];
+        var to = [255, 212, 59];
+        return 'rgba(' + from.map(function (c, i) {
+          return Math.round(c + (to[i] - c) * t);
+        }).join(',') + ',0.85)';
+      }
+
+      function altitudeFor(count) {
+        if (!count) {
+          return 0.004;
+        }
+        var t = maxCount <= 1 ? 0.6 : Math.log(count) / Math.log(maxCount);
+        return 0.01 + t * 0.05;
+      }
+
+      var nameToIso = {
+        'Norway': 'NO', 'Bahrain': 'BH', 'Hong Kong': 'HK', 'Macao': 'MO',
+        'Macau': 'MO', 'Maldives': 'MV', 'Singapore': 'SG', 'Palau': 'PW', 'Guam': 'GU'
+      };
+
+      function isoOf(feature) {
+        var p = (feature && feature.properties) || {};
+        var iso = p.ISO_A2;
+        if (!iso || iso === '-99') { iso = p.ISO_A2_EH; }
+        if (!iso || iso === '-99') { iso = nameToIso[p.NAME] || nameToIso[p.ADMIN] || ''; }
+        return iso;
+      }
+
+      var pointNavigationTimer = null;
+      var autoRotateResumeTimer = null;
+      var globe = new Globe(el)
+        .width(el.clientWidth)
+        .height(el.clientHeight)
+        .globeImageUrl(earthUrl)
+        .backgroundColor('rgba(0,0,0,0)')
+        .showAtmosphere(true)
+        .atmosphereColor('#4a9eff')
+        .atmosphereAltitude(0.22)
+        .polygonsData([])
+        .polygonAltitude(function (d) { return altitudeFor(regions[isoOf(d)] || 0); })
+        .polygonCapColor(function (d) { return colorFor(regions[isoOf(d)] || 0); })
+        .polygonSideColor(function () { return 'rgba(18, 48, 105, 0.55)'; })
+        .polygonStrokeColor(function () { return 'rgba(180, 215, 255, 0.30)'; })
+        .polygonCapCurvatureResolution(2)
+        .polygonLabel(function (d) {
+          var iso = isoOf(d);
+          var country = countryByIso[iso] || d.properties.NAME || '';
+          var count = regions[iso] || 0;
+          return '<b>' + esc(country) + '</b><br>' + count + ' OFW' + (count === 1 ? '' : 's');
+        })
+        .onPolygonClick(function (d) {
+          var country = countryByIso[isoOf(d)];
+          if (country && countryLinks[country]) {
+            window.location.href = countryLinks[country];
+          }
+        })
+        .onPolygonHover(function () {
+          el.style.cursor = 'pointer';
+        }, function () {
+          el.style.cursor = '';
+        })
+        .ringsData({{ stats.map_markers_json|safe }})
+        .ringLat('lat')
+        .ringLng('lng')
+        .ringColor(function () { return 'rgba(77, 171, 247, 0.55)'; })
+        .ringMaxRadius(function (d) { return 1.4 + Math.min(d.count, 8) * 0.5; })
+        .ringPropagationSpeed(1.1)
+        .ringRepeatPeriod(function (d) { return 1100 + Math.min(d.count, 8) * 120; })
+        .ringAltitude(0.07)
+        .pointsData(ofws)
+        .pointLat('lat')
+        .pointLng('lng')
+        .pointColor(function () { return '#ff6b6b'; })
+        .pointAltitude(0.085)
+        .pointRadius(0.16)
+        .pointsMerge(false)
+        .pointLabel(function (d) {
+          var where = d.city ? (d.city + ', ' + d.country) : d.country;
+          return '<b>' + esc(d.name) + '</b><br>' + esc(where) + '<br>' + esc(d.status);
+        })
+        .onPointClick(function (d) {
+          if (!d.link) { return; }
+
+          stopAutoRotate();
+          if (pointNavigationTimer) {
+            clearTimeout(pointNavigationTimer);
+          }
+          var duration = 1200;
+          globe.pointOfView({ lat: +d.lat, lng: +d.lng, altitude: 0.7 }, duration);
+          pointNavigationTimer = window.setTimeout(function () {
+            window.location.href = d.link;
+          }, duration + 100);
+        })
+        .pointOfView({ lat: 15, lng: 105, altitude: 2.2 });
+
+      window.tabler_deployment_map = globe;
+
+      function resizeGlobe() {
+        globe.width(el.clientWidth).height(el.clientHeight);
+      }
+      if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(resizeGlobe).observe(el);
+      } else {
+        window.addEventListener('resize', resizeGlobe);
+      }
+
+      var controls = globe.controls();
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 0.35;
+
+      function stopAutoRotate() {
+        controls.autoRotate = false;
+        if (autoRotateResumeTimer) {
+          clearTimeout(autoRotateResumeTimer);
+          autoRotateResumeTimer = null;
+        }
+      }
+
+      function resumeAutoRotateSoon() {
+        if (autoRotateResumeTimer) {
+          clearTimeout(autoRotateResumeTimer);
+        }
+        autoRotateResumeTimer = window.setTimeout(function () {
+          controls.autoRotate = true;
+        }, 3000);
+      }
+
+      el.addEventListener('pointerdown', stopAutoRotate);
+      el.addEventListener('pointerup', resumeAutoRotateSoon);
+      el.addEventListener('pointerleave', resumeAutoRotateSoon);
+
+      fetch(geoUrl)
+        .then(function (response) { return response.json(); })
+        .then(function (geojson) {
+          globe.polygonsData(geojson.features);
+        })
+        .catch(function (error) {
+          console.error('Unable to load country boundaries for the 3D map.', error);
+        });
+
+      var search = document.getElementById('deployment-search');
+      if (search) {
+        var rows = document.querySelectorAll('.deployment-country-row');
+        search.addEventListener('input', function () {
+          var term = search.value.trim().toLowerCase();
+          var firstMatch = null;
+          rows.forEach(function (row) {
+            var country = row.getAttribute('data-country') || '';
+            var match = !term || country.toLowerCase().indexOf(term) !== -1;
+            row.style.display = match ? '' : 'none';
+            if (match && term && !firstMatch) { firstMatch = country; }
+          });
+          ofws.forEach(function (o) {
+            if (term && o.name.toLowerCase().indexOf(term) !== -1 && !firstMatch) {
+              firstMatch = o.country;
+            }
+          });
+          if (term && firstMatch && coordsByCountry[firstMatch]) {
+            stopAutoRotate();
+            globe.pointOfView({ lat: coordsByCountry[firstMatch].lat,
+                                lng: coordsByCountry[firstMatch].lng,
+                                altitude: 1.5 }, 1000);
+            resumeAutoRotateSoon();
+          } else if (!term) {
+            stopAutoRotate();
+            globe.pointOfView({ lat: 15, lng: 105, altitude: 2.2 }, 1000);
+            resumeAutoRotateSoon();
+          }
+        });
+      }
+
+      return true;
+    }
+
+    if (!initDeploymentMap()) {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDeploymentMap, { once: true });
+      }
+      window.addEventListener('load', initDeploymentMap, { once: true });
+    }
+  })();
+</script>
+{% endif %}
 {% endblock %}

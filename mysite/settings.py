@@ -10,22 +10,65 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _env_bool(name, default=False):
+    return os.environ.get(name, str(default)).strip().lower() in {
+        '1', 'true', 'yes', 'on',
+    }
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-zsnno#^l!whuzs%55j6*366px#r09+borh$1^2mj*_ovz47!o_'
+DEBUG = _env_bool('DJANGO_DEBUG', True)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '').strip()
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-zsnno#^l!whuzs%55j6*366px#r09+borh$1^2mj*_ovz47!o_'
+    else:
+        raise ImproperlyConfigured(
+            'DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=0.'
+        )
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Hosts allowed to serve the app. Dev defaults cover localhost plus any host
+# passed through the DJANGO_ALLOWED_HOSTS environment variable (e.g. a tunnel).
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.0.8.166', '192.168.137.1', '100.113.159.28']
+_extra_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+if _extra_hosts:
+    ALLOWED_HOSTS += [h.strip() for h in _extra_hosts.split(',') if h.strip()]
+elif not DEBUG:
+    raise ImproperlyConfigured(
+        'DJANGO_ALLOWED_HOSTS must be set when DJANGO_DEBUG=0.'
+    )
 
-ALLOWED_HOSTS = []
+# Origins trusted for CSRF-protected POSTs (login, register, forms). When served
+# behind an HTTPS tunnel or hosting provider the public origin must be listed
+# here explicitly.
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://10.0.8.166:8000',
+    'http://192.168.137.1:8000',
+    'http://100.113.159.28:8000',
+]
+_extra_origins = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '')
+if _extra_origins:
+    CSRF_TRUSTED_ORIGINS += [
+        o.strip() for o in _extra_origins.split(',') if o.strip()
+    ]
+elif not DEBUG:
+    raise ImproperlyConfigured(
+        'DJANGO_CSRF_TRUSTED_ORIGINS must be set when DJANGO_DEBUG=0.'
+    )
 
 
 # Application definition
@@ -54,6 +97,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# WhiteNoise is only needed when Django is not serving static files itself.
+if not DEBUG:
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
 ROOT_URLCONF = 'mysite.urls'
 
 TEMPLATES = [
@@ -66,6 +113,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.ofw.context_processors.notifications',
             ],
         },
     },
@@ -119,16 +167,31 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
-
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+# WhiteNoise serves collected static files in production without needing a
+# separate web server mapping.  ``collectstatic`` must run before deployment.
+# Keep Django's default storage backends so FileField/media uploads continue
+# to use the local filesystem.  Compression is not used because the bundled
+# JS/CSS is already minified and compressing all of it is slow on the free
+# PythonAnywhere tier.
 
 LOGIN_REDIRECT_URL = '/home/'
 LOGOUT_REDIRECT_URL = '/'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = Path(os.environ.get('DJANGO_MEDIA_ROOT', BASE_DIR / 'media'))
+
+# PythonAnywhere (and most PaaS providers) terminate HTTPS at a proxy.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+# Keep this opt-in: forcing HTTPS without the proxy header causes redirect
+# loops on some hosts.
+SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
 
 # Concern proof uploads (photos/videos from the OFW portal)
 # DATA_UPLOAD_MAX_MEMORY_SIZE caps the whole request body; without raising it

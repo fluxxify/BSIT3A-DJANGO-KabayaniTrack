@@ -132,7 +132,7 @@ class Command(BaseCommand):
             counts['checkins'] += int(created)
 
         concerns = {}
-        for ofw_key, title, category, severity, status, days_ago, description, actions, resolved in self._concern_data():
+        for ofw_key, title, category, severity, status, days_ago, description, resolved in self._concern_data():
             concern, created = Concern.objects.get_or_create(
                 ofw=profiles[ofw_key],
                 title=title,
@@ -143,7 +143,6 @@ class Command(BaseCommand):
                     'status': status,
                     'reported_date': _date(days_ago),
                     'description': description,
-                    'actions_taken': actions,
                     'resolved_date': _date(resolved) if resolved is not None else None,
                 },
             )
@@ -283,20 +282,15 @@ class Command(BaseCommand):
     def _concern_data(self):
         return [
             ('Reyes', 'Delayed salary for two months', 'salary', 'high', 'in_progress', 10,
-             'Employer has not released wages for September and October.',
-             'Letter sent to employer; coordinating with POLO.', None),
+             'Employer has not released wages for September and October.', None),
             ('Villanueva', 'Contract substitution by employer', 'contract', 'critical', 'escalated', 4,
-             'Signed contract replaced on arrival with lower salary and longer hours.',
-             'Referred to POLO and legal assistance provider.', None),
+             'Signed contract replaced on arrival with lower salary and longer hours.', None),
             ('Santos', 'Delay in passport renewal', 'documents', 'low', 'resolved', 40,
-             'Passport renewal process took longer than expected.',
-             'Assisted with embassy appointment.', 15),
+             'Passport renewal process took longer than expected.', 15),
             ('Dela Cruz', 'Unsafe scaffolding at worksite', 'work_environment', 'medium', 'open', 7,
-             'Reported missing guardrails on the construction site.',
-             'Awaiting employer response.', None),
+             'Reported missing guardrails on the construction site.', None),
             ('Ramos', 'Reintegration livelihood support', 'other', 'medium', 'closed', 50,
-             'Needs assistance starting a small business after repatriation.',
-             'Enrolled in livelihood program.', 20),
+             'Needs assistance starting a small business after repatriation.', 20),
         ]
 
     def _contact_data(self):

@@ -1,0 +1,240 @@
+{% extends "theme/base.html" %}
+{% block extra_css %}
+<style>
+  .sos-hero {
+    background: linear-gradient(135deg, #d63939, #a02222);
+    color: #fff;
+    border: none;
+  }
+  .sos-hero .sos-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+  .sos-actions .btn {
+    min-height: 42px;
+  }
+  .sos-number {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">Emergency Contacts</h2>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <a href="{% url 'ofw:portal_contacts' %}" class="btn btn-ghost-secondary">
+          <i class="fas fa-address-book me-2"></i>Manage contacts
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="card sos-hero mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center">
+        <div class="me-3">
+          <i class="fas fa-tower-broadcast fa-2x"></i>
+        </div>
+        <div>
+          <div class="sos-title">In an emergency, call right away</div>
+          <div class="text-white-50">
+            Tap any button below to call, or open WhatsApp / Viber where calling
+            over the internet is cheaper.
+          </div>
+        </div>
+      </div>
+      <div class="row g-2 mt-3 sos-actions">
+        <div class="col-12 col-md-4">
+          <a href="tel:911" class="btn btn-light w-100 fw-bold">
+            <i class="fas fa-phone me-2 text-danger"></i>PH Emergency · 911
+          </a>
+        </div>
+        <div class="col-12 col-md-4">
+          <a href="tel:1348" class="btn btn-light w-100 fw-bold">
+            <i class="fas fa-phone me-2 text-danger"></i>OWWA · 1348
+          </a>
+        </div>
+        <div class="col-12 col-md-4">
+          <a href="tel:+63285511545" class="btn btn-light w-100 fw-bold">
+            <i class="fas fa-phone me-2 text-danger"></i>OWWA abroad · +632 8551 1545
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if not location_country %}
+  <div class="alert alert-warning">
+    <i class="fas fa-triangle-exclamation me-2"></i>
+    Set your <strong>country of deployment</strong> in your profile to also see the
+    embassy and hotline numbers for your area.
+    <a href="{% url 'ofw:portal_profile' %}" class="alert-link">Update my profile</a>
+  </div>
+  {% endif %}
+
+  {% if family_contacts %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-people-roof me-2 text-success"></i>My Family Emergency Contacts</h3>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Name</th><th>Phone</th><th class="w-1">Call / Message</th></tr>
+        </thead>
+        <tbody>
+          {% for contact in family_contacts %}
+          <tr>
+            <td>
+              <div class="fw-medium">{{ contact.name }}</div>
+              <div class="text-muted small">{{ contact.relationship|default:contact.get_contact_type_display }}</div>
+            </td>
+            <td class="sos-number">{{ contact.phone }}</td>
+            <td>
+              <div class="d-flex gap-1 flex-wrap">
+                <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-sm call-number"
+                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
+                  <i class="fas fa-phone me-1"></i>Call
+                </a>
+                {% if contact.whatsapp_url %}
+                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
+                  <i class="fab fa-whatsapp me-1"></i>WhatsApp
+                </a>
+                {% endif %}
+                {% if contact.viber_url %}
+                <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link" data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
+                  <i class="fab fa-viber me-1"></i>Viber
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if local_hotlines %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-location-dot me-2 text-primary"></i>
+        Hotlines for {{ location_country }}{% if location_city %} · {{ location_city }}{% endif %}
+      </h3>
+      <div class="card-actions">
+        <span class="text-muted small">Auto-filled from your profile</span>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Office</th><th>Type</th><th>Phone</th><th class="w-1">Call / Message</th></tr>
+        </thead>
+        <tbody>
+          {% for contact in local_hotlines %}
+          {% include 'ofw/portal/_sos_hotline_row.html' with contact=contact %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if national_hotlines %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-flag me-2 text-danger"></i>National Hotlines (Philippines · 24/7)</h3>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>Office</th><th>Phone</th><th class="w-1">Call / Message</th></tr>
+        </thead>
+        <tbody>
+          {% for contact in national_hotlines %}
+          <tr>
+            <td>
+              <div class="fw-medium">{{ contact.name }}</div>
+              {% if contact.email %}<div class="text-muted small">{{ contact.email }}</div>{% endif %}
+              {% if contact.automatic and contact.notes %}<div class="text-muted small">{{ contact.notes }}</div>{% endif %}
+            </td>
+            <td class="sos-number">{{ contact.phone }}</td>
+            <td>
+              <div class="d-flex gap-1 flex-wrap">
+                <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-sm call-number"
+                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
+                  <i class="fas fa-phone me-1"></i>Call
+                </a>
+                {% if contact.whatsapp_url %}
+                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
+                  <i class="fab fa-whatsapp me-1"></i>WhatsApp
+                </a>
+                {% endif %}
+                {% if contact.viber_url %}
+                <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link" data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
+                  <i class="fab fa-viber me-1"></i>Viber
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('click', function (event) {
+    var callLink = event.target.closest('a.call-number');
+    if (callLink) {
+      var number = callLink.getAttribute('data-number') || '';
+      if (!/^[0-9+*#,;]+$/.test(number)) {
+        event.preventDefault();
+        alert('This contact number can\'t be dialed automatically: ' + number);
+        return;
+      }
+      if (!window.matchMedia('(max-width: 768px)').matches) {
+        event.preventDefault();
+        if (confirm('Call ' + (callLink.getAttribute('data-name') || number) + ' at ' + number + '?')) {
+          window.location.href = callLink.getAttribute('href');
+        }
+      }
+      return;
+    }
+
+    var viberLink = event.target.closest('a.viber-link');
+    if (!viberLink) { return; }
+    var hidden = false;
+    var onHide = function () { hidden = true; };
+    document.addEventListener('visibilitychange', onHide, { once: true });
+    window.addEventListener('blur', onHide, { once: true });
+    setTimeout(function () {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('blur', onHide);
+      if (hidden) { return; }
+      var name = viberLink.getAttribute('data-name') || 'this contact';
+      var wa = viberLink.getAttribute('data-whatsapp');
+      var choice = confirm(
+        'Viber did not open. Is the Viber app installed?\n\n' +
+        'Tap OK to use WhatsApp instead' + (wa ? '' : ' (not available)') + ', ' +
+        'or Cancel to stay.'
+      );
+      if (choice && wa) { window.location.href = wa; }
+    }, 1200);
+  });
+</script>
+{% endblock %}

@@ -39,6 +39,17 @@
             <span class="nav-link-title">Dashboard</span>
           </a>
         </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" href="{% url 'ofw:notifications' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="far fa-bell"></i>
+            </span>
+            <span class="nav-link-title">Notifications</span>
+            {% if unread_notifications_count %}
+            <span class="badge bg-danger ms-auto">{{ unread_notifications_count }}</span>
+            {% endif %}
+          </a>
+        </li>
 
         <li class="nav-item">
           <span class="dh-nav-section">
@@ -85,23 +96,6 @@
             <span class="nav-link-title">Emergency Contacts</span>
           </a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'report_list' %}active{% endif %}" href="{% url 'ofw:report_list' %}">
-            <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-file-lines"></i>
-            </span>
-            <span class="nav-link-title">Reports</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'contact_request_list' %}active{% endif %}" href="{% url 'ofw:contact_request_list' %}">
-            <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-user-shield"></i>
-            </span>
-            <span class="nav-link-title">Contact Requests</span>
-          </a>
-        </li>
-
         {% if user.is_superuser %}
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.app_name == 'users' %}active{% endif %}" href="{% url 'users:user_list' %}">
@@ -112,19 +106,11 @@
           </a>
         </li>
 
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.app_name == 'info' %}active{% endif %}" href="{% url 'info:info_list' %}">
-            <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-address-card"></i>
-            </span>
-            <span class="nav-link-title">Info</span>
-          </a>
-        </li>
         {% endif %}
 
         {% if user.is_authenticated %}
         <li class="nav-item d-lg-none">
-          <a class="nav-link" href="{% url 'logout' %}">
+          <a class="nav-link" href="{% url 'logout' %}" onclick="return confirm('Are you sure you want to log out?');">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-sign-out-alt"></i>
             </span>
@@ -145,7 +131,7 @@
               </span>
             </a>
             {% if user.is_authenticated %}
-            <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout">
+            <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout" onclick="return confirm('Are you sure you want to log out?');">
               <i class="fas fa-sign-out-alt"></i>
             </a>
             {% endif %}

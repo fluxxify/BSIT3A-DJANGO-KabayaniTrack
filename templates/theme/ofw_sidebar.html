@@ -35,6 +35,15 @@
             <span class="nav-link-title">Home</span>
           </a>
         </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'notifications' %}active{% endif %}" href="{% url 'ofw:notifications' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="far fa-bell"></i></span>
+            <span class="nav-link-title">Notifications</span>
+            {% if unread_notifications_count %}
+            <span class="badge bg-danger ms-auto">{{ unread_notifications_count }}</span>
+            {% endif %}
+          </a>
+        </li>
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'portal_profile' %}active{% endif %}" href="{% url 'ofw:portal_profile' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-id-card"></i></span>
@@ -63,13 +72,19 @@
         <li class="nav-item mt-auto dh-nav-sidebar-footer">
           <div class="dh-user-card">
             <span class="d-flex align-items-center gap-2 text-white min-w-0 w-100">
+              {% with ofw_profile=user.ofw_profiles.first %}
+              {% if ofw_profile.profile_picture %}
+              <span class="dh-avatar dh-avatar-photo" style="background-image: url('{{ ofw_profile.profile_picture.url }}');" title="{{ user.get_full_name|default:user.username }}"></span>
+              {% else %}
               <span class="dh-avatar">{{ user.username|first|upper }}</span>
+              {% endif %}
+              {% endwith %}
               <span class="min-w-0 flex-grow-1">
                 <span class="dh-user-name">{{ user.get_full_name|default:user.username }}</span>
                 <span class="dh-user-role">OFW</span>
               </span>
             </span>
-            <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout">
+            <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout" onclick="return confirm('Are you sure you want to log out?');">
               <i class="fas fa-sign-out-alt"></i>
             </a>
           </div>

@@ -1,142 +1,145 @@
-"""Destination countries and their major cities for OFW profile dropdowns.
+"""World countries and city suggestions for OFW profile dropdowns.
 
-`COUNTRY_CHOICES` feeds the country datalist; `CITIES_BY_COUNTRY` maps each
-country to the cities offered by the dependent city datalist.  Values are plain
-strings because the underlying model fields are free-text ``CharField``s, so an
-OFW may still type a destination that is not listed here.
+The dataset in ``data/world_locations.json`` combines the dr5hn country list
+with populated places (5,000+ residents) from GeoNames and the curated
+destination cities that this module used to hard-code.  ``COUNTRY_CHOICES``
+feeds the country datalist, ``CITIES_BY_COUNTRY`` powers the dependent city
+datalist (served on demand by the ``portal_cities`` view), and ``COUNTRY_GEO``
+maps a country to its ISO2 code and map centroid.  Values stay plain strings
+because the underlying model fields are free-text ``CharField``s, so an OFW may
+still type a destination that is not listed here.
 """
 
-# Common deployment destinations for Overseas Filipino Workers.
-COUNTRY_CHOICES = [
-    'Bahrain',
-    'Brunei',
-    'Cambodia',
-    'Canada',
-    'China',
-    'Cyprus',
-    'Czech Republic',
-    'Egypt',
-    'Germany',
-    'Greece',
-    'Guam',
-    'Hong Kong',
-    'India',
-    'Indonesia',
-    'Ireland',
-    'Israel',
-    'Italy',
-    'Japan',
-    'Jordan',
-    'Kazakhstan',
-    'Kenya',
-    'Kuwait',
-    'Laos',
-    'Lebanon',
-    'Libya',
-    'Macau',
-    'Malaysia',
-    'Maldives',
-    'Mongolia',
-    'Myanmar',
-    'Netherlands',
-    'New Zealand',
-    'Nigeria',
-    'Norway',
-    'Oman',
-    'Pakistan',
-    'Palau',
-    'Papua New Guinea',
-    'Poland',
-    'Qatar',
-    'Romania',
-    'Russia',
-    'Saudi Arabia',
-    'Singapore',
-    'South Africa',
-    'South Korea',
-    'Spain',
-    'Sri Lanka',
-    'Switzerland',
-    'Taiwan',
-    'Thailand',
-    'Turkey',
-    'United Arab Emirates',
-    'United Kingdom',
-    'United States',
-    'Vietnam',
-]
+import json
+from pathlib import Path
 
-# City suggestions per country (major/most common cities for OFWs).
-CITIES_BY_COUNTRY = {
-    'Bahrain': ['Manama', 'Riffa', 'Muharraq', 'Hamad Town', 'Sitra'],
-    'Brunei': ['Bandar Seri Begawan', 'Kuala Belait', 'Seria', 'Tutong'],
-    'Cambodia': ['Phnom Penh', 'Siem Reap', 'Sihanoukville', 'Battambang'],
-    'Canada': ['Toronto', 'Vancouver', 'Calgary', 'Edmonton', 'Winnipeg', 'Montreal'],
-    'China': ['Beijing', 'Shanghai', 'Guangzhou', 'Shenzhen', 'Xiamen', 'Chengdu'],
-    'Cyprus': ['Nicosia', 'Limassol', 'Larnaca', 'Paphos'],
-    'Czech Republic': ['Prague', 'Brno', 'Ostrava', 'Plzen'],
-    'Egypt': ['Cairo', 'Alexandria', 'Giza', 'Port Said'],
-    'Germany': ['Berlin', 'Munich', 'Frankfurt', 'Hamburg', 'Cologne', 'Stuttgart'],
-    'Greece': ['Athens', 'Thessaloniki', 'Patras', 'Heraklion'],
-    'Guam': ['Hagatna', 'Tamuning', 'Dededo', 'Mangilao'],
-    'Hong Kong': ['Central', 'Kowloon', 'Tsuen Wan', 'Sha Tin', 'Tuen Mun', 'Yuen Long'],
-    'India': ['Mumbai', 'New Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata'],
-    'Indonesia': ['Jakarta', 'Surabaya', 'Bandung', 'Denpasar', 'Batam'],
-    'Ireland': ['Dublin', 'Cork', 'Galway', 'Limerick'],
-    'Israel': ['Tel Aviv', 'Jerusalem', 'Haifa', 'Beersheba', 'Netanya'],
-    'Italy': ['Rome', 'Milan', 'Naples', 'Turin', 'Florence', 'Bologna', 'Venice'],
-    'Japan': ['Tokyo', 'Osaka', 'Nagoya', 'Yokohama', 'Fukuoka', 'Sapporo'],
-    'Jordan': ['Amman', 'Zarqa', 'Irbid', 'Aqaba'],
-    'Kazakhstan': ['Almaty', 'Astana', 'Shymkent', 'Atyrau'],
-    'Kenya': ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru'],
-    'Kuwait': ['Kuwait City', 'Hawalli', 'Salmiya', 'Farwaniya', 'Ahmadi', 'Jahra'],
-    'Laos': ['Vientiane', 'Luang Prabang', 'Pakse', 'Savannakhet'],
-    'Lebanon': ['Beirut', 'Tripoli', 'Sidon', 'Jounieh'],
-    'Libya': ['Tripoli', 'Benghazi', 'Misrata', 'Sabha'],
-    'Macau': ['Macau Peninsula', 'Taipa', 'Coloane', 'Cotai'],
-    'Malaysia': ['Kuala Lumpur', 'Johor Bahru', 'Penang', 'Kota Kinabalu', 'Kuching', 'Ipoh'],
-    'Maldives': ['Male', 'Addu City', 'Fuvahmulah', 'Hulhumale'],
-    'Mongolia': ['Ulaanbaatar', 'Erdenet', 'Darkhan'],
-    'Myanmar': ['Yangon', 'Mandalay', 'Naypyidaw', 'Bago'],
-    'Netherlands': ['Amsterdam', 'Rotterdam', 'The Hague', 'Utrecht', 'Eindhoven'],
-    'New Zealand': ['Auckland', 'Wellington', 'Christchurch', 'Hamilton', 'Dunedin'],
-    'Nigeria': ['Lagos', 'Abuja', 'Port Harcourt', 'Kano'],
-    'Norway': ['Oslo', 'Bergen', 'Trondheim', 'Stavanger'],
-    'Oman': ['Muscat', 'Salalah', 'Sohar', 'Nizwa', 'Sur'],
-    'Pakistan': ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Faisalabad'],
-    'Palau': ['Ngerulmud', 'Koror', 'Airai'],
-    'Papua New Guinea': ['Port Moresby', 'Lae', 'Mount Hagen', 'Madang'],
-    'Poland': ['Warsaw', 'Krakow', 'Gdansk', 'Wroclaw', 'Poznan'],
-    'Qatar': ['Doha', 'Al Rayyan', 'Al Wakrah', 'Al Khor', 'Lusail'],
-    'Romania': ['Bucharest', 'Cluj-Napoca', 'Timisoara', 'Iasi', 'Brasov'],
-    'Russia': ['Moscow', 'Saint Petersburg', 'Kazan', 'Yekaterinburg', 'Novosibirsk'],
-    'Saudi Arabia': [
-        'Riyadh', 'Jeddah', 'Mecca', 'Medina', 'Dammam', 'Khobar',
-        'Dhahran', 'Taif', 'Tabuk', 'Abha',
-    ],
-    'Singapore': [
-        'Downtown Core', 'Jurong', 'Woodlands', 'Tampines', 'Bedok',
-        'Changi', 'Serangoon', 'Yishun',
-    ],
-    'South Africa': ['Johannesburg', 'Cape Town', 'Durban', 'Pretoria'],
-    'South Korea': ['Seoul', 'Busan', 'Incheon', 'Daegu', 'Daejeon', 'Gwangju'],
-    'Spain': ['Madrid', 'Barcelona', 'Valencia', 'Seville', 'Bilbao'],
-    'Sri Lanka': ['Colombo', 'Kandy', 'Galle', 'Negombo'],
-    'Switzerland': ['Zurich', 'Geneva', 'Basel', 'Bern', 'Lausanne'],
-    'Taiwan': [
-        'Taipei', 'New Taipei', 'Taichung', 'Kaohsiung', 'Tainan',
-        'Hsinchu', 'Taoyuan', 'Keelung',
-    ],
-    'Thailand': ['Bangkok', 'Chiang Mai', 'Pattaya', 'Phuket', 'Nonthaburi'],
-    'Turkey': ['Istanbul', 'Ankara', 'Izmir', 'Antalya', 'Bursa'],
-    'United Arab Emirates': [
-        'Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah',
-        'Fujairah', 'Umm Al Quwain', 'Al Ain',
-    ],
-    'United Kingdom': ['London', 'Manchester', 'Birmingham', 'Glasgow', 'Liverpool', 'Edinburgh'],
-    'United States': [
-        'New York', 'Los Angeles', 'Chicago', 'Houston', 'San Francisco',
-        'Seattle', 'Las Vegas', 'Honolulu', 'San Diego', 'Washington, D.C.',
-    ],
-    'Vietnam': ['Hanoi', 'Ho Chi Minh City', 'Da Nang', 'Hai Phong', 'Can Tho'],
+_DATA_FILE = Path(__file__).resolve().parent / 'data' / 'world_locations.json'
+_COUNTRIES = json.loads(_DATA_FILE.read_text(encoding='utf-8'))['countries']
+
+COUNTRY_CHOICES = [country['name'] for country in _COUNTRIES]
+CITIES_BY_COUNTRY = {country['name']: country['cities'] for country in _COUNTRIES}
+COUNTRY_GEO = {
+    country['name']: (country['iso2'], country['lat'], country['lng'])
+    for country in _COUNTRIES
 }
+_COUNTRY_BY_FOLDED = {name.casefold(): name for name in COUNTRY_CHOICES}
+_COUNTRY_BY_ISO2 = {
+    iso2.casefold(): name for name, (iso2, _lat, _lng) in COUNTRY_GEO.items()
+}
+
+# Common shorthand so a typed value still resolves to the canonical name.
+COUNTRY_ALIASES = {
+    'usa': 'United States',
+    'u.s.a.': 'United States',
+    'u.s.a': 'United States',
+    'united states of america': 'United States',
+    'america': 'United States',
+    'uk': 'United Kingdom',
+    'u.k.': 'United Kingdom',
+    'u.k': 'United Kingdom',
+    'great britain': 'United Kingdom',
+    'britain': 'United Kingdom',
+    'england': 'United Kingdom',
+    'scotland': 'United Kingdom',
+    'wales': 'United Kingdom',
+    'northern ireland': 'United Kingdom',
+    'uae': 'United Arab Emirates',
+    'u.a.e.': 'United Arab Emirates',
+    'u.a.e': 'United Arab Emirates',
+    'emirates': 'United Arab Emirates',
+    'ksa': 'Saudi Arabia',
+    'saudi': 'Saudi Arabia',
+    'kingdom of saudi arabia': 'Saudi Arabia',
+    'hong kong s.a.r.': 'Hong Kong',
+    'hong kong sar': 'Hong Kong',
+    'hong kong sar china': 'Hong Kong',
+    'hongkong': 'Hong Kong',
+    'macao': 'Macau',
+    'macau s.a.r.': 'Macau',
+    'macao sar china': 'Macau',
+    'czechia': 'Czech Republic',
+    'turkiye': 'Turkey',
+    'türkiye': 'Turkey',
+    'macedonia': 'North Macedonia',
+    'burma': 'Myanmar',
+    'swaziland': 'Eswatini',
+    'east timor': 'Timor-Leste',
+    'holland': 'Netherlands',
+    'vatican': 'Vatican City',
+    'st. kitts and nevis': 'Saint Kitts and Nevis',
+    'st kitts and nevis': 'Saint Kitts and Nevis',
+    'st. lucia': 'Saint Lucia',
+    'st lucia': 'Saint Lucia',
+    'st vincent and the grenadines': 'Saint Vincent and the Grenadines',
+    'sao tome': 'Sao Tome and Principe',
+    'republic of china': 'Taiwan',
+    'korea': 'South Korea',
+    'republic of korea': 'South Korea',
+    'korea, republic of': 'South Korea',
+    'dprk': 'North Korea',
+    "korea, democratic people's republic of": 'North Korea',
+    'russian federation': 'Russia',
+    'viet nam': 'Vietnam',
+    'brunei darussalam': 'Brunei',
+    'ivory coast': 'Ivory Coast',
+    "cote d'ivoire": 'Ivory Coast',
+    "côte d'ivoire": 'Ivory Coast',
+    'palestinian territories': 'Palestine',
+    'taiwan, province of china': 'Taiwan',
+    'british virgin islands': 'Virgin Islands (British)',
+    'u.s. virgin islands': 'Virgin Islands (US)',
+    'us virgin islands': 'Virgin Islands (US)',
+    'st. barthelemy': 'Saint Barthelemy',
+    'st barthelemy': 'Saint Barthelemy',
+    'st. martin': 'Saint-Martin',
+    'st martin': 'Saint-Martin',
+    'saint martin': 'Saint-Martin',
+    'st. pierre and miquelon': 'Saint Pierre and Miquelon',
+    'st. vincent and the grenadines': 'Saint Vincent and the Grenadines',
+    'congo, democratic republic of the': 'Democratic Republic of the Congo',
+    'drc': 'Democratic Republic of the Congo',
+    'congo-brazzaville': 'Republic of the Congo',
+    'congo-kinshasa': 'Democratic Republic of the Congo',
+}
+
+
+def canonical_country(country):
+    """Return the dataset's canonical name for a free-text country value.
+
+    Profiles store plain strings, so ``UAE``, ``uae`` and ``United Arab
+    Emirates`` should all resolve to the same hotline set.  Unknown values are
+    returned stripped but otherwise untouched, which keeps typo-tolerant DB
+    matching possible.
+    """
+    value = (country or '').strip()
+    if not value:
+        return ''
+    folded = value.casefold()
+    if folded in _COUNTRY_BY_FOLDED:
+        return _COUNTRY_BY_FOLDED[folded]
+    alias = COUNTRY_ALIASES.get(folded)
+    if alias:
+        return alias
+    return _COUNTRY_BY_ISO2.get(folded, value)
+
+
+def cities_for_country(country):
+    """Return the city suggestions for ``country``, tolerating case and aliases."""
+    country = (country or '').strip()
+    if not country:
+        return []
+    if country in CITIES_BY_COUNTRY:
+        return CITIES_BY_COUNTRY[country]
+    folded = country.casefold()
+    for name, cities in CITIES_BY_COUNTRY.items():
+        if name.casefold() == folded:
+            return cities
+    alias = COUNTRY_ALIASES.get(folded)
+    if alias:
+        return CITIES_BY_COUNTRY.get(alias, [])
+    return []
+
+
+# Data sources: dr5hn/countries-states-cities-database (countries) and
+# GeoNames cities5000 (populated places), merged with the originally curated
+# destination cities.  Regenerate the JSON rather than editing it by hand.

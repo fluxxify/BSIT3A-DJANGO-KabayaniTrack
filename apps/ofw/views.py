@@ -1,10 +1,13 @@
 """Views for the OFW monitoring and support information system."""
 
+import json
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Case, Count, IntegerField, Value, When
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -19,18 +22,20 @@ from .forms import (
     OFWProfileForm,
     WelfareAssessmentForm,
 )
+from .locations import COUNTRY_GEO
 from .models import (
     CheckIn,
     Concern,
+    ConcernProof,
     EmergencyContact,
-    EmergencyContactRequest,
     MonitoringReport,
+    Notification,
     OFWProfile,
     RiskLevel,
     WelfareAssessment,
     WelfareStatus,
 )
-from .roles import is_management
+from .notifications import mark_concern_read_by_management, notify
 
 _welfare_badge = {
     'active': 'bg-success-lt text-success',
@@ -70,11 +75,13 @@ _condition_badge = {
 }
 
 _contact_type_badge = {
+    'emergency': 'bg-red-lt text-red',
     'embassy': 'bg-azure-lt text-azure',
     'polo': 'bg-indigo-lt text-indigo',
     'owwa': 'bg-purple-lt text-purple',
     'dmw': 'bg-cyan-lt text-cyan',
     'police': 'bg-blue-lt text-blue',
+    'fire': 'bg-orange-lt text-orange',
     'hospital': 'bg-red-lt text-red',
     'agency': 'bg-teal-lt text-teal',
     'employer': 'bg-orange-lt text-orange',
@@ -88,11 +95,91 @@ _report_status_badge = {
     'approved': 'bg-success-lt text-success',
 }
 
-_request_status_badge = {
-    'pending': 'bg-warning-lt text-warning',
-    'approved': 'bg-success-lt text-success',
-    'rejected': 'bg-danger-lt text-danger',
-}
+
+def _notify_assessment_saved(obj, created, actor, previous):
+    recipient = obj.ofw.user
+    if recipient is None or recipient.pk == actor.pk:
+        return
+    if not created and previous.get('status') == obj.status:
+        return
+    level = {
+        WelfareStatus.DISTRESSED: Notification.Level.DANGER,
+        WelfareStatus.NEEDS_SUPPORT: Notification.Level.WARNING,
+        WelfareStatus.MISSING: Notification.Level.DANGER,
+        WelfareStatus.ACTIVE: Notification.Level.SUCCESS,
+        WelfareStatus.REPATRIATED: Notification.Level.INFO,
+    }.get(obj.status, Notification.Level.INFO)
+    notify(
+        recipient,
+        'Welfare status updated' if not created else 'New welfare assessment',
+        f'Your welfare status is now "{obj.get_status_display()}" '
+        f'(risk level: {obj.get_risk_level_display()}).',
+        url=reverse('ofw:portal'),
+        level=level,
+    )
+
+
+def _notify_checkin_saved(obj, created, actor, previous):
+    recipient = obj.ofw.user
+    if recipient is None or recipient.pk == actor.pk:
+        return
+    if not created and previous.get('condition') == obj.condition:
+        return
+    level = {
+        CheckIn.Condition.SAFE: Notification.Level.SUCCESS,
+        CheckIn.Condition.NEEDS_ASSISTANCE: Notification.Level.WARNING,
+        CheckIn.Condition.DISTRESSED: Notification.Level.DANGER,
+        CheckIn.Condition.UNREACHABLE: Notification.Level.WARNING,
+    }.get(obj.condition, Notification.Level.INFO)
+    message = (
+        f'Management logged a check-in for you: {obj.get_condition_display()} '
+        f'({obj.get_method_display()}).'
+    )
+    if obj.contact_person:
+        message += f' Contact person: {obj.contact_person}.'
+    notify(
+        recipient,
+        'New check-in recorded',
+        message,
+        url=reverse('ofw:portal_checkins'),
+        level=level,
+    )
+
+
+def _notify_concern_saved(obj, created, actor, previous):
+    recipient = obj.ofw.user
+    if recipient is None or recipient.pk == actor.pk:
+        return
+    if created:
+        notify(
+            recipient,
+            'Concern recorded',
+            f'A concern has been recorded for you: "{obj.title}" '
+            f'({obj.get_severity_display()} severity).',
+            url=reverse('ofw:portal_concerns'),
+            level=Notification.Level.WARNING,
+        )
+        return
+
+    old_status = previous.get('status')
+    if old_status == obj.status:
+        return
+    level = {
+        Concern.Status.OPEN: Notification.Level.WARNING,
+        Concern.Status.IN_PROGRESS: Notification.Level.INFO,
+        Concern.Status.ESCALATED: Notification.Level.DANGER,
+        Concern.Status.RESOLVED: Notification.Level.SUCCESS,
+        Concern.Status.CLOSED: Notification.Level.INFO,
+    }.get(obj.status, Notification.Level.INFO)
+    notify(
+        recipient,
+        'Concern status updated',
+        f'Your concern "{obj.title}" is now marked as '
+        f'"{obj.get_status_display()}".',
+        url=reverse('ofw:portal_concerns'),
+        level=level,
+    )
+
 
 _profiles = crud.make_crud(
     model=OFWProfile,
@@ -115,7 +202,10 @@ _profiles = crud.make_crud(
     add_label='Add OFW',
     search_placeholder='Search by name, passport, country, or employer...',
     detail_url_name='ofw:profile_detail',
-    filters={'welfare_status': ('welfare_status__in', crud.csv_list)},
+    filters={
+        'welfare_status': ('welfare_status__in', crud.csv_list),
+        'country': ('country__iexact', str),
+    },
 )
 
 _assessments = crud.make_crud(
@@ -139,6 +229,7 @@ _assessments = crud.make_crud(
         'status': ('status__in', crud.csv_list),
         'risk_level': ('risk_level__in', crud.csv_list),
     },
+    on_save=_notify_assessment_saved,
 )
 
 _checkins = crud.make_crud(
@@ -148,21 +239,23 @@ _checkins = crud.make_crud(
         {'field': 'ofw', 'label': 'OFW'},
         {'field': 'checkin_date', 'label': 'Date & Time', 'type': 'datetime'},
         {'field': 'get_method_display', 'label': 'How'},
+        {'field': 'contact_person', 'label': 'Contact person', 'truncate': 30},
         {'field': 'get_condition_display', 'label': 'Status', 'badge': _condition_badge,
          'raw_field': 'condition'},
         {'field': 'notes', 'label': 'Notes', 'truncate': 40},
     ],
-    search_fields=['ofw__first_name', 'ofw__last_name', 'notes'],
+    search_fields=['ofw__first_name', 'ofw__last_name', 'contact_person', 'notes'],
     title='Check-ins',
     entity='Check-in',
     add_label='Log Check-in',
-    search_placeholder='Search by OFW or notes...',
+    search_placeholder='Search by OFW, contact person, or notes...',
     detail_url_name='ofw:checkin_detail',
     filters={
         'condition': ('condition__in', crud.csv_list),
         'date_from': ('checkin_date__date__gte', str),
         'date_to': ('checkin_date__date__lte', str),
     },
+    on_save=_notify_checkin_saved,
 )
 
 _concerns = crud.make_crud(
@@ -170,7 +263,7 @@ _concerns = crud.make_crud(
     form_class=ConcernForm,
     columns=[
         {'field': 'ofw', 'label': 'OFW'},
-        {'field': 'title', 'label': 'Concern'},
+        {'field': 'title', 'label': 'Concern', 'url_name': 'ofw:concern_detail'},
         {'field': 'description', 'label': 'Description', 'truncate': 50},
         {'field': 'get_category_display', 'label': 'Category'},
         {'field': 'get_severity_display', 'label': 'Severity', 'badge': _severity_badge,
@@ -192,6 +285,7 @@ _concerns = crud.make_crud(
         'date_from': ('reported_date__gte', str),
         'date_to': ('reported_date__lte', str),
     },
+    on_save=_notify_concern_saved,
 )
 
 def _contact_row_actions(obj):
@@ -284,6 +378,11 @@ def profile_delete_ajax(request, pk):
 
 
 @login_required(login_url='login')
+def profile_delete_all_ajax(request):
+    return _profiles['delete_all_ajax'](request)
+
+
+@login_required(login_url='login')
 def profile_detail(request, pk):
     queryset = (
         OFWProfile.objects.all()
@@ -316,6 +415,8 @@ def checkin_detail(request, pk):
 @login_required(login_url='login')
 def concern_detail(request, pk):
     concern = get_object_or_404(crud._scoped(request.user, Concern), pk=pk)
+    mark_concern_read_by_management(concern, request.user)
+
     context = {
         'concern': concern,
         'severity_badge': _severity_badge.get(
@@ -326,6 +427,28 @@ def concern_detail(request, pk):
         ),
     }
     return render(request, 'ofw/concern_detail.html', context)
+
+
+def _admin_only(request, message):
+    if request.user.is_superuser:
+        return None
+    return JsonResponse({'error': message}, status=403)
+
+
+@login_required(login_url='login')
+@require_POST
+def concern_proof_delete(request, pk):
+    denied = _admin_only(request, 'Only administrators can delete proof files.')
+    if denied:
+        return denied
+
+    proof = get_object_or_404(ConcernProof, pk=pk)
+    label = proof.display_name
+    if proof.file:
+        proof.file.delete(save=False)
+    proof.delete()
+    messages.success(request, f'Proof file "{label}" has been deleted successfully.')
+    return JsonResponse({'status': 'deleted'})
 
 
 def assessment_list_page(request):
@@ -348,6 +471,11 @@ def assessment_delete_ajax(request, pk):
     return _assessments['delete_ajax'](request, pk)
 
 
+@login_required(login_url='login')
+def assessment_delete_all_ajax(request):
+    return _assessments['delete_all_ajax'](request)
+
+
 def checkin_list_page(request):
     return _checkins['page'](request)
 
@@ -368,6 +496,11 @@ def checkin_delete_ajax(request, pk):
     return _checkins['delete_ajax'](request, pk)
 
 
+@login_required(login_url='login')
+def checkin_delete_all_ajax(request):
+    return _checkins['delete_all_ajax'](request)
+
+
 def concern_list_page(request):
     return _concerns['page'](request)
 
@@ -377,6 +510,9 @@ def concern_list_ajax(request):
 
 
 def concern_get_ajax(request, pk):
+    if request.user.is_staff or request.user.is_superuser:
+        concern = get_object_or_404(Concern, pk=pk)
+        mark_concern_read_by_management(concern, request.user)
     return _concerns['get_ajax'](request, pk)
 
 
@@ -386,6 +522,11 @@ def concern_save_ajax(request):
 
 def concern_delete_ajax(request, pk):
     return _concerns['delete_ajax'](request, pk)
+
+
+@login_required(login_url='login')
+def concern_delete_all_ajax(request):
+    return _concerns['delete_all_ajax'](request)
 
 
 def contact_list_page(request):
@@ -406,6 +547,11 @@ def contact_save_ajax(request):
 
 def contact_delete_ajax(request, pk):
     return _contacts['delete_ajax'](request, pk)
+
+
+@login_required(login_url='login')
+def contact_delete_all_ajax(request):
+    return _contacts['delete_all_ajax'](request)
 
 
 def report_list_page(request):
@@ -429,95 +575,8 @@ def report_delete_ajax(request, pk):
 
 
 @login_required(login_url='login')
-@user_passes_test(is_management, login_url='dashboard')
-def contact_request_list_page(request):
-    """Review queue for family emergency-contact requests submitted by OFWs."""
-    status = request.GET.get('status', '').strip()
-    requests_qs = EmergencyContactRequest.objects.select_related('user', 'ofw')
-
-    if status in ('pending', 'approved', 'rejected'):
-        requests_qs = requests_qs.filter(status=status)
-    else:
-        status = ''
-
-    pending_first = Case(
-        When(status=EmergencyContactRequest.Status.PENDING, then=Value(0)),
-        When(status=EmergencyContactRequest.Status.APPROVED, then=Value(1)),
-        default=Value(2),
-        output_field=IntegerField(),
-    )
-    request_rows = [
-        {
-            'obj': r,
-            'status_badge': _request_status_badge.get(
-                r.status, 'bg-secondary-lt text-secondary'
-            ),
-        }
-        for r in requests_qs.annotate(_order=pending_first).order_by(
-            '_order', '-created_at', '-id'
-        )
-    ]
-
-    return render(request, 'ofw/contact_requests.html', {
-        'request_rows': request_rows,
-        'active_status': status,
-        'counts': {
-            'all': EmergencyContactRequest.objects.count(),
-            'pending': EmergencyContactRequest.objects.filter(
-                status=EmergencyContactRequest.Status.PENDING
-            ).count(),
-            'approved': EmergencyContactRequest.objects.filter(
-                status=EmergencyContactRequest.Status.APPROVED
-            ).count(),
-            'rejected': EmergencyContactRequest.objects.filter(
-                status=EmergencyContactRequest.Status.REJECTED
-            ).count(),
-        },
-    })
-
-
-@login_required(login_url='login')
-@user_passes_test(is_management, login_url='dashboard')
-@require_POST
-def contact_request_decide(request, pk):
-    """Approve or reject a family contact request; approval creates the contact."""
-    contact_request = get_object_or_404(EmergencyContactRequest, pk=pk)
-
-    if contact_request.status != EmergencyContactRequest.Status.PENDING:
-        messages.info(request, 'This request has already been reviewed.')
-        return redirect('ofw:contact_request_list')
-
-    action = request.POST.get('action')
-    contact_request.reviewed_at = timezone.now()
-    contact_request.reviewed_by = request.user
-    contact_request.review_notes = request.POST.get('review_notes', '').strip()
-
-    if action == 'approve':
-        EmergencyContact.objects.create(
-            user=contact_request.user,
-            name=contact_request.name,
-            contact_type=EmergencyContact.ContactType.FAMILY,
-            phone=contact_request.phone,
-            email=contact_request.email,
-            address=contact_request.address,
-            notes=contact_request.notes,
-        )
-        contact_request.status = EmergencyContactRequest.Status.APPROVED
-        messages.success(
-            request,
-            f'Approved. "{contact_request.name}" is now a family emergency contact.',
-        )
-    elif action == 'reject':
-        contact_request.status = EmergencyContactRequest.Status.REJECTED
-        messages.warning(
-            request, f'Request for "{contact_request.name}" was rejected.'
-        )
-    else:
-        messages.error(request, 'Unknown action; nothing was changed.')
-        return redirect('ofw:contact_request_list')
-
-    contact_request.save()
-    return redirect('ofw:contact_request_list')
+def report_delete_all_ajax(request):
+    return _reports['delete_all_ajax'](request)
 
 
 def dashboard_stats(user):
@@ -568,6 +627,67 @@ def dashboard_stats(user):
         for row in trend_rows
     ] or [{'label': 'No data', 'value': 0}]
 
+    # Deployment map: OFW counts per country of assignment, joined with the
+    # known coordinates so the dashboard can shade and pin them on the world map.
+    country_rows = (
+        profiles.exclude(country='')
+        .values('country')
+        .annotate(total=Count('id'))
+        .order_by('-total', 'country')
+    )
+    deployment_countries = []
+    map_regions = {}
+    map_markers = []
+    for row in country_rows:
+        country = row['country'].strip()
+        count = row['total']
+        geo = COUNTRY_GEO.get(country)
+        deployment_countries.append({
+            'country': country,
+            'count': count,
+            'link': reverse('ofw:profile_list') + '?' + urlencode({'country': country}),
+        })
+        if geo:
+            iso2, lat, lng = geo
+            map_regions[iso2] = count
+            map_markers.append({
+                'name': country,
+                'lat': lat,
+                'lng': lng,
+                'count': count,
+            })
+
+    # One pin per OFW so the map shows exactly where each person is assigned.
+    # People sharing a country are spread with a small deterministic offset so
+    # their pins do not sit on top of one another.
+    map_ofws = []
+    seen_per_country = {}
+    for profile in profiles.exclude(country='').order_by('country', 'last_name', 'first_name'):
+        country = profile.country.strip()
+        geo = COUNTRY_GEO.get(country)
+        if not geo:
+            continue
+        iso2, lat, lng = geo
+        slot = seen_per_country.get(country, 0)
+        seen_per_country[country] = slot + 1
+        if slot:
+            ring = (slot + 1) // 2
+            angle = (slot % 2 * 2 - 1) * (ring * 1.1)
+            lat += (ring * 0.9) * (1 if slot % 2 else -1)
+            lng += angle
+        map_ofws.append({
+            'name': profile.full_name,
+            'country': country,
+            'city': profile.city_abroad,
+            'iso2': iso2,
+            'lat': round(lat, 4),
+            'lng': round(lng, 4),
+            'status': profile.get_welfare_status_display(),
+            'link': reverse('ofw:profile_detail', args=[profile.pk]),
+        })
+
+    country_links = {row['country']: row['link'] for row in deployment_countries}
+
     return {
         'kpi': {
             'ofw_total': profiles.count(),
@@ -601,4 +721,11 @@ def dashboard_stats(user):
         'concern_chart': concern_chart,
         'trend_chart': trend,
         'risk_labels': dict(RiskLevel.choices),
+        'deployment_countries': deployment_countries,
+        'map_regions': map_regions,
+        'map_markers': map_markers,
+        'map_regions_json': json.dumps(map_regions),
+        'map_markers_json': json.dumps(map_markers),
+        'map_ofws_json': json.dumps(map_ofws),
+        'country_links_json': json.dumps(country_links),
     }

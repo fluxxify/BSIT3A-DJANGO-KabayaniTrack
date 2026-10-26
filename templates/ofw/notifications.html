@@ -1,0 +1,113 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">Inbox</div>
+        <h2 class="page-title mb-0">Notifications</h2>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <div class="d-flex gap-2">
+          <form method="post" action="{% url 'ofw:notifications_mark_all_read' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-outline-primary" {% if not unread_count %}disabled{% endif %}>
+              <i class="fas fa-check-double me-1"></i>Mark all as read
+            </button>
+          </form>
+          <form method="post" action="{% url 'ofw:notifications_delete_all' %}" onsubmit="return confirm('Are you sure you want to DELETE ALL notifications?\n\nThis action cannot be undone.');">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-outline-danger" {% if not total_count %}disabled{% endif %}>
+              <i class="fas fa-trash-alt me-1"></i>Delete All
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <ul class="nav nav-tabs card-header-tabs">
+        <li class="nav-item">
+          <a class="nav-link {% if not only_unread %}active{% endif %}" href="{% url 'ofw:notifications' %}">
+            All <span class="badge bg-secondary-lt ms-1">{{ total_count }}</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if only_unread %}active{% endif %}" href="{% url 'ofw:notifications' %}?filter=unread">
+            Unread <span class="badge bg-primary-lt text-primary ms-1">{{ unread_count }}</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="list-group list-group-flush">
+      {% for row in rows %}
+      <div class="list-group-item dh-notif-row {% if not row.obj.is_read %}dh-notif-unread{% endif %}">
+        <div class="d-flex gap-3 align-items-start">
+          <span class="dh-notif-icon {{ row.background }} {{ row.icon_class }}">
+            <i class="{{ row.icon }}"></i>
+          </span>
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-start gap-2">
+              <a href="{% url 'ofw:notification_open' row.obj.pk %}" class="fw-semibold text-body text-decoration-none flex-grow-1">
+                {{ row.obj.title }}
+              </a>
+              {% if not row.obj.is_read %}
+              <span class="badge bg-primary">New</span>
+              {% endif %}
+            </div>
+            {% if row.obj.message %}
+            <div class="text-muted small mt-1">{{ row.obj.message }}</div>
+            {% endif %}
+            <div class="text-muted dh-notif-time mt-1">
+              <i class="far fa-clock me-1"></i>{{ row.obj.created_at|date:"M d, Y H:i" }}
+            </div>
+          </div>
+          <div class="d-flex gap-1">
+            {% if not row.obj.is_read %}
+            <form method="post" action="{% url 'ofw:notification_mark_read' row.obj.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn btn-sm btn-ghost-secondary" title="Mark as read">
+                <i class="fas fa-check"></i>
+              </button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'ofw:notification_delete' row.obj.pk %}" onsubmit="return confirm('Delete this notification?');">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn btn-sm btn-ghost-danger" title="Delete">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="card-body text-center text-muted py-5">
+        <i class="far fa-bell-slash fa-2x mb-3 d-block"></i>
+        {% if only_unread %}You have no unread notifications.{% else %}You have no notifications yet.{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="card-footer d-flex align-items-center justify-content-between">
+      <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <ul class="pagination pagination-sm m-0">
+        <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+          <a class="page-link" href="?{% if only_unread %}filter=unread&amp;{% endif %}page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Previous</a>
+        </li>
+        <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+          <a class="page-link" href="?{% if only_unread %}filter=unread&amp;{% endif %}page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Next</a>
+        </li>
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

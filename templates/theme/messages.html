@@ -1,12 +1,14 @@
 {% if messages %}
-<div class="alert alert-info alert-dismissible fade show" role="alert">
-  <i class="fas fa-circle-check alert-icon" aria-hidden="true"></i>
-  <div>
-    <h4 class="alert-heading">Success</h4>
-    <div class="alert-description">
-      {% for message in messages %}{{ message }}{% endfor %}
-    </div>
+<div class="dh-flash-stack" id="dhFlashStack" aria-live="polite" aria-atomic="false">
+  {% for message in messages %}
+  <div class="alert dh-flash alert-dismissible fade show{% if message.level_tag == 'success' %} alert-success{% elif message.level_tag == 'error' %} alert-danger{% elif message.level_tag == 'warning' %} alert-warning{% elif message.level_tag == 'debug' %} alert-secondary{% else %} alert-info{% endif %}"
+       role="{% if message.level_tag == 'error' %}alert{% else %}status{% endif %}"
+       data-dh-flash
+       data-dh-flash-timeout="{% if 'lock' in message.tags %}0{% elif message.level_tag == 'error' %}6000{% elif message.level_tag == 'warning' %}5000{% else %}4000{% endif %}">
+    <i class="fas dh-flash-icon {% if message.level_tag == 'success' %}fa-circle-check{% elif message.level_tag == 'error' %}fa-circle-xmark{% elif message.level_tag == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %}" aria-hidden="true"></i>
+    <div class="dh-flash-text">{{ message }}</div>
+    <button type="button" class="btn-close" aria-label="Close" data-dh-flash-close></button>
   </div>
-  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  {% endfor %}
 </div>
 {% endif %}

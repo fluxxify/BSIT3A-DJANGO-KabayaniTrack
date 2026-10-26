@@ -57,17 +57,6 @@
     </div>
 </form>
 
-<div id="userAlert" class="alert alert-info alert-dismissible fade {% if not messages %}d-none{% endif %}{% if messages %}show{% endif %}" role="alert">
-    <i class="fas fa-circle-check alert-icon" aria-hidden="true"></i>
-    <div>
-        <h4 class="alert-heading">Success</h4>
-        <div class="alert-description" id="userAlertText">
-            {% for message in messages %}{{ message }}{% endfor %}
-        </div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-
     <div class="card">
         <div class="card-header">
             <div class="card-title">
@@ -88,7 +77,7 @@
                         <th>Joined</th>
                         <th>Status</th>
                         <th>Role</th>
-                        <th class="w-1">Actions</th>
+                        <th class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="usersTableBody">
@@ -124,10 +113,10 @@
                             <span class="badge bg-secondary-lt text-secondary">User</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <div class="d-flex gap-1">
-                                <a href="#"
-                                   class="btn btn-ghost-secondary btn-icon btn-sm"
+                        <td class="text-center">
+                            <div class="d-flex gap-1 justify-content-center">
+                                <button type="button"
+                                   class="btn btn-outline-primary btn-sm"
                                    data-bs-toggle="modal"
                                    data-bs-target="#editUserModal"
                                    data-mode="edit"
@@ -139,17 +128,17 @@
                                    data-active="{{ u.is_active|yesno:'true,false' }}"
                                    data-staff="{{ u.is_staff|yesno:'true,false' }}"
                                    title="Edit">
-                                    <i class="ti ti-pencil text-primary"></i>
-                                </a>
-                                <a href="#"
-                                   class="btn btn-ghost-secondary btn-icon btn-sm"
+                                    <i class="ti ti-pencil me-1"></i>Edit
+                                </button>
+                                <button type="button"
+                                   class="btn btn-outline-danger btn-sm"
                                    data-bs-toggle="modal"
                                    data-bs-target="#deleteUserModal"
                                    data-id="{{ u.id }}"
                                    data-name="{{ u.username }}"
                                    title="Delete">
-                                    <i class="ti ti-trash text-danger"></i>
-                                </a>
+                                    <i class="ti ti-trash me-1"></i>Delete
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -315,10 +304,9 @@
     }
 
     function showSuccessAlert(msg) {
-        const box = document.getElementById('userAlert');
-        document.getElementById('userAlertText').textContent = msg;
-        box.classList.remove('d-none');
-        box.classList.add('show');
+        if (window.dhFlash) {
+            window.dhFlash(msg, 'success');
+        }
     }
 
     // Populate edit/create modal on open

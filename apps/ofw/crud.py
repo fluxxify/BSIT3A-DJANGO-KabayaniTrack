@@ -169,7 +169,7 @@ def describe_fields(form):
 def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
               title, pretitle='Overview', entity='Record', add_label='Add Record',
               search_placeholder='Search...', detail_url_name=None, filters=None,
-              row_actions=None):
+              row_actions=None, on_save=None, on_delete=None):
     """Build the page + AJAX views for a single model.
 
     Returns a dict of view callables keyed by ``page``, ``list_ajax``,
@@ -179,6 +179,11 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     extra action buttons to every row (e.g. a ``tel:`` call link or an external
     website link).  Each action supports ``title``, ``icon``, ``icon_class``,
     ``href`` and ``target``.
+
+    ``on_save`` receives ``(obj, created, actor, previous)`` after a successful
+    save, where ``previous`` holds the field values before an update.  This is
+    used to raise notifications only when something meaningful changed.
+    ``on_delete`` receives ``(obj, actor)`` before the record is removed.
     """
     if order_by is None:
         order_by = model._meta.ordering or ['-pk']
@@ -260,9 +265,14 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     @require_POST
     def save_ajax(request):
         record_id = request.POST.get('id')
+        previous = {}
         if record_id:
             obj = get_object_or_404(_scoped(request.user, model), pk=record_id)
             is_update = True
+            previous = {
+                field.name: getattr(obj, field.name, None)
+                for field in model._meta.fields
+            }
         else:
             obj = model()
             is_update = False
@@ -277,6 +287,9 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             obj.user = request.user
         obj.save()
 
+        if on_save:
+            on_save(obj, not is_update, request.user, previous)
+
         messages.success(
             request,
             f'{entity} "{obj}" has been {"updated" if is_update else "saved"} successfully.',
@@ -288,9 +301,36 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     def delete_ajax(request, pk):
         obj = get_object_or_404(_scoped(request.user, model), pk=pk)
         label = str(obj)
+        if on_delete:
+            on_delete(obj, request.user)
         obj.delete()
         messages.success(request, f'{entity} "{label}" has been deleted successfully.')
         return JsonResponse({'status': 'deleted'})
+
+    @login_required(login_url='login')
+    @require_POST
+    def delete_all_ajax(request):
+        if not (request.user.is_superuser or request.user.is_staff):
+            return JsonResponse({'error': 'Not allowed.'}, status=403)
+
+        queryset = _scoped(request.user, model)
+        count = queryset.count()
+        if count == 0:
+            messages.info(request, f'No {entity.lower()} records to delete.')
+            return JsonResponse({'status': 'deleted_all', 'count': 0})
+
+        # Call on_delete for each object if provided (for side effects like files)
+        if on_delete:
+            for obj in queryset:
+                try:
+                    on_delete(obj, request.user)
+                except Exception:
+                    # Don't block bulk deletion on callback errors
+                    pass
+
+        queryset.delete()
+        messages.success(request, f'All {entity.lower()} records ({count}) have been deleted successfully.')
+        return JsonResponse({'status': 'deleted_all', 'count': count})
 
     return {
         'page': page,
@@ -298,4 +338,5 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         'get_ajax': get_ajax,
         'save_ajax': save_ajax,
         'delete_ajax': delete_ajax,
+        'delete_all_ajax': delete_all_ajax,
     }

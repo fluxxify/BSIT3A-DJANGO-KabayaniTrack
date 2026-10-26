@@ -1,0 +1,33 @@
+<tr>
+  <td>
+    <div class="fw-medium">{{ contact.name }}</div>
+    {% if contact.address %}<div class="text-muted small">{{ contact.address }}</div>{% endif %}
+    {% if contact.automatic and contact.notes %}<div class="text-muted small">{{ contact.notes }}</div>{% endif %}
+  </td>
+  <td>{{ contact.get_contact_type_display }}</td>
+  <td class="sos-number">{{ contact.phone }}</td>
+  <td>
+    <div class="d-flex gap-1 flex-wrap">
+      <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-sm call-number"
+         data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
+        <i class="fas fa-phone me-1"></i>Call
+      </a>
+      {% if contact.whatsapp_url %}
+      <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
+        <i class="fab fa-whatsapp me-1"></i>WhatsApp
+      </a>
+      {% endif %}
+      {% if contact.viber_url %}
+      <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link"
+         data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
+        <i class="fab fa-viber me-1"></i>Viber
+      </a>
+      {% endif %}
+      {% if contact.website_url %}
+      <a href="{{ contact.website_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Website">
+        <i class="fas fa-globe text-primary"></i>
+      </a>
+      {% endif %}
+    </div>
+  </td>
+</tr>

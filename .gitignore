@@ -12,6 +12,8 @@ env/
 db.sqlite3
 db.sqlite3.bak
 media/
+staticfiles/
+deploy/pythonanywhere_wsgi.generated.py
 
 # IDE / OS
 .idea/

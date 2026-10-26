@@ -26,7 +26,23 @@
               <label class="form-label" for="{{ field.id_for_label }}">
                 {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
               </label>
+              {% if field.name == 'proof_files' %}
+              <div class="d-grid gap-2 mb-2">
+                <button type="button" class="btn btn-warning" id="concern-camera-btn">
+                  <i class="fas fa-camera me-2"></i>Open Camera
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="concern-gallery-btn">
+                  <i class="fas fa-images me-2"></i>Upload from Gallery / Files
+                </button>
+              </div>
+              <input type="file" id="concern-camera-input" name="proof_files"
+                     accept="image/*" capture="environment" class="visually-hidden" tabindex="-1">
               {{ field }}
+              <div id="concern-proof-preview" class="d-flex flex-wrap gap-2 mt-2"></div>
+              <div id="concern-proof-status" class="form-hint mt-1" role="status" aria-live="polite"></div>
+              {% else %}
+              {{ field }}
+              {% endif %}
               {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
               {% for error in field.errors %}
               <div class="text-danger small mt-1">{{ error }}</div>
@@ -87,4 +103,427 @@
     </div>
   </div>
 </div>
+
+<div class="modal modal-blur fade" id="concernCameraModal" tabindex="-1"
+     aria-labelledby="concernCameraTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="concernCameraTitle">
+          <i class="fas fa-camera me-2"></i>Take a Photo
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="rounded overflow-hidden bg-dark" style="height: min(60vh, 420px);">
+          <video id="concern-camera-video" autoplay playsinline muted
+                 class="w-100 h-100" style="object-fit: cover;"></video>
+          <img id="concern-camera-snapshot" alt="Captured photo"
+               class="w-100 h-100 d-none" style="object-fit: contain;">
+        </div>
+        <canvas id="concern-camera-canvas" class="d-none"></canvas>
+        <div id="concern-camera-error" class="alert alert-warning mt-3 d-none" role="alert"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2 d-none"
+                id="concern-camera-fallback">
+          Use file picker instead
+        </button>
+        <p class="text-muted small mt-2 mb-0" id="concern-camera-hint">
+          Center the photo and tap Capture. Your browser may ask for camera
+          permission the first time.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary d-none" id="concern-camera-switch">
+          <i class="fas fa-camera-rotate me-1"></i>Switch Camera
+        </button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="concern-camera-retake">
+          <i class="fas fa-rotate-left me-1"></i>Retake
+        </button>
+        <button type="button" class="btn btn-warning" id="concern-camera-shutter">
+          <i class="fas fa-camera me-1"></i>Capture
+        </button>
+        <button type="button" class="btn btn-primary d-none" id="concern-camera-use">
+          <i class="fas fa-check me-1"></i>Use Photo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var cameraBtn = document.getElementById('concern-camera-btn');
+    var galleryBtn = document.getElementById('concern-gallery-btn');
+    var cameraInput = document.getElementById('concern-camera-input');
+    var proofInput = document.getElementById('id_proof_files');
+    var preview = document.getElementById('concern-proof-preview');
+    var status = document.getElementById('concern-proof-status');
+    if (!cameraBtn || !cameraInput || !proofInput || !preview) return;
+
+    var maxFiles = parseInt(proofInput.getAttribute('data-max-files') || '5', 10);
+    var maxSize = parseInt(proofInput.getAttribute('data-max-size') || '104857600', 10);
+
+    var modalEl = document.getElementById('concernCameraModal');
+    var video = document.getElementById('concern-camera-video');
+    var snapshot = document.getElementById('concern-camera-snapshot');
+    var canvas = document.getElementById('concern-camera-canvas');
+    var errorBox = document.getElementById('concern-camera-error');
+    var hint = document.getElementById('concern-camera-hint');
+    var shutterBtn = document.getElementById('concern-camera-shutter');
+    var retakeBtn = document.getElementById('concern-camera-retake');
+    var useBtn = document.getElementById('concern-camera-use');
+    var switchBtn = document.getElementById('concern-camera-switch');
+    var fallbackBtn = document.getElementById('concern-camera-fallback');
+    var hasCameraUi = !!(
+      modalEl && video && snapshot && canvas && errorBox && hint &&
+      shutterBtn && retakeBtn && useBtn && switchBtn && fallbackBtn
+    );
+
+    var cameraModal = null;
+    var cameraStream = null;
+    var cameraDevices = [];
+    var cameraDeviceIndex = 0;
+    var cameraRequestId = 0;
+
+    function currentFiles() {
+      return Array.prototype.slice.call(proofInput.files || []);
+    }
+
+    function canRebuildFileList() {
+      return typeof DataTransfer !== 'undefined';
+    }
+
+    function setFiles(files) {
+      if (!canRebuildFileList()) return false;
+      var transfer = new DataTransfer();
+      files.forEach(function (file) { transfer.items.add(file); });
+      try {
+        proofInput.files = transfer.files;
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function fileSizeLabel(bytes) {
+      if (bytes >= 1024 * 1024) return Math.round(bytes / (1024 * 1024)) + ' MB';
+      return Math.round(bytes / 1024) + ' KB';
+    }
+
+    function isImageFile(file) {
+      return (file.type && file.type.indexOf('image/') === 0) ||
+        /\.(jpe?g|png|gif|webp|bmp)$/i.test(file.name);
+    }
+
+    function renderPreview() {
+      var files = currentFiles();
+      preview.innerHTML = '';
+      files.forEach(function (file, index) {
+        var tile = document.createElement('div');
+        tile.className = 'position-relative rounded border overflow-hidden';
+        tile.style.cssText = 'width:76px;height:76px;background:#f1f5f9;';
+
+        if (isImageFile(file)) {
+          var img = document.createElement('img');
+          var objectUrl = URL.createObjectURL(file);
+          img.src = objectUrl;
+          img.alt = file.name;
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+          img.onload = function () { URL.revokeObjectURL(objectUrl); };
+          tile.appendChild(img);
+        } else {
+          var placeholder = document.createElement('div');
+          placeholder.className = 'd-flex flex-column align-items-center justify-content-center h-100 text-muted';
+          placeholder.innerHTML = '<i class="fas fa-video mb-1"></i><span class="small">Video</span>';
+          tile.appendChild(placeholder);
+        }
+
+        if (canRebuildFileList()) {
+          var remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'btn btn-danger position-absolute top-0 end-0 p-0';
+          remove.style.cssText = 'width:20px;height:20px;border-radius:50%;line-height:1;font-size:13px;';
+          remove.title = 'Remove file';
+          remove.setAttribute('aria-label', 'Remove ' + file.name);
+          remove.innerHTML = '&times;';
+          remove.addEventListener('click', function () {
+            var remaining = currentFiles();
+            remaining.splice(index, 1);
+            if (setFiles(remaining)) renderPreview();
+          });
+          tile.appendChild(remove);
+        }
+
+        preview.appendChild(tile);
+      });
+
+      status.textContent = files.length
+        ? files.length + ' of ' + maxFiles + ' file(s) selected.'
+        : '';
+    }
+
+    function addFiles(files) {
+      var accepted = [];
+      var notice = '';
+      files.forEach(function (file) {
+        if (file.size > maxSize) {
+          notice = '"' + file.name + '" is too large (max ' + fileSizeLabel(maxSize) + ').';
+          return;
+        }
+        accepted.push(file);
+      });
+
+      var existing = currentFiles();
+      var room = Math.max(0, maxFiles - existing.length);
+      if (accepted.length > room) {
+        notice = 'You can attach at most ' + maxFiles + ' files.';
+        accepted = accepted.slice(0, room);
+      }
+      if (!accepted.length) {
+        return { ok: false, message: notice || 'No file selected.' };
+      }
+      if (!setFiles(existing.concat(accepted))) {
+        return {
+          ok: false,
+          message: 'Your browser cannot attach the captured photo. Please use Upload from Gallery / Files.'
+        };
+      }
+      renderPreview();
+      if (notice) status.textContent = notice;
+      return { ok: true };
+    }
+
+    if (galleryBtn) {
+      galleryBtn.addEventListener('click', function () {
+        proofInput.click();
+      });
+    }
+
+    cameraInput.addEventListener('change', function () {
+      var picked = Array.prototype.slice.call(cameraInput.files || []);
+      if (!picked.length) return;
+      var result = addFiles(picked);
+      cameraInput.value = '';
+      if (!result.ok) status.textContent = result.message;
+    });
+
+    proofInput.addEventListener('change', function () {
+      var count = currentFiles().length;
+      renderPreview();
+      if (count > maxFiles) {
+        status.textContent = 'You can attach at most ' + maxFiles + ' files.';
+      }
+    });
+
+    renderPreview();
+
+    function supportsLiveCamera() {
+      return !!(
+        window.isSecureContext && navigator.mediaDevices &&
+        typeof navigator.mediaDevices.getUserMedia === 'function'
+      );
+    }
+
+    function stopCamera() {
+      cameraRequestId += 1;
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(function (track) { track.stop(); });
+        cameraStream = null;
+      }
+      if (video) video.srcObject = null;
+    }
+
+    function resetCameraUi() {
+      if (!hasCameraUi) return;
+      video.classList.remove('d-none');
+      snapshot.classList.add('d-none');
+      snapshot.removeAttribute('src');
+      errorBox.classList.add('d-none');
+      errorBox.textContent = '';
+      fallbackBtn.classList.add('d-none');
+      retakeBtn.classList.add('d-none');
+      useBtn.classList.add('d-none');
+      shutterBtn.classList.remove('d-none');
+      switchBtn.classList.add('d-none');
+      hint.textContent = 'Center the photo and tap Capture. Your browser may ask for camera permission the first time.';
+    }
+
+    function showCameraError(message) {
+      if (!hasCameraUi) return;
+      errorBox.textContent = message;
+      errorBox.classList.remove('d-none');
+      fallbackBtn.classList.remove('d-none');
+      shutterBtn.classList.add('d-none');
+      switchBtn.classList.add('d-none');
+      retakeBtn.classList.add('d-none');
+      useBtn.classList.add('d-none');
+      hint.textContent = 'You can still upload an existing photo from your device.';
+    }
+
+    function cameraErrorMessage(error) {
+      var name = error && error.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        return 'Camera permission was blocked. Allow camera access in your browser settings, then try again.';
+      }
+      if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') {
+        return 'No camera was found on this device. You can upload a photo from your device instead.';
+      }
+      if (name === 'NotReadableError' || name === 'TrackStartError') {
+        return 'The camera is busy or cannot be started. Close other apps using it and try again.';
+      }
+      return 'Could not open the camera. You can upload a photo from your device instead.';
+    }
+
+    async function startCamera(useDeviceId) {
+      if (!supportsLiveCamera()) {
+        showCameraError('Live camera is not available here. Use the file picker instead.');
+        return;
+      }
+      stopCamera();
+      resetCameraUi();
+      hint.textContent = 'Starting camera...';
+      var requestId = ++cameraRequestId;
+
+      var constraints = { audio: false, video: { facingMode: { ideal: 'environment' } } };
+      if (useDeviceId && cameraDevices.length) {
+        constraints.video = { deviceId: { exact: cameraDevices[cameraDeviceIndex].deviceId } };
+      }
+
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (requestId !== cameraRequestId) {
+          stream.getTracks().forEach(function (track) { track.stop(); });
+          return;
+        }
+        cameraStream = stream;
+        video.srcObject = stream;
+        try { await video.play(); } catch (error) { /* autoplay can be blocked */ }
+        hint.textContent = 'Center the photo and tap Capture.';
+
+        try {
+          var devices = await navigator.mediaDevices.enumerateDevices();
+          if (requestId !== cameraRequestId) return;
+          cameraDevices = devices.filter(function (device) {
+            return device.kind === 'videoinput';
+          });
+          var track = stream.getVideoTracks()[0];
+          var settings = track && track.getSettings ? track.getSettings() : {};
+          if (settings && settings.deviceId) {
+            for (var i = 0; i < cameraDevices.length; i += 1) {
+              if (cameraDevices[i].deviceId === settings.deviceId) {
+                cameraDeviceIndex = i;
+                break;
+              }
+            }
+          }
+          if (cameraDevices.length > 1) switchBtn.classList.remove('d-none');
+        } catch (error) { /* device switching is optional */ }
+      } catch (error) {
+        if (requestId !== cameraRequestId) return;
+        stopCamera();
+        showCameraError(cameraErrorMessage(error));
+      }
+    }
+
+    function capturePhoto() {
+      if (!cameraStream || !video.videoWidth) {
+        hint.textContent = 'The camera is still starting. Please wait a moment and try again.';
+        return;
+      }
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      snapshot.src = canvas.toDataURL('image/jpeg', 0.92);
+      video.classList.add('d-none');
+      snapshot.classList.remove('d-none');
+      shutterBtn.classList.add('d-none');
+      switchBtn.classList.add('d-none');
+      retakeBtn.classList.remove('d-none');
+      useBtn.classList.remove('d-none');
+      errorBox.classList.add('d-none');
+      fallbackBtn.classList.add('d-none');
+      hint.textContent = 'Happy with this photo? Tap Use Photo.';
+    }
+
+    function retakePhoto() {
+      snapshot.classList.add('d-none');
+      snapshot.removeAttribute('src');
+      video.classList.remove('d-none');
+      shutterBtn.classList.remove('d-none');
+      retakeBtn.classList.add('d-none');
+      useBtn.classList.add('d-none');
+      if (cameraDevices.length > 1) switchBtn.classList.remove('d-none');
+      hint.textContent = 'Center the photo and tap Capture.';
+    }
+
+    function switchCamera() {
+      if (cameraDevices.length < 2) return;
+      cameraDeviceIndex = (cameraDeviceIndex + 1) % cameraDevices.length;
+      startCamera(true);
+    }
+
+    function usePhoto() {
+      if (!canvas.width || !canvas.height) return;
+      canvas.toBlob(function (blob) {
+        if (!blob) {
+          showCameraError('Could not create the photo. Please try again.');
+          return;
+        }
+        var now = new Date();
+        var filename = 'camera-' + now.getFullYear() +
+          ('0' + (now.getMonth() + 1)).slice(-2) +
+          ('0' + now.getDate()).slice(-2) + '-' +
+          ('0' + now.getHours()).slice(-2) +
+          ('0' + now.getMinutes()).slice(-2) +
+          ('0' + now.getSeconds()).slice(-2) + '.jpg';
+        var file;
+        try {
+          file = new File([blob], filename, { type: 'image/jpeg' });
+        } catch (error) {
+          showCameraError('Your browser cannot attach the photo. Please use Upload from Gallery / Files.');
+          return;
+        }
+        var result = addFiles([file]);
+        if (result.ok) {
+          if (cameraModal) cameraModal.hide();
+        } else {
+          showCameraError(result.message);
+        }
+      }, 'image/jpeg', 0.92);
+    }
+
+    if (hasCameraUi) {
+      modalEl.addEventListener('shown.bs.modal', function () {
+        startCamera(false);
+      });
+      modalEl.addEventListener('hidden.bs.modal', function () {
+        stopCamera();
+        resetCameraUi();
+      });
+      shutterBtn.addEventListener('click', capturePhoto);
+      retakeBtn.addEventListener('click', retakePhoto);
+      useBtn.addEventListener('click', usePhoto);
+      switchBtn.addEventListener('click', switchCamera);
+      fallbackBtn.addEventListener('click', function () {
+        if (cameraModal) cameraModal.hide();
+        setTimeout(function () { cameraInput.click(); }, 350);
+      });
+    }
+
+    cameraBtn.addEventListener('click', function () {
+      var canUseModal = hasCameraUi && window.bootstrap && bootstrap.Modal;
+      if (!canUseModal || !supportsLiveCamera()) {
+        status.textContent = supportsLiveCamera()
+          ? 'The live camera is not available. Opening your device camera/file picker instead.'
+          : 'Live camera needs HTTPS or localhost. Opening your device camera/file picker instead.';
+        cameraInput.click();
+        return;
+      }
+      cameraModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      cameraModal.show();
+    });
+  })();
+</script>
 {% endblock %}

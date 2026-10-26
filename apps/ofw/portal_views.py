@@ -7,34 +7,35 @@ check-ins, assessments and concerns logged by management against an OFW's
 profile are surfaced back here because they are linked through the profile.
 """
 
-import json
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from .forms import (
-    FamilyContactRequestForm,
+    FamilyContactForm,
     OFWPortalProfileForm,
     OFWSelfCheckInForm,
     OFWSelfConcernForm,
 )
-from .locations import CITIES_BY_COUNTRY, COUNTRY_CHOICES
+from .hotlines import automatic_local_hotlines, philippine_national_hotlines
+from .locations import COUNTRY_CHOICES, canonical_country, cities_for_country
 from .models import (
     CheckIn,
     Concern,
     ConcernProof,
     EmergencyContact,
-    EmergencyContactRequest,
+    Notification,
     OFWProfile,
     WelfareAssessment,
 )
+from .notifications import notify_managers
 from .roles import is_ofw
 from .views import (
     _concern_status_badge,
     _condition_badge,
-    _request_status_badge,
     _severity_badge,
     _welfare_badge,
 )
@@ -49,6 +50,58 @@ def _guard(request):
 
 def _profile_for(user):
     return OFWProfile.objects.filter(user=user).order_by('id').first()
+
+
+def _hotline_number(contact):
+    return contact.dial_number or (contact.phone or '').strip()
+
+
+def _dedupe_hotlines(contacts, key_func):
+    """Keep the first row for each key while preserving priority order."""
+    seen = set()
+    result = []
+    for contact in contacts:
+        key = key_func(contact)
+        if key and key in seen:
+            continue
+        seen.add(key)
+        result.append(contact)
+    return result
+
+
+def _hotlines_for(location_country):
+    """Public hotlines for the OFW's deployment country plus the PH national ones.
+
+    Database entries are authoritative and come first.  Bundled country data
+    fills in local emergency numbers when management has not added any, so an
+    OFW always has at least one local number plus the Philippine hotlines.
+    Returns a ``(local_hotlines, national_hotlines)`` tuple.
+    """
+    country = canonical_country(location_country)
+    public_contacts = list(
+        EmergencyContact.objects
+        .filter(contact_type__in=EmergencyContact.PUBLIC_TYPES)
+        .order_by('country', 'contact_type', 'name')
+    )
+
+    db_local = []
+    db_national = []
+    for contact in public_contacts:
+        contact_country = canonical_country(contact.country)
+        if country and country != 'Philippines' and contact_country == country:
+            db_local.append(contact)
+        elif contact_country == 'Philippines':
+            db_national.append(contact)
+
+    local = _dedupe_hotlines(
+        db_local + automatic_local_hotlines(country),
+        _hotline_number,
+    )
+    national = _dedupe_hotlines(
+        db_national + philippine_national_hotlines(),
+        _hotline_number,
+    )
+    return local, national
 
 
 @login_required(login_url='login')
@@ -106,7 +159,7 @@ def portal_profile(request):
     profile = _profile_for(request.user)
 
     if request.method == 'POST':
-        form = OFWPortalProfileForm(request.POST, instance=profile)
+        form = OFWPortalProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             obj = form.save(commit=False)
             obj.user = request.user
@@ -124,8 +177,18 @@ def portal_profile(request):
             if profile else 'bg-secondary-lt text-secondary'
         ),
         'country_options': COUNTRY_CHOICES,
-        'cities_by_country_json': json.dumps(CITIES_BY_COUNTRY),
     })
+
+
+@login_required(login_url='login')
+def portal_cities(request):
+    """City datalist options for one country (fetched as the country changes)."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    country = (request.GET.get('country') or '').strip()
+    return JsonResponse({'cities': cities_for_country(country)})
 
 
 @login_required(login_url='login')
@@ -147,6 +210,25 @@ def portal_checkins(request):
             checkin.user = request.user
             checkin.checkin_date = timezone.now()
             checkin.save()
+            detail = (
+                f'{checkin.get_condition_display()} via '
+                f'{checkin.get_method_display()}.'
+            )
+            if checkin.contact_person:
+                detail += f' Contact person: {checkin.contact_person}.'
+            notify_managers(
+                title=f'New check-in from {profile.full_name}',
+                message=detail,
+                url=reverse('ofw:checkin_detail', args=[checkin.pk]),
+                level=(
+                    Notification.Level.DANGER
+                    if checkin.condition == CheckIn.Condition.DISTRESSED
+                    else Notification.Level.WARNING
+                    if checkin.condition != CheckIn.Condition.SAFE
+                    else Notification.Level.SUCCESS
+                ),
+                exclude_user=request.user,
+            )
             messages.success(request, 'Thank you! Your check-in has been recorded.')
             return redirect('ofw:portal_checkins')
     else:
@@ -191,6 +273,20 @@ def portal_concerns(request):
                     file=uploaded,
                     original_name=uploaded.name,
                 )
+            notify_managers(
+                title=f'New concern from {profile.full_name}',
+                message=(
+                    f'{concern.get_category_display()}: "{concern.title}" '
+                    f'({concern.get_severity_display()} severity).'
+                ),
+                url=reverse('ofw:concern_detail', args=[concern.pk]),
+                level=(
+                    Notification.Level.DANGER
+                    if concern.severity in (Concern.Severity.HIGH, Concern.Severity.CRITICAL)
+                    else Notification.Level.WARNING
+                ),
+                exclude_user=request.user,
+            )
             if proof_files:
                 messages.success(
                     request,
@@ -234,57 +330,31 @@ def portal_contacts(request):
         return guard
 
     profile = _profile_for(request.user)
-    location_country = profile.country.strip() if profile and profile.country else ''
+    location_country = canonical_country(profile.country) if profile and profile.country else ''
     location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
 
     if request.method == 'POST':
-        form = FamilyContactRequestForm(request.POST)
+        form = FamilyContactForm(request.POST)
         if form.is_valid():
-            contact_request = form.save(commit=False)
-            contact_request.user = request.user
-            contact_request.ofw = profile
-            contact_request.save()
+            contact = form.save(commit=False)
+            contact.user = request.user
+            contact.save()
             messages.success(
                 request,
-                'Your request has been submitted. The management team will review it shortly.',
+                f'"{contact.name}" has been added to your family emergency contacts.',
             )
             return redirect('ofw:portal_contacts')
     else:
-        form = FamilyContactRequestForm()
+        form = FamilyContactForm()
 
-    # Public hotlines: the OFW's deployment country plus the national Philippine
-    # hotlines (DMW / OWWA) that apply wherever they are posted.
-    hotline_countries = {'Philippines'}
-    if location_country:
-        hotline_countries.add(location_country)
-
-    hotlines = (
-        EmergencyContact.objects
-        .filter(
-            contact_type__in=EmergencyContact.PUBLIC_TYPES,
-            country__in=sorted(hotline_countries),
-        )
-        .order_by('country', 'contact_type', 'name')
-    )
-    local_hotlines = [
-        c for c in hotlines if location_country and c.country == location_country
-    ]
-    national_hotlines = [c for c in hotlines if c.country == 'Philippines']
+    local_hotlines, national_hotlines = _hotlines_for(location_country)
 
     my_contacts = (
         EmergencyContact.objects
         .filter(user=request.user)
+        .exclude(contact_type__in=EmergencyContact.PUBLIC_TYPES)
         .order_by('contact_type', 'name')
     )
-    request_rows = [
-        {
-            'obj': r,
-            'status_badge': _request_status_badge.get(
-                r.status, 'bg-secondary-lt text-secondary'
-            ),
-        }
-        for r in EmergencyContactRequest.objects.filter(user=request.user)
-    ]
 
     return render(request, 'ofw/portal/contacts.html', {
         'profile': profile,
@@ -293,6 +363,96 @@ def portal_contacts(request):
         'local_hotlines': local_hotlines,
         'national_hotlines': national_hotlines,
         'my_contacts': my_contacts,
-        'request_rows': request_rows,
         'form': form,
     })
+
+
+@login_required(login_url='login')
+def portal_sos(request):
+    """One-tap emergency page: every reachable number in one place."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    location_country = canonical_country(profile.country) if profile and profile.country else ''
+    location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
+
+    local_hotlines, national_hotlines = _hotlines_for(location_country)
+
+    # The SOS hero already has one-tap buttons for these numbers.  Avoid
+    # repeating the *automatic* copies below; database entries are still kept
+    # because they may carry a more specific office name or extra details.
+    quick_numbers = {'911', '1348', '+63285511545'}
+    national_hotlines = [
+        contact for contact in national_hotlines
+        if not (
+            getattr(contact, 'automatic', False)
+            and contact.dial_number in quick_numbers
+        )
+    ]
+
+    family_contacts = (
+        EmergencyContact.objects
+        .filter(user=request.user)
+        .exclude(contact_type__in=EmergencyContact.PUBLIC_TYPES)
+        .order_by('contact_type', 'name')
+    )
+
+    return render(request, 'ofw/portal/sos.html', {
+        'profile': profile,
+        'location_country': location_country,
+        'location_city': location_city,
+        'local_hotlines': local_hotlines,
+        'national_hotlines': national_hotlines,
+        'family_contacts': family_contacts,
+    })
+
+
+@login_required(login_url='login')
+def portal_contact_edit(request, pk):
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    contact = get_object_or_404(
+        EmergencyContact.objects.exclude(
+            contact_type__in=EmergencyContact.PUBLIC_TYPES
+        ),
+        pk=pk, user=request.user,
+    )
+
+    if request.method == 'POST':
+        form = FamilyContactForm(request.POST, instance=contact)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'"{contact.name}" has been updated.')
+            return redirect('ofw:portal_contacts')
+    else:
+        form = FamilyContactForm(instance=contact)
+
+    return render(request, 'ofw/portal/contact_form.html', {
+        'form': form,
+        'contact': contact,
+    })
+
+
+@login_required(login_url='login')
+def portal_contact_delete(request, pk):
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    contact = get_object_or_404(
+        EmergencyContact.objects.exclude(
+            contact_type__in=EmergencyContact.PUBLIC_TYPES
+        ),
+        pk=pk, user=request.user,
+    )
+
+    if request.method == 'POST':
+        name = contact.name
+        contact.delete()
+        messages.success(request, f'"{name}" has been removed from your emergency contacts.')
+
+    return redirect('ofw:portal_contacts')

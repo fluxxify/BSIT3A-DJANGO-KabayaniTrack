@@ -1,0 +1,3767 @@
+{
+  "_meta": {
+    "description": "Automatic country emergency hotlines shown in the OFW portal when the deployment country is set. Management-created EmergencyContact records are shown first and can override or add to these entries.",
+    "retrieved": "2026-10-26",
+    "sources": [
+      {
+        "name": "emergency-numbers (MIT)",
+        "url": "https://github.com/roderickhsiao/emergency-numbers"
+      },
+      {
+        "name": "Emergency Numbers & Suicide Helplines API (CC BY-SA 4.0, compiled from Wikipedia)",
+        "url": "https://github.com/fernando-195/emergency-and-helplines-api"
+      }
+    ],
+    "disclaimer": "Emergency numbers can change. These entries are guidance only; confirm with local authorities and the nearest Philippine embassy or POLO office. Management can add verified numbers in Emergency Contacts."
+  },
+  "countries": {
+    "Afghanistan": [
+      {
+        "name": "Afghanistan emergency hotline",
+        "contact_type": "emergency",
+        "phone": "119",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Afghanistan national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Aland Islands": [
+      {
+        "name": "Aland Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Albania": [
+      {
+        "name": "Albania police",
+        "contact_type": "police",
+        "phone": "129",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Albania fire / rescue",
+        "contact_type": "fire",
+        "phone": "128",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Albania ambulance",
+        "contact_type": "hospital",
+        "phone": "127",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Algeria": [
+      {
+        "name": "Algeria police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Algeria fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "14",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "American Samoa": [
+      {
+        "name": "American Samoa emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Andorra": [
+      {
+        "name": "Andorra police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Andorra fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "118",
+        "notes": "Fire and medical emergencies."
+      },
+      {
+        "name": "Andorra national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "116",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Angola": [
+      {
+        "name": "Angola police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Angola fire / rescue",
+        "contact_type": "fire",
+        "phone": "115",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Angola ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Anguilla": [
+      {
+        "name": "Anguilla emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Antigua and Barbuda": [
+      {
+        "name": "Antigua and Barbuda emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Argentina": [
+      {
+        "name": "Argentina police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Argentina fire / rescue",
+        "contact_type": "fire",
+        "phone": "100",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Argentina ambulance",
+        "contact_type": "hospital",
+        "phone": "107",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Armenia": [
+      {
+        "name": "Armenia police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Armenia fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Armenia ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Armenia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 911"
+      }
+    ],
+    "Aruba": [
+      {
+        "name": "Aruba emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Australia": [
+      {
+        "name": "Australia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "000",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Austria": [
+      {
+        "name": "Austria police",
+        "contact_type": "police",
+        "phone": "133",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Austria fire / rescue",
+        "contact_type": "fire",
+        "phone": "122",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Austria ambulance",
+        "contact_type": "hospital",
+        "phone": "144",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Azerbaijan": [
+      {
+        "name": "Azerbaijan police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Azerbaijan fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Azerbaijan ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Bahamas": [
+      {
+        "name": "Bahamas emergency hotline",
+        "contact_type": "emergency",
+        "phone": "919",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Bahamas national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "911 or 919"
+      }
+    ],
+    "Bahrain": [
+      {
+        "name": "Bahrain emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Bangladesh": [
+      {
+        "name": "Bangladesh police",
+        "contact_type": "police",
+        "phone": "999",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Bangladesh fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "199",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Barbados": [
+      {
+        "name": "Barbados police",
+        "contact_type": "police",
+        "phone": "211",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Barbados fire / rescue",
+        "contact_type": "fire",
+        "phone": "311",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Barbados ambulance",
+        "contact_type": "hospital",
+        "phone": "511",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Belarus": [
+      {
+        "name": "Belarus police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Belarus fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Belarus ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Belgium": [
+      {
+        "name": "Belgium police",
+        "contact_type": "police",
+        "phone": "101",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Belgium fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Belgium ambulance",
+        "contact_type": "hospital",
+        "phone": "100",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Belize": [
+      {
+        "name": "Belize police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Belize fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "90",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Benin": [
+      {
+        "name": "Benin police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Benin fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Benin ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Bermuda": [
+      {
+        "name": "Bermuda emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Bhutan": [
+      {
+        "name": "Bhutan police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Bhutan fire / rescue",
+        "contact_type": "fire",
+        "phone": "110",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Bhutan ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Bolivia": [
+      {
+        "name": "Bolivia police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Bolivia fire / rescue",
+        "contact_type": "fire",
+        "phone": "119",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Bolivia ambulance",
+        "contact_type": "hospital",
+        "phone": "118",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Bolivia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Bonaire, Sint Eustatius and Saba": [
+      {
+        "name": "Bonaire, Sint Eustatius and Saba emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Bosnia and Herzegovina": [
+      {
+        "name": "Bosnia and Herzegovina police",
+        "contact_type": "police",
+        "phone": "122",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Bosnia and Herzegovina fire / rescue",
+        "contact_type": "fire",
+        "phone": "123",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Bosnia and Herzegovina ambulance",
+        "contact_type": "hospital",
+        "phone": "124",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Botswana": [
+      {
+        "name": "Botswana police & fire",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police and fire emergencies."
+      },
+      {
+        "name": "Botswana ambulance",
+        "contact_type": "hospital",
+        "phone": "997",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Brazil": [
+      {
+        "name": "Brazil police",
+        "contact_type": "police",
+        "phone": "190",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Brazil fire / rescue",
+        "contact_type": "fire",
+        "phone": "193",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Brazil ambulance",
+        "contact_type": "hospital",
+        "phone": "192",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "British Indian Ocean Territory": [
+      {
+        "name": "British Indian Ocean Territory emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999"
+      }
+    ],
+    "Brunei": [
+      {
+        "name": "Brunei police",
+        "contact_type": "police",
+        "phone": "993",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Brunei fire / rescue",
+        "contact_type": "fire",
+        "phone": "995",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Brunei ambulance",
+        "contact_type": "hospital",
+        "phone": "991",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Bulgaria": [
+      {
+        "name": "Bulgaria emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Burkina Faso": [
+      {
+        "name": "Burkina Faso police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Burkina Faso fire / rescue",
+        "contact_type": "fire",
+        "phone": "18",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Burkina Faso ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Burundi": [
+      {
+        "name": "Burundi police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Burundi fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Burundi ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Cambodia": [
+      {
+        "name": "Cambodia police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Cambodia fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Cambodia ambulance",
+        "contact_type": "hospital",
+        "phone": "119",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Cameroon": [
+      {
+        "name": "Cameroon emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Canada": [
+      {
+        "name": "Canada emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Cape Verde": [
+      {
+        "name": "Cape Verde emergency hotline",
+        "contact_type": "emergency",
+        "phone": "132",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Cape Verde national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "130",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Cayman Islands": [
+      {
+        "name": "Cayman Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Central African Republic": [
+      {
+        "name": "Central African Republic police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Central African Republic fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Central African Republic ambulance",
+        "contact_type": "hospital",
+        "phone": "1220",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Chad": [
+      {
+        "name": "Chad police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Chad fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "2251",
+        "notes": "Fire and medical emergencies."
+      },
+      {
+        "name": "Chad national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "2251-4242",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Chile": [
+      {
+        "name": "Chile police",
+        "contact_type": "police",
+        "phone": "133",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Chile fire / rescue",
+        "contact_type": "fire",
+        "phone": "132",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Chile ambulance",
+        "contact_type": "hospital",
+        "phone": "131",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "China": [
+      {
+        "name": "China police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "China fire / rescue",
+        "contact_type": "fire",
+        "phone": "119",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "China ambulance",
+        "contact_type": "hospital",
+        "phone": "120",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Christmas Island": [
+      {
+        "name": "Christmas Island emergency hotline",
+        "contact_type": "emergency",
+        "phone": "000",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Cocos (Keeling) Islands": [
+      {
+        "name": "Cocos (Keeling) Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "000",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Colombia": [
+      {
+        "name": "Colombia police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Colombia fire / rescue",
+        "contact_type": "fire",
+        "phone": "119",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Colombia ambulance",
+        "contact_type": "hospital",
+        "phone": "123",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Colombia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "125",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Comoros": [
+      {
+        "name": "Comoros police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Comoros fire / rescue",
+        "contact_type": "fire",
+        "phone": "18",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Comoros ambulance",
+        "contact_type": "hospital",
+        "phone": "19",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Comoros national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "772-03-73",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Cook Islands": [
+      {
+        "name": "Cook Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Costa Rica": [
+      {
+        "name": "Costa Rica emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Croatia": [
+      {
+        "name": "Croatia police",
+        "contact_type": "police",
+        "phone": "192",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Croatia fire / rescue",
+        "contact_type": "fire",
+        "phone": "193",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Croatia ambulance",
+        "contact_type": "hospital",
+        "phone": "194",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Croatia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 194"
+      }
+    ],
+    "Cuba": [
+      {
+        "name": "Cuba police",
+        "contact_type": "police",
+        "phone": "106",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Cuba fire / rescue",
+        "contact_type": "fire",
+        "phone": "105",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Cuba ambulance",
+        "contact_type": "hospital",
+        "phone": "104",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Curaçao": [
+      {
+        "name": "Curaçao emergency hotline",
+        "contact_type": "emergency",
+        "phone": "910",
+        "notes": "910 and 912"
+      }
+    ],
+    "Cyprus": [
+      {
+        "name": "Cyprus emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Czech Republic": [
+      {
+        "name": "Czech Republic police",
+        "contact_type": "police",
+        "phone": "158",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Czech Republic fire / rescue",
+        "contact_type": "fire",
+        "phone": "150",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Czech Republic ambulance",
+        "contact_type": "hospital",
+        "phone": "155",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Czech Republic national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 155"
+      }
+    ],
+    "Democratic Republic of the Congo": [
+      {
+        "name": "Democratic Republic of the Congo police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Democratic Republic of the Congo fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Democratic Republic of the Congo ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Denmark": [
+      {
+        "name": "Denmark emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Djibouti": [
+      {
+        "name": "Djibouti police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Djibouti fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "3510",
+        "notes": "Fire and medical emergencies."
+      },
+      {
+        "name": "Djibouti national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "19",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Dominica": [
+      {
+        "name": "Dominica emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Dominican Republic": [
+      {
+        "name": "Dominican Republic emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Ecuador": [
+      {
+        "name": "Ecuador emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Egypt": [
+      {
+        "name": "Egypt police",
+        "contact_type": "police",
+        "phone": "122",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Egypt fire / rescue",
+        "contact_type": "fire",
+        "phone": "180",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Egypt ambulance",
+        "contact_type": "hospital",
+        "phone": "123",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "El Salvador": [
+      {
+        "name": "El Salvador police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "El Salvador fire / rescue",
+        "contact_type": "fire",
+        "phone": "913",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "El Salvador ambulance",
+        "contact_type": "hospital",
+        "phone": "132",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Equatorial Guinea": [
+      {
+        "name": "Equatorial Guinea police",
+        "contact_type": "police",
+        "phone": "114",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Equatorial Guinea fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Equatorial Guinea ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Equatorial Guinea national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "115",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Eritrea": [
+      {
+        "name": "Eritrea emergency hotline",
+        "contact_type": "emergency",
+        "phone": "119",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Eritrea national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "114",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Estonia": [
+      {
+        "name": "Estonia police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Estonia fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Eswatini": [
+      {
+        "name": "Eswatini police & fire",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police and fire emergencies."
+      },
+      {
+        "name": "Eswatini ambulance",
+        "contact_type": "hospital",
+        "phone": "977",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Ethiopia": [
+      {
+        "name": "Ethiopia police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Ethiopia fire / rescue",
+        "contact_type": "fire",
+        "phone": "939",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Ethiopia ambulance",
+        "contact_type": "hospital",
+        "phone": "907",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Falkland Islands": [
+      {
+        "name": "Falkland Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999"
+      }
+    ],
+    "Faroe Islands": [
+      {
+        "name": "Faroe Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Fiji": [
+      {
+        "name": "Fiji emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Finland": [
+      {
+        "name": "Finland emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "France": [
+      {
+        "name": "France police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "France fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "France ambulance",
+        "contact_type": "hospital",
+        "phone": "15",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "French Guiana": [
+      {
+        "name": "French Guiana emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "French Polynesia": [
+      {
+        "name": "French Polynesia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "French Southern Territories": [
+      {
+        "name": "French Southern Territories emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "French territory; 112 is the standard emergency number."
+      }
+    ],
+    "Gabon": [
+      {
+        "name": "Gabon police",
+        "contact_type": "police",
+        "phone": "1730",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Gabon fire / rescue",
+        "contact_type": "fire",
+        "phone": "18",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Gabon ambulance",
+        "contact_type": "hospital",
+        "phone": "1300",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Gambia": [
+      {
+        "name": "Gambia police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Gambia fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Gambia ambulance",
+        "contact_type": "hospital",
+        "phone": "116",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Georgia": [
+      {
+        "name": "Georgia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Germany": [
+      {
+        "name": "Germany police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Germany fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Ghana": [
+      {
+        "name": "Ghana police",
+        "contact_type": "police",
+        "phone": "191",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Ghana fire / rescue",
+        "contact_type": "fire",
+        "phone": "192",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Ghana ambulance",
+        "contact_type": "hospital",
+        "phone": "193",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Ghana national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Gibraltar": [
+      {
+        "name": "Gibraltar emergency hotline",
+        "contact_type": "emergency",
+        "phone": "190",
+        "notes": "190 or 112 or 999"
+      }
+    ],
+    "Greece": [
+      {
+        "name": "Greece police",
+        "contact_type": "police",
+        "phone": "100",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Greece fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Greece ambulance",
+        "contact_type": "hospital",
+        "phone": "166",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Greenland": [
+      {
+        "name": "Greenland emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Grenada": [
+      {
+        "name": "Grenada emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Guadeloupe": [
+      {
+        "name": "Guadeloupe emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Guam": [
+      {
+        "name": "Guam emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Guatemala": [
+      {
+        "name": "Guatemala police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Guatemala fire / rescue",
+        "contact_type": "fire",
+        "phone": "123",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Guatemala ambulance",
+        "contact_type": "hospital",
+        "phone": "128",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Guatemala national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "122",
+        "notes": "122 CBV (national) ; 123 CBM (municipal local only) ; 1554 ASOBOMBD (municipalities associations, national) ;"
+      }
+    ],
+    "Guernsey": [
+      {
+        "name": "Guernsey emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999"
+      }
+    ],
+    "Guinea": [
+      {
+        "name": "Guinea police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Guinea fire / rescue",
+        "contact_type": "fire",
+        "phone": "18",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Guinea ambulance",
+        "contact_type": "hospital",
+        "phone": "2245050",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Guinea-Bissau": [
+      {
+        "name": "Guinea-Bissau police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Guinea-Bissau fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Guinea-Bissau ambulance",
+        "contact_type": "hospital",
+        "phone": "119",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Guinea-Bissau national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Guyana": [
+      {
+        "name": "Guyana police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Guyana fire / rescue",
+        "contact_type": "fire",
+        "phone": "912",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Guyana ambulance",
+        "contact_type": "hospital",
+        "phone": "913",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Haiti": [
+      {
+        "name": "Haiti police",
+        "contact_type": "police",
+        "phone": "114",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Haiti fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Haiti ambulance",
+        "contact_type": "hospital",
+        "phone": "116",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Honduras": [
+      {
+        "name": "Honduras police",
+        "contact_type": "police",
+        "phone": "199",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Honduras fire / rescue",
+        "contact_type": "fire",
+        "phone": "198",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Honduras ambulance",
+        "contact_type": "hospital",
+        "phone": "195",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Hong Kong": [
+      {
+        "name": "Hong Kong emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Hungary": [
+      {
+        "name": "Hungary police",
+        "contact_type": "police",
+        "phone": "107",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Hungary fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Hungary ambulance",
+        "contact_type": "hospital",
+        "phone": "104",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Iceland": [
+      {
+        "name": "Iceland emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "India": [
+      {
+        "name": "India police",
+        "contact_type": "police",
+        "phone": "100",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "India fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "India ambulance",
+        "contact_type": "hospital",
+        "phone": "102",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "India national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Indonesia": [
+      {
+        "name": "Indonesia police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Indonesia fire / rescue",
+        "contact_type": "fire",
+        "phone": "113",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Indonesia ambulance",
+        "contact_type": "hospital",
+        "phone": "118",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Indonesia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Iran": [
+      {
+        "name": "Iran police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Iran fire / rescue",
+        "contact_type": "fire",
+        "phone": "125",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Iran ambulance",
+        "contact_type": "hospital",
+        "phone": "115",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Iraq": [
+      {
+        "name": "Iraq police",
+        "contact_type": "police",
+        "phone": "104",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Iraq fire / rescue",
+        "contact_type": "fire",
+        "phone": "115",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Iraq ambulance",
+        "contact_type": "hospital",
+        "phone": "122",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Iraq national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 911"
+      }
+    ],
+    "Ireland": [
+      {
+        "name": "Ireland emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Isle of Man": [
+      {
+        "name": "Isle of Man emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999"
+      }
+    ],
+    "Israel": [
+      {
+        "name": "Israel police",
+        "contact_type": "police",
+        "phone": "100",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Israel fire / rescue",
+        "contact_type": "fire",
+        "phone": "102",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Israel ambulance",
+        "contact_type": "hospital",
+        "phone": "101",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Italy": [
+      {
+        "name": "Italy police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Italy fire / rescue",
+        "contact_type": "fire",
+        "phone": "115",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Italy ambulance",
+        "contact_type": "hospital",
+        "phone": "118",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Italy national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Ivory Coast": [
+      {
+        "name": "Ivory Coast police",
+        "contact_type": "police",
+        "phone": "111",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Ivory Coast fire / rescue",
+        "contact_type": "fire",
+        "phone": "180",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Ivory Coast ambulance",
+        "contact_type": "hospital",
+        "phone": "185",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Jamaica": [
+      {
+        "name": "Jamaica police",
+        "contact_type": "police",
+        "phone": "119",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Jamaica fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "110",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Japan": [
+      {
+        "name": "Japan police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Japan fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "119",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Jersey": [
+      {
+        "name": "Jersey emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999"
+      }
+    ],
+    "Jordan": [
+      {
+        "name": "Jordan police",
+        "contact_type": "police",
+        "phone": "191",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Jordan fire / rescue",
+        "contact_type": "fire",
+        "phone": "199",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Jordan ambulance",
+        "contact_type": "hospital",
+        "phone": "193",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Jordan national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Kazakhstan": [
+      {
+        "name": "Kazakhstan police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Kazakhstan fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Kazakhstan ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Kazakhstan national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Kenya": [
+      {
+        "name": "Kenya emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Kenya national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999 or 911"
+      }
+    ],
+    "Kiribati": [
+      {
+        "name": "Kiribati police",
+        "contact_type": "police",
+        "phone": "194",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Kiribati fire / rescue",
+        "contact_type": "fire",
+        "phone": "192",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Kiribati ambulance",
+        "contact_type": "hospital",
+        "phone": "193",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Kiribati national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "100",
+        "notes": "100 or 999"
+      }
+    ],
+    "Kosovo": [
+      {
+        "name": "Kosovo emergency hotline",
+        "contact_type": "emergency",
+        "phone": "194",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Kuwait": [
+      {
+        "name": "Kuwait emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Kyrgyzstan": [
+      {
+        "name": "Kyrgyzstan police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Kyrgyzstan fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Kyrgyzstan ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Kyrgyzstan national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Laos": [
+      {
+        "name": "Laos police",
+        "contact_type": "police",
+        "phone": "191",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Laos fire / rescue",
+        "contact_type": "fire",
+        "phone": "190",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Laos ambulance",
+        "contact_type": "hospital",
+        "phone": "195",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Latvia": [
+      {
+        "name": "Latvia police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Latvia fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Latvia ambulance",
+        "contact_type": "hospital",
+        "phone": "113",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Lebanon": [
+      {
+        "name": "Lebanon police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Lebanon fire / rescue",
+        "contact_type": "fire",
+        "phone": "175",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Lebanon ambulance",
+        "contact_type": "hospital",
+        "phone": "140",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Lesotho": [
+      {
+        "name": "Lesotho police",
+        "contact_type": "police",
+        "phone": "122",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Lesotho fire / rescue",
+        "contact_type": "fire",
+        "phone": "121",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Lesotho ambulance",
+        "contact_type": "hospital",
+        "phone": "123",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Liberia": [
+      {
+        "name": "Liberia police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Liberia fire / rescue",
+        "contact_type": "fire",
+        "phone": "113",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Liberia ambulance",
+        "contact_type": "hospital",
+        "phone": "4455",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Liberia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Libya": [
+      {
+        "name": "Libya emergency hotline",
+        "contact_type": "emergency",
+        "phone": "1515",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Liechtenstein": [
+      {
+        "name": "Liechtenstein police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Liechtenstein fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Liechtenstein ambulance",
+        "contact_type": "hospital",
+        "phone": "144",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Lithuania": [
+      {
+        "name": "Lithuania emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Luxembourg": [
+      {
+        "name": "Luxembourg police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Luxembourg fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Macau": [
+      {
+        "name": "Macau emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Madagascar": [
+      {
+        "name": "Madagascar emergency hotline",
+        "contact_type": "emergency",
+        "phone": "117",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Madagascar national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "124",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Malawi": [
+      {
+        "name": "Malawi police",
+        "contact_type": "police",
+        "phone": "997",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Malawi fire / rescue",
+        "contact_type": "fire",
+        "phone": "998",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Malawi ambulance",
+        "contact_type": "hospital",
+        "phone": "999",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Malaysia": [
+      {
+        "name": "Malaysia police & ambulance",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police and medical emergencies."
+      },
+      {
+        "name": "Malaysia fire / rescue",
+        "contact_type": "fire",
+        "phone": "994",
+        "notes": "Fire and rescue emergency number."
+      }
+    ],
+    "Maldives": [
+      {
+        "name": "Maldives police",
+        "contact_type": "police",
+        "phone": "119",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Maldives fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Maldives ambulance",
+        "contact_type": "hospital",
+        "phone": "102",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Maldives national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Mali": [
+      {
+        "name": "Mali police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Mali fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Mali ambulance",
+        "contact_type": "hospital",
+        "phone": "15",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Malta": [
+      {
+        "name": "Malta emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Marshall Islands": [
+      {
+        "name": "Marshall Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Martinique": [
+      {
+        "name": "Martinique emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Mauritania": [
+      {
+        "name": "Mauritania police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Mauritania fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Mauritania ambulance",
+        "contact_type": "hospital",
+        "phone": "116",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Mauritania national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "101",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Mauritius": [
+      {
+        "name": "Mauritius police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Mauritius fire / rescue",
+        "contact_type": "fire",
+        "phone": "115",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Mauritius ambulance",
+        "contact_type": "hospital",
+        "phone": "114",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Mayotte": [
+      {
+        "name": "Mayotte emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Mexico": [
+      {
+        "name": "Mexico emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Micronesia": [
+      {
+        "name": "Micronesia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Moldova": [
+      {
+        "name": "Moldova police",
+        "contact_type": "police",
+        "phone": "902",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Moldova fire / rescue",
+        "contact_type": "fire",
+        "phone": "901",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Moldova ambulance",
+        "contact_type": "hospital",
+        "phone": "903",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Moldova national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Monaco": [
+      {
+        "name": "Monaco police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Monaco fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Monaco ambulance",
+        "contact_type": "hospital",
+        "phone": "15",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Mongolia": [
+      {
+        "name": "Mongolia police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Mongolia fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Mongolia ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Mongolia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "105",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Montenegro": [
+      {
+        "name": "Montenegro police",
+        "contact_type": "police",
+        "phone": "122",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Montenegro fire / rescue",
+        "contact_type": "fire",
+        "phone": "123",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Montenegro ambulance",
+        "contact_type": "hospital",
+        "phone": "124",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Montserrat": [
+      {
+        "name": "Montserrat emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "911 or 999"
+      }
+    ],
+    "Morocco": [
+      {
+        "name": "Morocco police",
+        "contact_type": "police",
+        "phone": "190",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Morocco fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "150",
+        "notes": "Fire and medical emergencies."
+      },
+      {
+        "name": "Morocco national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "15",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Mozambique": [
+      {
+        "name": "Mozambique police",
+        "contact_type": "police",
+        "phone": "119",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Mozambique fire / rescue",
+        "contact_type": "fire",
+        "phone": "198",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Mozambique ambulance",
+        "contact_type": "hospital",
+        "phone": "117",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Myanmar": [
+      {
+        "name": "Myanmar police",
+        "contact_type": "police",
+        "phone": "199",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Myanmar fire / rescue",
+        "contact_type": "fire",
+        "phone": "191",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Myanmar ambulance",
+        "contact_type": "hospital",
+        "phone": "192",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Myanmar national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Namibia": [
+      {
+        "name": "Namibia police",
+        "contact_type": "police",
+        "phone": "10111",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Namibia fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Nauru": [
+      {
+        "name": "Nauru emergency hotline",
+        "contact_type": "emergency",
+        "phone": "110",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Nauru national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "111",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Nepal": [
+      {
+        "name": "Nepal police",
+        "contact_type": "police",
+        "phone": "100",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Nepal fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Nepal ambulance",
+        "contact_type": "hospital",
+        "phone": "102",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Netherlands": [
+      {
+        "name": "Netherlands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "New Caledonia": [
+      {
+        "name": "New Caledonia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "New Zealand": [
+      {
+        "name": "New Zealand emergency hotline",
+        "contact_type": "emergency",
+        "phone": "111",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Nicaragua": [
+      {
+        "name": "Nicaragua police & fire",
+        "contact_type": "emergency",
+        "phone": "118",
+        "notes": "Police and fire emergencies."
+      },
+      {
+        "name": "Nicaragua ambulance",
+        "contact_type": "hospital",
+        "phone": "128",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Niger": [
+      {
+        "name": "Niger police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Niger fire / rescue",
+        "contact_type": "fire",
+        "phone": "18",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Niger ambulance",
+        "contact_type": "hospital",
+        "phone": "15",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Nigeria": [
+      {
+        "name": "Nigeria emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Niue": [
+      {
+        "name": "Niue emergency hotline",
+        "contact_type": "emergency",
+        "phone": "683 4202",
+        "notes": "(+683) 4202"
+      }
+    ],
+    "Norfolk Island": [
+      {
+        "name": "Norfolk Island emergency hotline",
+        "contact_type": "emergency",
+        "phone": "000",
+        "notes": "Australian territory; 000 is the national emergency number."
+      }
+    ],
+    "North Korea": [
+      {
+        "name": "North Korea emergency hotline",
+        "contact_type": "emergency",
+        "phone": "110",
+        "notes": "110 or 8119"
+      }
+    ],
+    "North Macedonia": [
+      {
+        "name": "North Macedonia police",
+        "contact_type": "police",
+        "phone": "192",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "North Macedonia fire / rescue",
+        "contact_type": "fire",
+        "phone": "193",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "North Macedonia ambulance",
+        "contact_type": "hospital",
+        "phone": "194",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Northern Mariana Islands": [
+      {
+        "name": "Northern Mariana Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Norway": [
+      {
+        "name": "Norway police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Norway fire / rescue",
+        "contact_type": "fire",
+        "phone": "110",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Norway ambulance",
+        "contact_type": "hospital",
+        "phone": "113",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Oman": [
+      {
+        "name": "Oman emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Oman national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "9999",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Pakistan": [
+      {
+        "name": "Pakistan police",
+        "contact_type": "police",
+        "phone": "15",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Pakistan fire / rescue",
+        "contact_type": "fire",
+        "phone": "16",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Pakistan ambulance",
+        "contact_type": "hospital",
+        "phone": "115",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Palau": [
+      {
+        "name": "Palau emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Palestine": [
+      {
+        "name": "Palestine emergency hotline",
+        "contact_type": "emergency",
+        "phone": "101",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Panama": [
+      {
+        "name": "Panama police",
+        "contact_type": "police",
+        "phone": "104",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Panama fire / rescue",
+        "contact_type": "fire",
+        "phone": "103",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Panama ambulance",
+        "contact_type": "hospital",
+        "phone": "911",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Papua New Guinea": [
+      {
+        "name": "Papua New Guinea emergency hotline",
+        "contact_type": "emergency",
+        "phone": "111",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Paraguay": [
+      {
+        "name": "Paraguay police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Paraguay fire / rescue",
+        "contact_type": "fire",
+        "phone": "132",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Paraguay ambulance",
+        "contact_type": "hospital",
+        "phone": "141",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Peru": [
+      {
+        "name": "Peru police",
+        "contact_type": "police",
+        "phone": "105",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Peru fire / rescue",
+        "contact_type": "fire",
+        "phone": "116",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Peru ambulance",
+        "contact_type": "hospital",
+        "phone": "117",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Peru national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Philippines": [
+      {
+        "name": "Philippines emergency hotline",
+        "contact_type": "emergency",
+        "phone": "117",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Philippines national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Pitcairn Island": [
+      {
+        "name": "Pitcairn Island emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "British Overseas Territory; verify the local emergency service."
+      }
+    ],
+    "Poland": [
+      {
+        "name": "Poland police",
+        "contact_type": "police",
+        "phone": "997",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Poland fire / rescue",
+        "contact_type": "fire",
+        "phone": "998",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Poland ambulance",
+        "contact_type": "hospital",
+        "phone": "999",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Portugal": [
+      {
+        "name": "Portugal emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Puerto Rico": [
+      {
+        "name": "Puerto Rico emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Qatar": [
+      {
+        "name": "Qatar emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Republic of the Congo": [
+      {
+        "name": "Republic of the Congo police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Republic of the Congo fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Republic of the Congo ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Reunion": [
+      {
+        "name": "Reunion emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Romania": [
+      {
+        "name": "Romania emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Russia": [
+      {
+        "name": "Russia police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Russia fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Russia ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Rwanda": [
+      {
+        "name": "Rwanda emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Rwanda national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "912",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Saint Barthelemy": [
+      {
+        "name": "Saint Barthelemy emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "French territory; 112 is the standard emergency number."
+      }
+    ],
+    "Saint Helena": [
+      {
+        "name": "Saint Helena emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Saint Kitts and Nevis": [
+      {
+        "name": "Saint Kitts and Nevis emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Saint Lucia": [
+      {
+        "name": "Saint Lucia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Saint Pierre and Miquelon": [
+      {
+        "name": "Saint Pierre and Miquelon emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Saint Vincent and the Grenadines": [
+      {
+        "name": "Saint Vincent and the Grenadines emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Saint Vincent and the Grenadines national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "999 or 911 or 112"
+      }
+    ],
+    "Saint-Martin": [
+      {
+        "name": "Saint-Martin emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "French territory; 112 is the standard emergency number."
+      }
+    ],
+    "Samoa": [
+      {
+        "name": "Samoa police",
+        "contact_type": "police",
+        "phone": "995",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Samoa fire / rescue",
+        "contact_type": "fire",
+        "phone": "994",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Samoa ambulance",
+        "contact_type": "hospital",
+        "phone": "996",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Samoa national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "San Marino": [
+      {
+        "name": "San Marino police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "San Marino fire / rescue",
+        "contact_type": "fire",
+        "phone": "115",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "San Marino ambulance",
+        "contact_type": "hospital",
+        "phone": "118",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Sao Tome and Principe": [
+      {
+        "name": "Sao Tome and Principe emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Saudi Arabia": [
+      {
+        "name": "Saudi Arabia police",
+        "contact_type": "police",
+        "phone": "999",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Saudi Arabia fire / rescue",
+        "contact_type": "fire",
+        "phone": "998",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Saudi Arabia ambulance",
+        "contact_type": "hospital",
+        "phone": "997",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Saudi Arabia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Senegal": [
+      {
+        "name": "Senegal police",
+        "contact_type": "police",
+        "phone": "17",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Senegal fire / rescue",
+        "contact_type": "fire",
+        "phone": "18",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Senegal ambulance",
+        "contact_type": "hospital",
+        "phone": "15",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Serbia": [
+      {
+        "name": "Serbia police",
+        "contact_type": "police",
+        "phone": "192",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Serbia fire / rescue",
+        "contact_type": "fire",
+        "phone": "193",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Serbia ambulance",
+        "contact_type": "hospital",
+        "phone": "194",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Seychelles": [
+      {
+        "name": "Seychelles emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Seychelles national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "112 or 999"
+      }
+    ],
+    "Sierra Leone": [
+      {
+        "name": "Sierra Leone emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Singapore": [
+      {
+        "name": "Singapore police",
+        "contact_type": "police",
+        "phone": "999",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Singapore fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "995",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Sint Maarten": [
+      {
+        "name": "Sint Maarten emergency hotline",
+        "contact_type": "emergency",
+        "phone": "912",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Slovakia": [
+      {
+        "name": "Slovakia police",
+        "contact_type": "police",
+        "phone": "158",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Slovakia fire / rescue",
+        "contact_type": "fire",
+        "phone": "112",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Slovakia ambulance",
+        "contact_type": "hospital",
+        "phone": "155",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Slovenia": [
+      {
+        "name": "Slovenia police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Slovenia fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Solomon Islands": [
+      {
+        "name": "Solomon Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Solomon Islands national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "911 or 999"
+      }
+    ],
+    "Somalia": [
+      {
+        "name": "Somalia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "555",
+        "notes": "Police, fire, and medical emergencies."
+      },
+      {
+        "name": "Somalia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "South Africa": [
+      {
+        "name": "South Africa police",
+        "contact_type": "police",
+        "phone": "10111",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "South Africa fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "10177",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "South Georgia": [
+      {
+        "name": "South Georgia emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "South Korea": [
+      {
+        "name": "South Korea police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "South Korea fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "119",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "South Sudan": [
+      {
+        "name": "South Sudan emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Spain": [
+      {
+        "name": "Spain emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Sri Lanka": [
+      {
+        "name": "Sri Lanka police",
+        "contact_type": "police",
+        "phone": "119",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Sri Lanka fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "110",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Sudan": [
+      {
+        "name": "Sudan emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Suriname": [
+      {
+        "name": "Suriname police",
+        "contact_type": "police",
+        "phone": "115",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Suriname fire / rescue",
+        "contact_type": "fire",
+        "phone": "110",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Suriname ambulance",
+        "contact_type": "hospital",
+        "phone": "113",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Svalbard and Jan Mayen Islands": [
+      {
+        "name": "Svalbard and Jan Mayen police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Norwegian police emergency number."
+      },
+      {
+        "name": "Svalbard and Jan Mayen fire / rescue",
+        "contact_type": "fire",
+        "phone": "110",
+        "notes": "Norwegian fire and rescue number."
+      },
+      {
+        "name": "Svalbard and Jan Mayen ambulance",
+        "contact_type": "hospital",
+        "phone": "113",
+        "notes": "Norwegian medical emergency number."
+      }
+    ],
+    "Sweden": [
+      {
+        "name": "Sweden emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Switzerland": [
+      {
+        "name": "Switzerland police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Switzerland fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Switzerland ambulance",
+        "contact_type": "hospital",
+        "phone": "144",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Syria": [
+      {
+        "name": "Syria police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Syria fire / rescue",
+        "contact_type": "fire",
+        "phone": "113",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Syria ambulance",
+        "contact_type": "hospital",
+        "phone": "110",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Taiwan": [
+      {
+        "name": "Taiwan police",
+        "contact_type": "police",
+        "phone": "110",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Taiwan fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "119",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Tajikistan": [
+      {
+        "name": "Tajikistan police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Tajikistan fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Tajikistan ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Tajikistan national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Tanzania": [
+      {
+        "name": "Tanzania police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Tanzania fire / rescue",
+        "contact_type": "fire",
+        "phone": "114",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Tanzania ambulance",
+        "contact_type": "hospital",
+        "phone": "115",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Thailand": [
+      {
+        "name": "Thailand police",
+        "contact_type": "police",
+        "phone": "191",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Thailand fire / rescue",
+        "contact_type": "fire",
+        "phone": "199",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Thailand ambulance",
+        "contact_type": "hospital",
+        "phone": "1669",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Timor-Leste": [
+      {
+        "name": "Timor-Leste police",
+        "contact_type": "police",
+        "phone": "112",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Timor-Leste fire / rescue",
+        "contact_type": "fire",
+        "phone": "115",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Timor-Leste ambulance",
+        "contact_type": "hospital",
+        "phone": "114",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Togo": [
+      {
+        "name": "Togo police",
+        "contact_type": "police",
+        "phone": "117",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Togo fire / rescue",
+        "contact_type": "fire",
+        "phone": "118",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Togo ambulance",
+        "contact_type": "hospital",
+        "phone": "111",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Togo national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "8200",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Tonga": [
+      {
+        "name": "Tonga emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Trinidad and Tobago": [
+      {
+        "name": "Trinidad and Tobago police",
+        "contact_type": "police",
+        "phone": "999",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Trinidad and Tobago fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "990",
+        "notes": "Fire and medical emergencies."
+      },
+      {
+        "name": "Trinidad and Tobago national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "811",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Tunisia": [
+      {
+        "name": "Tunisia police",
+        "contact_type": "police",
+        "phone": "197",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Tunisia fire / rescue",
+        "contact_type": "fire",
+        "phone": "198",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Tunisia ambulance",
+        "contact_type": "hospital",
+        "phone": "190",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Turkey": [
+      {
+        "name": "Turkey police",
+        "contact_type": "police",
+        "phone": "155",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Turkey fire / rescue",
+        "contact_type": "fire",
+        "phone": "110",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Turkey ambulance",
+        "contact_type": "hospital",
+        "phone": "112",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Turkmenistan": [
+      {
+        "name": "Turkmenistan police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Turkmenistan fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Turkmenistan ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Turkmenistan national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "03",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Turks and Caicos Islands": [
+      {
+        "name": "Turks and Caicos Islands emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Tuvalu": [
+      {
+        "name": "Tuvalu emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Uganda": [
+      {
+        "name": "Uganda police",
+        "contact_type": "police",
+        "phone": "999",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Uganda fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Fire and medical emergencies."
+      },
+      {
+        "name": "Uganda national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Ukraine": [
+      {
+        "name": "Ukraine police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Ukraine fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Ukraine ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "United Arab Emirates": [
+      {
+        "name": "United Arab Emirates police",
+        "contact_type": "police",
+        "phone": "999",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "United Arab Emirates fire / rescue",
+        "contact_type": "fire",
+        "phone": "997",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "United Arab Emirates ambulance",
+        "contact_type": "hospital",
+        "phone": "998",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "United Kingdom": [
+      {
+        "name": "United Kingdom emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "United States": [
+      {
+        "name": "United States emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Uruguay": [
+      {
+        "name": "Uruguay police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Uruguay fire / rescue",
+        "contact_type": "fire",
+        "phone": "104",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Uruguay ambulance",
+        "contact_type": "hospital",
+        "phone": "105",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Uzbekistan": [
+      {
+        "name": "Uzbekistan police",
+        "contact_type": "police",
+        "phone": "102",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Uzbekistan fire / rescue",
+        "contact_type": "fire",
+        "phone": "101",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Uzbekistan ambulance",
+        "contact_type": "hospital",
+        "phone": "103",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Vanuatu": [
+      {
+        "name": "Vanuatu emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "Police, fire, and medical emergencies."
+      }
+    ],
+    "Vatican City": [
+      {
+        "name": "Vatican City emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Venezuela": [
+      {
+        "name": "Venezuela police",
+        "contact_type": "police",
+        "phone": "911",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Venezuela fire / rescue",
+        "contact_type": "fire",
+        "phone": "171",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Venezuela ambulance",
+        "contact_type": "hospital",
+        "phone": "161",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Vietnam": [
+      {
+        "name": "Vietnam police",
+        "contact_type": "police",
+        "phone": "113",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Vietnam fire / rescue",
+        "contact_type": "fire",
+        "phone": "114",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Vietnam ambulance",
+        "contact_type": "hospital",
+        "phone": "115",
+        "notes": "Medical emergency number."
+      }
+    ],
+    "Virgin Islands (British)": [
+      {
+        "name": "Virgin Islands (British) emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "911 or 999"
+      }
+    ],
+    "Virgin Islands (US)": [
+      {
+        "name": "Virgin Islands (US) emergency hotline",
+        "contact_type": "emergency",
+        "phone": "911",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Wallis and Futuna Islands": [
+      {
+        "name": "Wallis and Futuna emergency hotline",
+        "contact_type": "emergency",
+        "phone": "112",
+        "notes": "French territory; 112 is the standard emergency number."
+      }
+    ],
+    "Western Sahara": [
+      {
+        "name": "Western Sahara emergency hotline",
+        "contact_type": "emergency",
+        "phone": "150",
+        "notes": "General emergency number. Verify locally."
+      }
+    ],
+    "Yemen": [
+      {
+        "name": "Yemen police",
+        "contact_type": "police",
+        "phone": "194",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Yemen fire & ambulance",
+        "contact_type": "emergency",
+        "phone": "191",
+        "notes": "Fire and medical emergencies."
+      }
+    ],
+    "Zambia": [
+      {
+        "name": "Zambia police",
+        "contact_type": "police",
+        "phone": "991",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Zambia fire / rescue",
+        "contact_type": "fire",
+        "phone": "993",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Zambia ambulance",
+        "contact_type": "hospital",
+        "phone": "992",
+        "notes": "Medical emergency number."
+      },
+      {
+        "name": "Zambia national emergency hotline",
+        "contact_type": "emergency",
+        "phone": "999",
+        "notes": "Unified/national emergency number. Verify locally."
+      }
+    ],
+    "Zimbabwe": [
+      {
+        "name": "Zimbabwe police",
+        "contact_type": "police",
+        "phone": "995",
+        "notes": "Police emergency number."
+      },
+      {
+        "name": "Zimbabwe fire / rescue",
+        "contact_type": "fire",
+        "phone": "993",
+        "notes": "Fire and rescue emergency number."
+      },
+      {
+        "name": "Zimbabwe ambulance",
+        "contact_type": "hospital",
+        "phone": "994",
+        "notes": "Medical emergency number."
+      }
+    ]
+  },
+  "philippines": [
+    {
+      "name": "Philippines National Emergency Hotline",
+      "contact_type": "emergency",
+      "phone": "911",
+      "website": "https://911.gov.ph",
+      "notes": "Police, fire, and medical emergencies nationwide."
+    },
+    {
+      "name": "OWWA 24/7 Hotline",
+      "contact_type": "owwa",
+      "phone": "1348",
+      "website": "https://owwa.gov.ph",
+      "notes": "Overseas Workers Welfare Administration, 24/7."
+    },
+    {
+      "name": "OWWA Overseas Hotline",
+      "contact_type": "owwa",
+      "phone": "+63 2 8551 1545",
+      "website": "https://owwa.gov.ph",
+      "notes": "For OFWs calling from abroad."
+    },
+    {
+      "name": "Philippine Red Cross",
+      "contact_type": "hospital",
+      "phone": "143",
+      "website": "https://redcross.org.ph",
+      "notes": "Emergency medical and ambulance assistance."
+    }
+  ]
+}

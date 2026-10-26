@@ -22,6 +22,7 @@
     <style>
     @import url("https://rsms.me/inter/inter.css");
     </style>
+    {% block extra_css %}{% endblock %}
   </head>
 
   <body>
@@ -38,11 +39,19 @@
         {% endif %}
 
         <div class="page-wrapper">
+            {% if request.user.is_authenticated %}
+            <div class="dh-topbar d-print-none">
+                <div class="container-xl d-flex align-items-center justify-content-end gap-2">
+                    <span class="dh-topbar-user d-none d-sm-inline">
+                        <i class="far fa-user-circle me-1"></i>{{ request.user.get_full_name|default:request.user.username }}
+                    </span>
+                    {% include 'theme/notifications_bell.html' %}
+                </div>
+            </div>
+            {% endif %}
             <div class="page-body">
                 <div class="container-xl">
-                    {% if messages and not request.user.is_staff and not request.user.is_superuser %}
-                        {% include 'theme/messages.html' %}
-                    {% endif %}
+                    {% include 'theme/messages.html' %}
                     {% block content %}
                     {% endblock %}
                 </div>
@@ -61,6 +70,7 @@
     <script src="{% static 'libs/list.js/dist/list.min.js' %}" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/tabler.min.js' %}"></script>
+    <script src="{% static 'js/flash-messages.js' %}" defer></script>
     <script src="{% static 'js/custom.js' %}"></script>
     {% block extra_js %}{% endblock %}
 
@@ -679,6 +689,9 @@
     <script>
       window.tabler_map_vector = window.tabler_map_vector || {};
       document.addEventListener("DOMContentLoaded", function () {
+        if (!document.getElementById("map-world") || typeof jsVectorMap === "undefined") {
+          return;
+        }
         const map = (window.tabler_map_vector["map-world"] = new jsVectorMap({
           selector: "#map-world",
           map: "world",

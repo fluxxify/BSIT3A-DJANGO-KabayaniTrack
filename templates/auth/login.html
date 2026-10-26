@@ -37,30 +37,11 @@
         </div>
         <h2 class="h3 text-center mb-4">Sign in to start your session</h2>
 
+        {% include 'theme/messages.html' %}
+
         <form method="post">
           {% csrf_token %}
 
-          {% if messages %}
-          {% for message in messages %}
-          <div id="error-message" class="alert alert-danger">
-            {{ message }}
-          </div>
-          {% endfor %}
-          {% endif %}
-          <div class="mb-3">
-            <label class="form-label required">Account type</label>
-            <div class="input-group">
-              <span class="input-group-text">
-                <i class="fas fa-user-shield text-secondary"></i>
-              </span>
-              <select class="form-select" name="account_type" required {% if locked %}disabled{% endif %}>
-                <option value="" disabled {% if not selected_type %}selected{% endif %}>Select the account you are signing in as</option>
-                {% for value, label in account_types %}
-                <option value="{{ value }}" {% if value == selected_type %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
           <div class="mb-3">
             <label class="form-label">Username</label>
             <input type="text" class="form-control" name="username" autocomplete="off" value="{{ username|default:'' }}" {% if locked %}disabled{% endif %}>
@@ -73,41 +54,41 @@
               <input type="password" class="form-control" name="password" autocomplete="off" {% if locked %}disabled{% endif %}>
             </div>
           </div>
-          <div class="form-footer d-flex justify-content-end">
-            <button type="submit" class="btn btn-primary w-50">
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary w-100">
               <i class="fas fa-sign-in-alt me-1"></i> Sign in
             </button>
+            <div class="text-center text-secondary mt-3">
+              Don't have an account?
+              <a href="{% url 'register' %}" class="text-primary fw-bold">Register</a>
+            </div>
+          </div>
           </div>
        </form>
      </div>
    </div>
- </div>
- <!-- <div class="text-center text-secondary mt-n1">
-  Don't have an account?
-  <a href="{% url 'register' %}" class="text-primary fw-bold">Register</a>
- </div> -->
- <div class="text-center text-secondary mt-3">
-  OFW? Don't have an account yet?
-  <a href="{% url 'register' %}" class="text-primary fw-bold">Register here</a>
- </div>
+  </div>
 </div>
 
 {% include 'theme/settings.html' %}
 
 <script src="{% static 'js/tabler.js' %}" defer></script>
+<script src="{% static 'js/flash-messages.js' %}" defer></script>
 <script src="{% static 'js/demo.js' %}" defer></script>
 {% if locked %}
 <script>
   let remaining = {{ remaining }};
-  const messageBox = document.getElementById("error-message");
+  const messageBox = document.querySelector("#dhFlashStack .dh-flash-text");
 
   let interval = setInterval(function() {
     remaining--;
 
-    if (remaining > 0) {
-      messageBox.innerHTML =
-      "Too many failed attempts. Try again in " + remaining + " seconds.";
-    } else {
+    if (messageBox) {
+      messageBox.textContent =
+      "Too many failed attempts. Try again in " + Math.max(remaining, 0) + " seconds.";
+    }
+
+    if (remaining <= 0) {
       clearInterval(interval);
       window.location.href = "{% url 'login' %}";
     }

@@ -24,6 +24,12 @@
       <div class="card">
         <div class="card-header"><h3 class="card-title">Personal Information</h3></div>
         <div class="card-body">
+          {% if profile.profile_picture %}
+          <div class="mb-3 text-center">
+            <img src="{{ profile.profile_picture.url }}" alt="Profile picture"
+                 class="rounded border" style="width:120px;height:120px;object-fit:cover;">
+          </div>
+          {% endif %}
           <dl class="row mb-0">
             <dt class="col-5 text-muted">Full Name</dt>
             <dd class="col-7">{{ profile.full_name }}</dd>

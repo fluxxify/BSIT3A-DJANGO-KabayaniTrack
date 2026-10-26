@@ -17,7 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from django.conf.urls.static import static
+
+from .media import serve_media
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,5 +28,13 @@ urlpatterns = [
     path('ofw/', include('apps.ofw.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Media is served by the project view instead of ``static()`` so that
+# ``Range`` requests are answered with ``206 Partial Content``; browsers
+# (Safari on iOS in particular) refuse to play a video otherwise.
+urlpatterns += [
+    path(
+        f"{settings.MEDIA_URL.lstrip('/')}<path:path>",
+        serve_media,
+        name='media',
+    ),
+]

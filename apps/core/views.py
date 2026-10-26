@@ -58,12 +58,6 @@ def _home_url_name(user):
     return 'ofw:portal' if is_ofw(user) else 'dashboard'
 
 
-def _account_type_context(selected=''):
-    from apps.ofw.roles import ACCOUNT_TYPE_CHOICES
-
-    return {'account_types': ACCOUNT_TYPE_CHOICES, 'selected_type': selected}
-
-
 def _validate_registration_data(data):
     errors = {}
 
@@ -119,68 +113,52 @@ def login_view(request):
 
     failed_attempts, remaining = _get_lock_state(request)
     if remaining is not None:
-        messages.error(request, f'Too many failed attempts. Try again in {remaining} seconds.')
+        messages.error(
+            request,
+            f'Too many failed attempts. Try again in {remaining} seconds.',
+            extra_tags='lock',
+        )
         return render(
             request, 'auth/login.html',
-            {**_account_type_context(), 'locked': True, 'remaining': remaining},
+            {'locked': True, 'remaining': remaining},
         )
 
     if request.method == 'GET':
-        return render(request, 'auth/login.html', _account_type_context())
-
-    from apps.ofw.roles import account_role, account_role_label
+        return render(request, 'auth/login.html')
 
     username = request.POST.get('username', '').strip()
     password = request.POST.get('password', '')
-    account_type = request.POST.get('account_type', '').strip()
-    valid_types = {'admin', 'ofw', 'staff'}
-
-    if account_type not in valid_types:
-        messages.error(request, 'Please choose the account type you are signing in as.')
-        return render(
-            request, 'auth/login.html',
-            {**_account_type_context(account_type), 'username': username},
-        )
 
     user = authenticate(request, username=username, password=password)
 
     if user is not None:
-        if account_role(user) != account_type:
-            label = account_role_label(account_type)
-            messages.error(
-                request,
-                f'These credentials do not match the {label} account type. '
-                'Please pick the correct account type.',
-            )
-            return render(
-                request, 'auth/login.html',
-                {**_account_type_context(account_type), 'username': username},
-            )
-
         _reset_lock_state(request)
         login(request, user)
+        messages.success(
+            request,
+            'Logged in successfully.',
+            extra_tags='auth',
+        )
         return redirect(_home_url_name(user))
 
     failed_attempts += 1
     request.session['failed_attempts'] = failed_attempts
     if failed_attempts >= MAX_FAILED_ATTEMPTS:
         remaining = _set_lock_state(request)
-        messages.error(request, LOCKED_MESSAGE)
+        messages.error(request, LOCKED_MESSAGE, extra_tags='lock')
         return render(
             request, 'auth/login.html',
-            {**_account_type_context(), 'locked': True, 'remaining': remaining},
+            {'locked': True, 'remaining': remaining},
         )
 
     remaining_attempts = MAX_FAILED_ATTEMPTS - failed_attempts
     messages.error(request, f'{INVALID_LOGIN_MESSAGE} {remaining_attempts} attempts remaining.')
-    return render(
-        request, 'auth/login.html',
-        {**_account_type_context(account_type), 'username': username},
-    )
+    return render(request, 'auth/login.html', {'username': username})
 
 
 def logout_view(request):
     logout(request)
+    messages.success(request, 'Logged out successfully.')
     return redirect('login')
 
 
@@ -202,7 +180,7 @@ def register_view(request):
         return redirect('dashboard')
 
     if request.method == 'GET':
-        return render(request, 'auth/register.html', _account_type_context('ofw'))
+        return render(request, 'auth/register.html')
 
     form_data = {
         'username': request.POST.get('username', ''),
@@ -215,14 +193,10 @@ def register_view(request):
 
     errors = _validate_registration_data(form_data)
 
-    account_type = request.POST.get('account_type', 'ofw').strip() or 'ofw'
-    if account_type != 'ofw':
-        errors['account_type'] = 'Only OFW accounts can be self-registered.'
-
     if errors:
         return render(
             request, 'auth/register.html',
-            {**_account_type_context(account_type), 'errors': errors, 'form_data': form_data},
+            {'errors': errors, 'form_data': form_data},
         )
 
     user = User.objects.create_user(

@@ -10,7 +10,6 @@ from .models import (
     Concern,
     ConcernProof,
     EmergencyContact,
-    EmergencyContactRequest,
     MonitoringReport,
     OFWProfile,
     WelfareAssessment,
@@ -102,7 +101,9 @@ class WelfareAssessmentForm(StyledModelForm):
 class CheckInForm(StyledModelForm):
     class Meta:
         model = CheckIn
-        fields = ['ofw', 'checkin_date', 'method', 'condition', 'notes']
+        fields = [
+            'ofw', 'checkin_date', 'method', 'condition', 'contact_person', 'notes',
+        ]
 
     def clean(self):
         cleaned = super().clean()
@@ -119,7 +120,7 @@ class ConcernForm(StyledModelForm):
         model = Concern
         fields = [
             'ofw', 'title', 'category', 'severity', 'status',
-            'reported_date', 'description', 'actions_taken', 'resolved_date',
+            'reported_date', 'description', 'resolved_date',
         ]
 
     def clean(self):
@@ -144,8 +145,8 @@ class EmergencyContactForm(StyledModelForm):
     class Meta:
         model = EmergencyContact
         fields = [
-            'name', 'contact_type', 'country', 'city', 'phone', 'email',
-            'website', 'address', 'notes',
+            'name', 'contact_type', 'relationship', 'country', 'city', 'phone',
+            'email', 'website', 'address', 'notes',
         ]
 
 
@@ -176,12 +177,16 @@ class OFWPortalProfileForm(StyledModelForm):
     class Meta:
         model = OFWProfile
         fields = [
+            'profile_picture',
             'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
             'city_abroad', 'employer_name', 'occupation', 'agency',
             'deployment_date', 'contract_end_date',
         ]
         widgets = {
+            'profile_picture': forms.ClearableFileInput(attrs={
+                'accept': 'image/jpeg,image/png,image/webp,image/gif',
+            }),
             'country': forms.TextInput(attrs={
                 'list': 'country-options',
                 'autocomplete': 'off',
@@ -201,6 +206,24 @@ class OFWPortalProfileForm(StyledModelForm):
         self.fields['city_abroad'].help_text = (
             'City or area in your country of deployment.'
         )
+        self.fields['profile_picture'].help_text = (
+            'JPG, PNG, WEBP or GIF. Maximum 5 MB. Leave empty to keep your '
+            'current photo.'
+        )
+
+    def clean_profile_picture(self):
+        picture = self.cleaned_data.get('profile_picture')
+        if not picture or picture is False:
+            return picture
+
+        extension = os.path.splitext(picture.name)[1].lower()
+        if extension not in OFWProfile.PROFILE_PICTURE_EXTENSIONS:
+            raise ValidationError(
+                'Upload a JPG, PNG, WEBP or GIF image.'
+            )
+        if picture.size > OFWProfile.PROFILE_PICTURE_MAX_SIZE:
+            raise ValidationError('Your profile picture must be 5 MB or smaller.')
+        return picture
 
 
 class OFWSelfCheckInForm(StyledModelForm):
@@ -208,18 +231,22 @@ class OFWSelfCheckInForm(StyledModelForm):
 
     class Meta:
         model = CheckIn
-        fields = ['method', 'condition', 'notes']
+        fields = ['method', 'condition', 'contact_person', 'notes']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['contact_person'].label = 'Who you called / who called you'
+        self.fields['contact_person'].help_text = (
+            'Optional. Name of the person you called, or who called/messaged '
+            'you (e.g. your manager, a family member, OWWA staff).'
+        )
 
 
-class FamilyContactRequestForm(StyledModelForm):
-    """An OFW's request to add a family member as an emergency contact.
-
-    The request is reviewed by the management team before it becomes a real
-    emergency contact, so specifying a desired ``contact_type`` is unnecessary.
-    """
+class FamilyContactForm(StyledModelForm):
+    """An OFW adds a family member as their own emergency contact directly."""
 
     class Meta:
-        model = EmergencyContactRequest
+        model = EmergencyContact
         fields = ['name', 'relationship', 'phone', 'email', 'address', 'notes']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Full name of your family member'}),
@@ -239,6 +266,16 @@ class FamilyContactRequestForm(StyledModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['notes'].required = False
+        self.fields['email'].required = False
+        self.fields['address'].required = False
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if not obj.pk:
+            obj.contact_type = EmergencyContact.ContactType.FAMILY
+        if commit:
+            obj.save()
+        return obj
 
 
 class OFWSelfConcernForm(StyledModelForm):
@@ -248,16 +285,21 @@ class OFWSelfConcernForm(StyledModelForm):
         required=False,
         label='Photo / Video Proof',
         help_text=(
-            'Attach photos or videos as proof (e.g. evidence of maltreatment). '
+            'Tap "Open Camera" to take a photo with your phone or PC webcam, '
+            'or upload existing photos/videos as proof '
+            '(e.g. evidence of maltreatment). '
             f'Up to {ConcernProof.MAX_FILES} files, '
             f'{ConcernProof.MAX_FILE_SIZE // (1024 * 1024)} MB each. '
             'Accepted: JPG, PNG, GIF, WEBP, MP4, MOV, WEBM, etc.'
         ),
         widget=MultipleFileInput(attrs={
-            'class': 'form-control',
+            'class': 'visually-hidden',
+            'tabindex': '-1',
             'accept': ','.join(
                 list(ConcernProof.IMAGE_EXTENSIONS) + list(ConcernProof.VIDEO_EXTENSIONS)
             ),
+            'data-max-files': ConcernProof.MAX_FILES,
+            'data-max-size': ConcernProof.MAX_FILE_SIZE,
         }),
     )
 

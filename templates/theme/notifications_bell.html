@@ -1,0 +1,56 @@
+<div class="dropdown dh-notif">
+  <a href="{% url 'ofw:notifications' %}"
+     class="btn btn-icon btn-outline-secondary position-relative dh-notif-toggle"
+     data-bs-toggle="dropdown"
+     data-bs-auto-close="outside"
+     aria-expanded="false"
+     aria-label="Notifications">
+    <i class="far fa-bell"></i>
+    {% if unread_notifications_count %}
+    <span class="dh-notif-badge">
+      {% if unread_notifications_count > 99 %}99+{% else %}{{ unread_notifications_count }}{% endif %}
+    </span>
+    {% endif %}
+  </a>
+
+  <div class="dropdown-menu dropdown-menu-end dh-notif-menu">
+    <div class="dh-notif-menu-header">
+      <span class="fw-bold">Notifications</span>
+      {% if unread_notifications_count %}
+      <span class="badge bg-primary-lt text-primary">{{ unread_notifications_count }} unread</span>
+      {% endif %}
+    </div>
+
+    <div class="dh-notif-list">
+      {% for notification in recent_notifications %}
+      <a href="{% url 'ofw:notification_open' notification.pk %}"
+         class="dropdown-item dh-notif-item {% if not notification.is_read %}is-unread{% endif %}">
+        <span class="dh-notif-dot dh-notif-dot--{{ notification.level }}"></span>
+        <span class="min-w-0 flex-grow-1">
+          <span class="d-block fw-semibold text-truncate">{{ notification.title }}</span>
+          {% if notification.message %}
+          <span class="d-block text-muted small text-truncate">{{ notification.message }}</span>
+          {% endif %}
+          <span class="d-block text-muted dh-notif-time">{{ notification.created_at|timesince }} ago</span>
+        </span>
+      </a>
+      {% empty %}
+      <div class="px-3 py-4 text-center text-muted small">
+        <i class="far fa-bell-slash d-block mb-2"></i>
+        No notifications yet.
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dh-notif-menu-footer d-flex gap-2">
+      {% if unread_notifications_count %}
+      <form method="post" action="{% url 'ofw:notifications_mark_all_read' %}" class="flex-grow-1">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Mark all read</button>
+      </form>
+      {% endif %}
+      <a class="btn btn-sm btn-primary flex-grow-1" href="{% url 'ofw:notifications' %}">View all</a>
+    </div>
+  </div>
+</div>

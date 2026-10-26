@@ -10,6 +10,7 @@ The system tracks five key areas:
 """
 
 import os
+import re
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -38,12 +39,20 @@ class OFWProfile(models.Model):
         MALE = 'M', 'Male'
         FEMALE = 'F', 'Female'
 
+    PROFILE_PICTURE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp', '.gif')
+    PROFILE_PICTURE_MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name='ofw_profiles',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+    )
+    profile_picture = models.FileField(
+        upload_to='ofw/profile_pictures/',
+        blank=True,
+        help_text='Optional photo so the management team can recognise you.',
     )
     first_name = models.CharField(max_length=120)
     last_name = models.CharField(max_length=120)
@@ -159,6 +168,12 @@ class CheckIn(models.Model):
         choices=Condition.choices,
         default=Condition.SAFE,
     )
+    contact_person = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Contact person',
+        help_text='Person called, or the person who called/contacted the OFW.',
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -215,8 +230,12 @@ class Concern(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     reported_date = models.DateField()
     description = models.TextField(blank=True)
-    actions_taken = models.TextField(blank=True)
     resolved_date = models.DateField(null=True, blank=True)
+    read_by_management_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When a staff member or administrator first opened this concern.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -270,11 +289,13 @@ class EmergencyContact(models.Model):
     """A directory entry for embassies, hotlines, or personal contacts."""
 
     class ContactType(models.TextChoices):
+        EMERGENCY = 'emergency', 'Emergency Hotline'
         EMBASSY = 'embassy', 'Embassy / Consulate'
         POLO = 'polo', 'POLO / Labor Office'
         OWWA = 'owwa', 'OWWA'
         DMW = 'dmw', 'DMW Hotline'
         POLICE = 'police', 'Police'
+        FIRE = 'fire', 'Fire / Rescue'
         HOSPITAL = 'hospital', 'Hospital / Medical'
         AGENCY = 'agency', 'Recruitment Agency'
         EMPLOYER = 'employer', 'Employer'
@@ -294,6 +315,7 @@ class EmergencyContact(models.Model):
         choices=ContactType.choices,
         default=ContactType.OTHER,
     )
+    relationship = models.CharField(max_length=120, blank=True)
     country = models.CharField(max_length=120, blank=True)
     city = models.CharField(max_length=120, blank=True)
     phone = models.CharField(max_length=60)
@@ -317,7 +339,7 @@ class EmergencyContact(models.Model):
 
     # Types treated as public hotlines (shown to every OFW based on country),
     # as opposed to personal contacts (family, employer, agency) that stay private.
-    PUBLIC_TYPES = ('embassy', 'polo', 'owwa', 'dmw', 'police', 'hospital')
+    PUBLIC_TYPES = ('emergency', 'embassy', 'polo', 'owwa', 'dmw', 'police', 'fire', 'hospital')
 
     class Meta:
         db_table = 'tblemergencycontact'
@@ -330,57 +352,65 @@ class EmergencyContact(models.Model):
         """Return the resolved website, falling back to a type default."""
         return self.website or self.DEFAULT_WEBSITES.get(self.contact_type, '')
 
+    @property
+    def dial_number(self):
+        """The number as it should be handed to a ``tel:`` link.
 
-class EmergencyContactRequest(models.Model):
-    """A request by an OFW to add a family emergency contact.
+        Keeps a leading ``+`` plus digits, and drops everything a dialer does
+        not need (spaces, dashes, parentheses).
+        """
+        cleaned = re.sub(r'[^\d+]', '', self.phone or '')
+        return cleaned
 
-    The management team reviews each request; approving one creates a
-    matching :class:`EmergencyContact` owned by the requesting OFW.
-    """
+    @property
+    def whatsapp_number(self):
+        """The number formatted for a ``wa.me`` link (digits only, no +)."""
+        return re.sub(r'\D', '', self.phone or '')
 
-    class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        APPROVED = 'approved', 'Approved'
-        REJECTED = 'rejected', 'Rejected'
+    @property
+    def whatsapp_url(self):
+        number = self.whatsapp_number
+        return f'https://wa.me/{number}' if number else ''
 
-    user = models.ForeignKey(
+    @property
+    def viber_url(self):
+        number = self.whatsapp_number
+        if not number:
+            return ''
+        # Viber expects the number with a URL-encoded leading plus sign.
+        return f'viber://chat?number=%2B{number}'
+
+
+class Notification(models.Model):
+    """An in-app message delivered to a single user."""
+
+    class Level(models.TextChoices):
+        INFO = 'info', 'Info'
+        SUCCESS = 'success', 'Success'
+        WARNING = 'warning', 'Warning'
+        DANGER = 'danger', 'Danger'
+
+    recipient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        related_name='contact_requests',
+        related_name='notifications',
         on_delete=models.CASCADE,
     )
-    ofw = models.ForeignKey(
-        OFWProfile,
-        related_name='contact_requests',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
-    name = models.CharField(max_length=200, help_text='Family member to contact')
-    relationship = models.CharField(max_length=120, blank=True)
-    phone = models.CharField(max_length=60)
-    email = models.EmailField(max_length=255, blank=True)
-    address = models.CharField(max_length=255, blank=True)
-    notes = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.PENDING
-    )
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    url = models.CharField(max_length=500, blank=True)
+    level = models.CharField(max_length=10, choices=Level.choices, default=Level.INFO)
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        related_name='reviewed_contact_requests',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
-    review_notes = models.TextField(blank=True)
 
     class Meta:
-        db_table = 'tblemergencycontactrequest'
+        db_table = 'tblnotification'
         ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read'], name='notif_recipient_read_idx'),
+        ]
 
     def __str__(self):
-        return f'{self.name} ({self.get_status_display()})'
+        return f'{self.title} → {self.recipient}'
 
 
 class MonitoringReport(models.Model):

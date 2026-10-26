@@ -33,6 +33,8 @@
             <dd class="col-7">{{ checkin.checkin_date|date:"M d, Y H:i" }}</dd>
             <dt class="col-5 text-muted">Method</dt>
             <dd class="col-7">{{ checkin.get_method_display }}</dd>
+            <dt class="col-5 text-muted">Contact person</dt>
+            <dd class="col-7">{{ checkin.contact_person|default:"—" }}</dd>
             <dt class="col-5 text-muted">Condition</dt>
             <dd class="col-7"><span class="badge {{ condition_badge }}">{{ checkin.get_condition_display }}</span></dd>
             <dt class="col-5 text-muted">Logged By</dt>

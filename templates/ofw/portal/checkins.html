@@ -46,17 +46,18 @@
         <div class="card-header"><h3 class="card-title">Check-in History</h3></div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
-            <thead><tr><th>Date</th><th>How</th><th>Status</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Date</th><th>How</th><th>Status</th><th>Contact person</th><th>Notes</th></tr></thead>
             <tbody>
               {% for row in checkin_rows %}
               <tr>
                 <td class="text-muted">{{ row.obj.checkin_date|date:"M d, Y H:i" }}</td>
                 <td>{{ row.obj.get_method_display }}</td>
                 <td><span class="badge {{ row.badge }}">{{ row.obj.get_condition_display }}</span></td>
+                <td class="text-muted">{{ row.obj.contact_person|default:"—" }}</td>
                 <td class="text-muted">{{ row.obj.notes|default:"—" }}</td>
               </tr>
               {% empty %}
-              <tr><td colspan="4" class="text-muted text-center">No check-ins yet. Use the form to send your first one.</td></tr>
+              <tr><td colspan="5" class="text-muted text-center">No check-ins yet. Use the form to send your first one.</td></tr>
               {% endfor %}
             </tbody>
           </table>

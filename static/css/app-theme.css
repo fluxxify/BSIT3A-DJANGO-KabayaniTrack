@@ -403,6 +403,14 @@ html {
   box-shadow: 0 4px 10px -4px rgba(245, 159, 0, 0.8);
 }
 
+.dh-avatar-photo {
+  background-color: #ffffff;
+  background-position: center;
+  background-size: cover;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+}
+
 .dh-user-name {
   display: block;
   font-size: 0.85rem;
@@ -669,6 +677,151 @@ html {
   font-weight: 600;
 }
 
+.dh-topbar {
+  padding: 0.65rem 0 0.15rem;
+}
+
+.dh-topbar-user {
+  color: var(--tblr-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.dh-notif-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border-radius: 50%;
+  background-color: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
+  box-shadow: var(--tblr-shadow-sm);
+  color: var(--tblr-body-color);
+}
+
+.dh-notif-toggle:hover,
+.dh-notif-toggle[aria-expanded="true"] {
+  color: var(--tblr-primary);
+  border-color: rgba(var(--tblr-primary-rgb), 0.45);
+}
+
+.dh-notif-badge {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 100rem;
+  border: 2px solid var(--tblr-bg-surface);
+  background-color: #dc3545;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dh-notif-menu {
+  width: 22rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--tblr-border-radius-lg);
+  border: 1px solid var(--tblr-border-color);
+  box-shadow: var(--tblr-shadow-lg);
+}
+
+.dh-notif-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--tblr-border-color);
+  background-color: var(--tblr-bg-surface-secondary);
+}
+
+.dh-notif-list {
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.dh-notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 1rem;
+  white-space: normal;
+  border-bottom: 1px solid var(--tblr-border-color-translucent);
+}
+
+.dh-notif-item:last-child {
+  border-bottom: 0;
+}
+
+.dh-notif-item.is-unread {
+  background-color: rgba(var(--tblr-primary-rgb), 0.06);
+}
+
+.dh-notif-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  background-color: var(--tblr-muted);
+}
+
+.dh-notif-dot--info {
+  background-color: #06b6d4;
+}
+
+.dh-notif-dot--success {
+  background-color: #22c55e;
+}
+
+.dh-notif-dot--warning {
+  background-color: #f59e0b;
+}
+
+.dh-notif-dot--danger {
+  background-color: #ef4444;
+}
+
+.dh-notif-menu-footer {
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--tblr-border-color);
+  background-color: var(--tblr-bg-surface-secondary);
+}
+
+.dh-notif-time {
+  font-size: 0.72rem;
+}
+
+.dh-notif-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.65rem;
+  font-size: 0.95rem;
+}
+
+.dh-notif-row {
+  padding: 0.9rem 1rem;
+}
+
+.dh-notif-unread {
+  background-color: rgba(var(--tblr-primary-rgb), 0.05);
+}
+
 @media (max-width: 767.98px) {
   .dh-hero {
     padding: 1.25rem 1.25rem;
@@ -676,5 +829,51 @@ html {
 
   .dh-hero-title {
     font-size: 1.3rem;
+  }
+}
+
+/* Flash messages (Django messages framework) */
+.dh-flash-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1090;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(24rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.dh-flash {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin-bottom: 0;
+  pointer-events: auto;
+  box-shadow: var(--tblr-shadow-lg);
+}
+
+.dh-flash-icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  opacity: 0.9;
+}
+
+.dh-flash-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 575.98px) {
+  .dh-flash-stack {
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
   }
 }
