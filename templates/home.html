@@ -41,33 +41,6 @@
   </div>
   <br>
 
-  {% if stats.recent_ofws %}
-  <div class="alert alert-info" role="alert">
-    <div class="d-flex align-items-start flex-wrap gap-3">
-      <div class="fs-2">
-        <i class="fas fa-user-plus"></i>
-      </div>
-      <div class="flex-fill">
-        <h4 class="alert-title mb-1">Recent OFW Registrations</h4>
-        <div class="text-muted">
-          Latest:
-          {% for profile in stats.recent_ofws|slice:":3" %}
-          <a href="{% url 'ofw:profile_detail' profile.pk %}" class="fw-medium">{{ profile.full_name }}</a>{% if not forloop.last %}, {% endif %}
-          {% endfor %}
-          {% if stats.incomplete_profiles %}
-          <span class="text-warning ms-1">· {{ stats.incomplete_profiles }} still need a country</span>
-          {% endif %}
-        </div>
-      </div>
-      <div>
-        <a href="#recent-ofw-registrations" class="btn btn-outline-info btn-sm">
-          View details
-        </a>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
   <div class="row row-deck row-cards">
     <div class="col-sm-6 col-lg-3">
       <div class="card">
@@ -183,7 +156,7 @@
     </div>
   </div>
 
-  <div class="row row-deck row-cards mt-3" id="recent-ofw-registrations">
+  <div class="row row-deck row-cards mt-3">
     <div class="col-12">
       <div class="card">
         <div class="card-header">
