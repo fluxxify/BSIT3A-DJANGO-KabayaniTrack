@@ -161,6 +161,77 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">
+            <i class="fas fa-user-plus me-2 text-primary"></i>Recent OFW Registrations
+            {% if stats.new_ofws_month %}
+            <span class="badge bg-blue-lt ms-2">{{ stats.new_ofws_month }} this month</span>
+            {% endif %}
+          </h3>
+          <div class="card-actions">
+            <a href="{{ stats.links.ofw_total }}" class="btn btn-sm btn-outline-primary">
+              View all
+            </a>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>OFW</th>
+                <th>Username</th>
+                <th>Country</th>
+                <th>Registered</th>
+                <th class="w-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for profile in stats.recent_ofws %}
+              <tr>
+                <td>
+                  <a href="{% url 'ofw:profile_detail' profile.pk %}" class="text-decoration-none fw-medium">
+                    {{ profile.full_name }}
+                  </a>
+                  {% if profile.email %}
+                  <div class="text-muted small">{{ profile.email }}</div>
+                  {% endif %}
+                </td>
+                <td class="text-muted">{{ profile.user.username|default:"-" }}</td>
+                <td>
+                  {% if profile.country %}
+                  {{ profile.country }}
+                  {% else %}
+                  <span class="badge bg-warning-lt text-warning">Not set</span>
+                  {% endif %}
+                </td>
+                <td class="text-muted">{{ profile.created_at|date:"M d, Y H:i" }}</td>
+                <td class="text-end">
+                  <a href="{% url 'ofw:profile_detail' profile.pk %}" class="btn btn-sm btn-ghost-secondary" title="Open profile">
+                    <i class="fas fa-arrow-right"></i>
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-muted text-center py-4">No OFW registrations yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if stats.incomplete_profiles %}
+        <div class="card-footer text-warning">
+          <i class="fas fa-triangle-exclamation me-1"></i>
+          {{ stats.incomplete_profiles }} OFW{{ stats.incomplete_profiles|pluralize }} still need a country of deployment.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
             <i class="fas fa-earth-asia me-2 text-primary"></i>OFW Deployment Map
             <span class="badge bg-blue-lt ms-2">3D Globe</span>
           </h3>
@@ -208,6 +279,12 @@
           {% else %}
           <div class="text-muted text-center py-4">
             No OFWs have been assigned a country of deployment yet.
+            {% if stats.incomplete_profiles %}
+            <div class="mt-2">
+              {{ stats.incomplete_profiles }} registered OFW{{ stats.incomplete_profiles|pluralize }} still need a country — see
+              <a href="{{ stats.links.ofw_total }}">Registered OFWs</a>.
+            </div>
+            {% endif %}
           </div>
           {% endif %}
         </div>

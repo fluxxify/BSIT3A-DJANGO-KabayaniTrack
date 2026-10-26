@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from apps.ofw.models import Notification, OFWProfile
+
 
 TEMP_MEDIA_DIR = tempfile.mkdtemp(prefix='kabayani_core_media_')
 
@@ -114,6 +116,107 @@ class OFWRegistrationTests(TestCase):
         user = get_user_model().objects.get(username='newofw')
         self.assertTrue(user.ofw_profiles.exists())
         self.assertTrue(user.groups.filter(name='OFW').exists())
+
+    def test_registration_notifies_managers_and_links_profile(self):
+        staff = get_user_model().objects.create_user(
+            username='registration_manager',
+            password='Str0ngPassw0rd!',
+            is_staff=True,
+        )
+
+        response = self.client.post(reverse('register'), {
+            'username': 'phoneofw',
+            'first_name': 'Maria',
+            'last_name': 'Santos',
+            'email': 'maria@example.com',
+            'password': 'Str0ngPassw0rd!',
+            'confirm_password': 'Str0ngPassw0rd!',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        profile = OFWProfile.objects.get(user__username='phoneofw')
+        self.assertEqual(profile.country, '')
+
+        notification = Notification.objects.get(
+            recipient=staff,
+            title__startswith='New OFW registered',
+        )
+        self.assertEqual(notification.level, Notification.Level.SUCCESS)
+        self.assertEqual(
+            notification.url,
+            reverse('ofw:profile_detail', args=[profile.pk]),
+        )
+        self.assertIn('phoneofw', notification.message)
+        self.assertIn('not set', notification.message)
+
+    def test_registration_sends_welcome_notification(self):
+        response = self.client.post(reverse('register'), {
+            'username': 'welcomeofw',
+            'first_name': 'Ana',
+            'last_name': 'Reyes',
+            'email': 'ana@example.com',
+            'password': 'Str0ngPassw0rd!',
+            'confirm_password': 'Str0ngPassw0rd!',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        user = get_user_model().objects.get(username='welcomeofw')
+        notification = Notification.objects.get(
+            recipient=user,
+            title='Welcome to KabayaniTrack',
+        )
+        self.assertEqual(notification.url, reverse('ofw:portal_profile'))
+        self.assertEqual(notification.level, Notification.Level.INFO)
+
+    def test_new_registration_appears_on_management_dashboard(self):
+        staff = get_user_model().objects.create_user(
+            username='dashboard_manager',
+            password='Str0ngPassw0rd!',
+            is_staff=True,
+        )
+        ofw = get_user_model().objects.create_user(
+            username='dashboardofw',
+            password='Str0ngPassw0rd!',
+        )
+        OFWProfile.objects.create(
+            user=ofw,
+            first_name='Maria',
+            last_name='Santos',
+            country='',
+        )
+
+        self.client.force_login(staff)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Recent OFW Registrations')
+        self.assertContains(response, 'Maria Santos')
+        self.assertContains(response, 'dashboardofw')
+        self.assertContains(response, 'Not set')
+
+    def test_new_registration_appears_in_django_admin(self):
+        admin_user = get_user_model().objects.create_superuser(
+            username='registration_admin',
+            email='admin@example.com',
+            password='Str0ngPassw0rd!',
+        )
+        ofw = get_user_model().objects.create_user(
+            username='adminvisibleofw',
+            password='Str0ngPassw0rd!',
+        )
+        OFWProfile.objects.create(
+            user=ofw,
+            first_name='Maria',
+            last_name='Santos',
+            country='',
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse('admin:kabayan_ofwprofile_changelist'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Santos')
+        self.assertContains(response, 'adminvisibleofw')
 
     def test_ofw_is_redirected_from_dashboard_to_portal(self):
         user = get_user_model().objects.create_user(

@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from django.contrib import messages
@@ -6,11 +7,15 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db import transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 MAX_FAILED_ATTEMPTS = 5
 LOCK_DURATION = timedelta(minutes=1)
@@ -199,24 +204,55 @@ def register_view(request):
             {'errors': errors, 'form_data': form_data},
         )
 
-    user = User.objects.create_user(
-        username=form_data['username'].strip(),
-        first_name=form_data['first_name'].strip(),
-        last_name=form_data['last_name'].strip(),
-        email=form_data['email'].strip(),
-        password=form_data['password'],
-    )
-
-    from apps.ofw.models import OFWProfile
+    from apps.ofw.models import Notification, OFWProfile
+    from apps.ofw.notifications import notify, notify_managers
     from apps.ofw.roles import mark_as_ofw
 
-    mark_as_ofw(user)
-    OFWProfile.objects.create(
-        user=user,
-        first_name=form_data['first_name'].strip(),
-        last_name=form_data['last_name'].strip(),
-        email=form_data['email'].strip(),
-    )
+    # Create both records together.  A half-created account (user without an
+    # OFW profile) is invisible in the OFW admin and cannot use the portal.
+    with transaction.atomic():
+        user = User.objects.create_user(
+            username=form_data['username'].strip(),
+            first_name=form_data['first_name'].strip(),
+            last_name=form_data['last_name'].strip(),
+            email=form_data['email'].strip(),
+            password=form_data['password'],
+        )
+
+        mark_as_ofw(user)
+        profile = OFWProfile.objects.create(
+            user=user,
+            first_name=form_data['first_name'].strip(),
+            last_name=form_data['last_name'].strip(),
+            email=form_data['email'].strip(),
+            country='',
+        )
+
+    # Notifications are useful but must never block a successful registration.
+    try:
+        notify_managers(
+            f'New OFW registered: {profile.full_name}',
+            (
+                f'{profile.full_name} ({user.username}) just registered. '
+                f'Email: {user.email or "not provided"}. '
+                f'Country of deployment: {profile.country or "not set"}.'
+            ),
+            url=reverse('ofw:profile_detail', args=[profile.pk]),
+            level=Notification.Level.SUCCESS,
+        )
+        notify(
+            user,
+            'Welcome to KabayaniTrack',
+            (
+                'Your OFW account is ready. Complete your profile, especially '
+                'your country of deployment, so we can show the right emergency '
+                'hotlines.'
+            ),
+            url=reverse('ofw:portal_profile'),
+            level=Notification.Level.INFO,
+        )
+    except Exception:
+        logger.exception('Could not create registration notifications for %s', user.pk)
 
     login(request, user)
     return redirect('ofw:portal')

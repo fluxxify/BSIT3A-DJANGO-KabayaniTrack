@@ -593,6 +593,9 @@ def dashboard_stats(user):
         welfare_status__in=[WelfareStatus.DISTRESSED, WelfareStatus.NEEDS_SUPPORT]
     )
     open_concerns = concerns.filter(status__in=['open', 'in_progress', 'escalated'])
+    recent_ofws = profiles.select_related('user').order_by('-created_at', '-id')[:5]
+    new_ofws_month = profiles.filter(created_at__gte=month_start).count()
+    incomplete_profiles = profiles.filter(country='').count()
 
     welfare_rows = profiles.values('welfare_status').annotate(total=Count('id'))
     welfare_labels = dict(WelfareStatus.choices)
@@ -715,6 +718,9 @@ def dashboard_stats(user):
             'reports_total': reverse('ofw:report_list'),
             'welfare_status': reverse('ofw:profile_list'),
         },
+        'recent_ofws': recent_ofws,
+        'new_ofws_month': new_ofws_month,
+        'incomplete_profiles': incomplete_profiles,
         'recent_checkins': checkins.select_related('ofw').order_by('-checkin_date')[:5],
         'recent_concerns': concerns.select_related('ofw').order_by('-reported_date')[:5],
         'welfare_chart': welfare_chart,
