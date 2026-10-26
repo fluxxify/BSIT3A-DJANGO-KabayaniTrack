@@ -185,6 +185,8 @@ _profiles = crud.make_crud(
     model=OFWProfile,
     form_class=OFWProfileForm,
     columns=[
+        {'field': 'profile_picture', 'label': 'Photo', 'type': 'image',
+         'url_name': 'ofw:profile_detail'},
         {'field': 'full_name', 'label': 'Name', 'url_name': 'ofw:profile_detail'},
         {'field': 'passport_number', 'label': 'Passport'},
         {'field': 'age', 'label': 'Age'},

@@ -253,6 +253,16 @@ class OFWProfilePictureTests(TestCase):
         self.profile.refresh_from_db()
         self.assertFalse(self.profile.profile_picture)
 
+    def test_profile_list_shows_profile_picture(self):
+        self.profile.profile_picture.save(
+            'me.jpg',
+            SimpleUploadedFile('me.jpg', b'\xff\xd8\xff fakejpg', 'image/jpeg'),
+        )
+        response = self.client.get(reverse('ofw:profile_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.profile.profile_picture.url)
+        self.assertContains(response, 'avatar avatar-sm rounded-circle')
+
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
 class ConcernProofUploadTests(TestCase):

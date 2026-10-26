@@ -65,10 +65,29 @@ def _apply_filters(qs, filters, params):
 
 
 def _format_cell(value, column):
+    kind = column.get('type')
+
+    if kind == 'image':
+        url = ''
+        if value:
+            try:
+                url = value.url
+            except (ValueError, AttributeError):
+                url = ''
+        if url:
+            return (
+                f'<img src="{escape(url)}" alt="Profile picture" '
+                'class="avatar avatar-sm rounded-circle" '
+                'style="object-fit: cover;" loading="lazy">'
+            )
+        return (
+            '<span class="avatar avatar-sm rounded-circle bg-secondary-lt '
+            'text-secondary"><i class="fas fa-user"></i></span>'
+        )
+
     if value is None or value == '':
         return '<span class="text-muted">—</span>'
 
-    kind = column.get('type')
     if kind in ('date', 'datetime') and isinstance(value, (date, datetime)):
         fmt = '%b %d, %Y' if kind == 'date' else '%b %d, %Y %H:%M'
         return escape(value.strftime(fmt))
