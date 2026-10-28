@@ -33,9 +33,6 @@
           <div class="page-pretitle">{% if current_agency %}{{ current_agency.name }}{% else %}Overview{% endif %}</div>
           <div class="d-flex align-items-center gap-3 flex-wrap d-none d-md-flex">
             <h2 class="page-title mb-0">Dashboard</h2>
-            {% if current_agency %}
-            <span class="badge bg-azure-lt text-azure"><i class="fas fa-building me-1"></i>Agency workspace</span>
-            {% endif %}
           </div>
           <h2 class="page-title mb-0 d-md-none">Dashboard</h2>
         </div>
@@ -43,20 +40,6 @@
     </div>
   </div>
   <br>
-
-  {% if current_agency %}
-  <div class="alert alert-azure d-flex align-items-start gap-2" role="alert">
-    <i class="fas fa-circle-info mt-1"></i>
-    <div>
-      <div class="fw-bold">Showing {{ current_agency.name }} records only</div>
-      <div class="text-muted small">
-        OFWs who register through your agency link are assigned to your workspace automatically.
-        {% if current_agency.address %}{{ current_agency.address }}{% endif %}
-        {% if current_agency.phone %} · {{ current_agency.phone }}{% endif %}
-      </div>
-    </div>
-  </div>
-  {% endif %}
 
   <div class="row row-deck row-cards">
     <div class="col-sm-6 col-lg-3">
