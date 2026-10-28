@@ -150,6 +150,32 @@ class AgencyWorkspaceTests(TestCase):
         self.assertEqual(response.context['stats']['kpi']['ofw_total'], 1)
         self.assertContains(response, 'Alpha Agency')
 
+    def test_agency_staff_contact_is_visible_and_deletable(self):
+        from apps.ofw.models import EmergencyContact
+
+        self.client.force_login(self.staff_a)
+        create = self.client.post(reverse('ofw:contact_save_ajax'), {
+            'name': 'Alpha Hotline',
+            'contact_type': 'owwa',
+            'phone': '09170000000',
+        })
+
+        self.assertEqual(create.status_code, 200)
+        contact = EmergencyContact.objects.get(name='Alpha Hotline')
+        self.assertIsNone(contact.user_id)
+
+        listing = self.client.get(
+            reverse('ofw:contact_list_ajax'), {'q': 'Alpha'}
+        )
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(listing.json()['total'], 1)
+
+        delete = self.client.post(
+            reverse('ofw:contact_delete_ajax', args=[contact.pk])
+        )
+        self.assertEqual(delete.status_code, 200)
+        self.assertFalse(EmergencyContact.objects.filter(pk=contact.pk).exists())
+
     def test_agency_staff_cannot_open_other_agency_ofw(self):
         self.client.force_login(self.staff_a)
 

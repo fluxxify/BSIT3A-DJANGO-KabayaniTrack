@@ -334,8 +334,12 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
                 obj.agency = agency
         if not obj.pk and hasattr(obj, 'user'):
             # An agency officer adding a paper profile should not turn that
-            # profile into their own OFW portal account.
-            if not (model is OFWProfile and agency is not None):
+            # profile into their own OFW portal account.  Directory contacts
+            # are shared entries, so they are not owned by the officer either.
+            if not (
+                agency is not None
+                and model in (OFWProfile, EmergencyContact)
+            ):
                 obj.user = request.user
         obj.save()
 
