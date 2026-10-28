@@ -33,58 +33,60 @@
 
       <div class="card card-md">
         <div class="card-body">
-          <div class="d-flex align-items-center gap-3 mb-3">
-            <span class="avatar avatar-lg rounded bg-azure-lt text-azure">
-              <i class="fas fa-building fa-lg"></i>
-            </span>
-            <div>
-              <h2 class="h2 mb-0">{{ agency.name }}</h2>
-              {% if agency.category %}
-              <div class="text-muted">{{ agency.category }}</div>
-              {% endif %}
-            </div>
-          </div>
-
-          {% if agency.description %}
-          <p class="text-muted">{{ agency.description }}</p>
-          {% endif %}
-
-          <div class="list-group list-group-flush mb-4">
-            {% if agency.address %}
-            <div class="list-group-item px-0 d-flex gap-2">
-              <i class="fas fa-location-dot text-secondary mt-1"></i>
-              <div>{{ agency.address }}</div>
-            </div>
-            {% endif %}
-            {% if agency.phone %}
-            <div class="list-group-item px-0 d-flex gap-2">
-              <i class="fas fa-phone text-secondary mt-1"></i>
-              <div><a href="tel:{{ agency.phone }}" class="text-reset">{{ agency.phone }}</a></div>
-            </div>
-            {% endif %}
-            {% if agency.email %}
-            <div class="list-group-item px-0 d-flex gap-2">
-              <i class="fas fa-envelope text-secondary mt-1"></i>
-              <div><a href="mailto:{{ agency.email }}" class="text-reset">{{ agency.email }}</a></div>
-            </div>
-            {% endif %}
-            {% if agency.website %}
-            <div class="list-group-item px-0 d-flex gap-2">
-              <i class="fas fa-globe text-secondary mt-1"></i>
+          <div class="d-none d-md-block">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <span class="avatar avatar-lg rounded bg-azure-lt text-azure">
+                <i class="fas fa-building fa-lg"></i>
+              </span>
               <div>
-                <a href="{{ agency.website }}" target="_blank" rel="noopener" class="text-reset">
-                  {{ agency.website }}
-                </a>
+                <h2 class="h2 mb-0">{{ agency.name }}</h2>
+                {% if agency.category %}
+                <div class="text-muted">{{ agency.category }}</div>
+                {% endif %}
               </div>
             </div>
+
+            {% if agency.description %}
+            <p class="text-muted">{{ agency.description }}</p>
             {% endif %}
+
+            <div class="list-group list-group-flush mb-4">
+              {% if agency.address %}
+              <div class="list-group-item px-0 d-flex gap-2">
+                <i class="fas fa-location-dot text-secondary mt-1"></i>
+                <div>{{ agency.address }}</div>
+              </div>
+              {% endif %}
+              {% if agency.phone %}
+              <div class="list-group-item px-0 d-flex gap-2">
+                <i class="fas fa-phone text-secondary mt-1"></i>
+                <div><a href="tel:{{ agency.phone }}" class="text-reset">{{ agency.phone }}</a></div>
+              </div>
+              {% endif %}
+              {% if agency.email %}
+              <div class="list-group-item px-0 d-flex gap-2">
+                <i class="fas fa-envelope text-secondary mt-1"></i>
+                <div><a href="mailto:{{ agency.email }}" class="text-reset">{{ agency.email }}</a></div>
+              </div>
+              {% endif %}
+              {% if agency.website %}
+              <div class="list-group-item px-0 d-flex gap-2">
+                <i class="fas fa-globe text-secondary mt-1"></i>
+                <div>
+                  <a href="{{ agency.website }}" target="_blank" rel="noopener" class="text-reset">
+                    {{ agency.website }}
+                  </a>
+                </div>
+              </div>
+              {% endif %}
+            </div>
           </div>
 
           <div class="d-grid gap-2">
             <a href="{{ register_url }}" class="btn btn-primary w-100">
               <i class="fas fa-user-plus me-1"></i> Register as OFW
             </a>
-            <a href="{{ login_url }}" class="btn btn-outline-secondary w-100">
+            <a href="{{ login_url }}" class="btn btn-outline-secondary w-100 d-none d-md-block">
               <i class="fas fa-sign-in-alt me-1"></i> Agency / OFW Sign in
             </a>
           </div>
