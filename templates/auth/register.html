@@ -103,6 +103,28 @@ rel="stylesheet"
                         </div>
                     </div>
 
+                    <!-- Middle Name & Suffix -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Middle Name (Optional)</label>
+                            <input
+                            type="text"
+                            name="middle_name"
+                            class="form-control"
+                            placeholder=""
+                            value="{{ form_data.middle_name|default:'' }}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Suffix (Optional)</label>
+                            <input
+                            type="text"
+                            name="suffix"
+                            class="form-control"
+                            placeholder="e.g. Jr., III"
+                            value="{{ form_data.suffix|default:'' }}">
+                        </div>
+                    </div>
+
                     <!-- Username -->
                     <div class="mb-3">
                         <label class="form-label required">Username</label>

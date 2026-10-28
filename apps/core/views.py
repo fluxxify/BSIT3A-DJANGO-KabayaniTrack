@@ -231,7 +231,9 @@ def register_view(request, agency_slug=None):
     form_data = {
         'username': request.POST.get('username', ''),
         'first_name': request.POST.get('first_name', ''),
+        'middle_name': request.POST.get('middle_name', ''),
         'last_name': request.POST.get('last_name', ''),
+        'suffix': request.POST.get('suffix', ''),
         'email': request.POST.get('email', ''),
         'password': request.POST.get('password', ''),
         'confirm_password': request.POST.get('confirm_password', ''),
@@ -264,7 +266,9 @@ def register_view(request, agency_slug=None):
         profile = OFWProfile.objects.create(
             user=user,
             first_name=form_data['first_name'].strip(),
+            middle_name=form_data['middle_name'].strip(),
             last_name=form_data['last_name'].strip(),
+            suffix=form_data['suffix'].strip(),
             email=form_data['email'].strip(),
             country='',
             agency_org=agency,

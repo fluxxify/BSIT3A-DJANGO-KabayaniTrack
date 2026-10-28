@@ -15,12 +15,12 @@ from .models import (
 @admin.register(OFWProfile)
 class OFWProfileAdmin(admin.ModelAdmin):
     list_display = (
-        'last_name', 'first_name', 'user', 'country', 'employer_name',
-        'welfare_status', 'created_at',
+        'last_name', 'first_name', 'middle_name', 'suffix', 'user', 'country', 'employer_name',
+        'welfare_status', 'agency_org', 'created_at',
     )
-    list_filter = ('welfare_status', 'country', 'sex')
+    list_filter = ('welfare_status', 'agency_org', 'country', 'sex')
     search_fields = (
-        'first_name', 'last_name', 'passport_number', 'country', 'employer_name',
+        'first_name', 'middle_name', 'last_name', 'suffix', 'passport_number', 'country', 'employer_name',
         'user__username', 'user__email',
     )
     date_hierarchy = 'created_at'

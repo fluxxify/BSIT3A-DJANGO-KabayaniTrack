@@ -55,7 +55,9 @@ class OFWProfile(models.Model):
         help_text='Optional photo so the management team can recognise you.',
     )
     first_name = models.CharField(max_length=120)
+    middle_name = models.CharField(max_length=120, blank=True)
     last_name = models.CharField(max_length=120)
+    suffix = models.CharField(max_length=30, blank=True)
     passport_number = models.CharField(max_length=40, blank=True)
     birth_date = models.DateField(null=True, blank=True)
     age = models.PositiveIntegerField(
@@ -98,11 +100,19 @@ class OFWProfile(models.Model):
         ordering = ['last_name', 'first_name']
 
     def __str__(self):
-        return f'{self.last_name}, {self.first_name}'
+        parts = [self.last_name, ',']
+        if self.first_name:
+            parts.append(self.first_name)
+        if self.middle_name:
+            parts.append(self.middle_name)
+        if self.suffix:
+            parts.append(self.suffix)
+        return ' '.join(parts).strip()
 
     @property
     def full_name(self):
-        return f'{self.first_name} {self.last_name}'.strip()
+        parts = [self.first_name, self.middle_name, self.last_name, self.suffix]
+        return ' '.join(p for p in parts if p).strip()
 
 
 class WelfareAssessment(models.Model):

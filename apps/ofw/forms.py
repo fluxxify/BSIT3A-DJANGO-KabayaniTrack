@@ -100,7 +100,7 @@ class OFWProfileForm(StyledModelForm):
     class Meta:
         model = OFWProfile
         fields = [
-            'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
+            'first_name', 'middle_name', 'last_name', 'suffix', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
             'city_abroad', 'employer_name', 'occupation', 'agency_org',
             'deployment_date', 'contract_end_date', 'welfare_status', 'remarks',
@@ -211,7 +211,7 @@ class OFWPortalProfileForm(StyledModelForm):
         model = OFWProfile
         fields = [
             'profile_picture',
-            'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
+            'first_name', 'middle_name', 'last_name', 'suffix', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
             'city_abroad', 'employer_name', 'occupation',
             'deployment_date', 'contract_end_date',
