@@ -255,10 +255,14 @@ html {
 
 .dh-brand-link {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
   min-width: 0;
   color: inherit;
+  text-align: center;
 }
 
 .dh-brand-mark {
@@ -286,6 +290,7 @@ html {
 .dh-brand-text {
   display: block;
   min-width: 0;
+  text-align: center;
 }
 
 .dh-brand-name {
@@ -316,6 +321,7 @@ html {
 
 .dh-brand-agency {
   display: -webkit-box;
+  width: 100%;
   margin: 0;
   padding-top: 0.55rem;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
@@ -328,6 +334,7 @@ html {
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0.01em;
+  text-align: center;
   color: rgba(255, 255, 255, 0.62);
 }
 
@@ -411,10 +418,21 @@ html {
     display: none;
   }
 
+  .dh-brand-link {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .dh-brand-text {
+    text-align: left;
+  }
+
   .dh-brand-agency {
     -webkit-line-clamp: 1;
     line-clamp: 1;
     padding-top: 0.4rem;
+    text-align: left;
   }
 }
 
