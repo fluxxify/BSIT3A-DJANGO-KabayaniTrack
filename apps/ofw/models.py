@@ -71,7 +71,17 @@ class OFWProfile(models.Model):
     city_abroad = models.CharField(max_length=120, blank=True)
     employer_name = models.CharField(max_length=200, blank=True)
     occupation = models.CharField(max_length=120, blank=True)
+    # Legacy free-text agency name kept for imported records.  New tenancy and
+    # registration links use ``agency_org`` below.
     agency = models.CharField(max_length=200, blank=True)
+    agency_org = models.ForeignKey(
+        'users.Agency',
+        related_name='ofws',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Agency',
+    )
     deployment_date = models.DateField(null=True, blank=True)
     contract_end_date = models.DateField(null=True, blank=True)
     welfare_status = models.CharField(
@@ -446,6 +456,13 @@ class MonitoringReport(models.Model):
     country = models.CharField(max_length=120, blank=True)
     summary = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    agency = models.ForeignKey(
+        'users.Agency',
+        related_name='reports',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     attachment = models.FileField(upload_to='reports/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -24,16 +24,23 @@ def notify(user, title, message='', url='', level=Notification.Level.INFO):
 
 
 def notify_managers(title, message='', url='', level=Notification.Level.INFO,
-                    exclude_user=None):
-    """Notify every active staff member and administrator.
+                    exclude_user=None, agency=None):
+    """Notify active administrators and the relevant agency staff.
 
-    ``exclude_user`` avoids notifying the person who performed the action (for
-    example an administrator logging a check-in on their own account).
+    When ``agency`` is supplied, only that agency's staff plus all superusers
+    are notified.  Without an agency, all staff are notified (legacy/global
+    behaviour).
     """
-    recipients = User.objects.filter(
-        Q(is_staff=True) | Q(is_superuser=True),
-        is_active=True,
-    )
+    if agency is not None:
+        recipients = User.objects.filter(
+            Q(is_superuser=True) | Q(agency_staff__agency=agency),
+            is_active=True,
+        )
+    else:
+        recipients = User.objects.filter(
+            Q(is_staff=True) | Q(is_superuser=True),
+            is_active=True,
+        )
     if exclude_user is not None and exclude_user.is_authenticated:
         recipients = recipients.exclude(pk=exclude_user.pk)
 

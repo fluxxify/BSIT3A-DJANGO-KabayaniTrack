@@ -5,6 +5,9 @@ import os
 from django import forms
 from django.core.exceptions import ValidationError
 
+from apps.users.agencies import agency_for_user
+from apps.users.models import Agency
+
 from .models import (
     CheckIn,
     Concern,
@@ -43,17 +46,38 @@ class StyledModelForm(forms.ModelForm):
         self.user = user
         super().__init__(*args, **kwargs)
 
+        agency = agency_for_user(user) if user is not None else None
+
         if user is not None and 'ofw' in self.fields:
-            if user.is_superuser or user.is_staff:
+            if user.is_superuser or (user.is_staff and agency is None):
                 self.fields['ofw'].queryset = OFWProfile.objects.all()
+            elif agency is not None:
+                self.fields['ofw'].queryset = OFWProfile.objects.filter(
+                    agency_org=agency,
+                )
             else:
                 self.fields['ofw'].queryset = OFWProfile.objects.filter(user=user)
 
         if user is not None and 'concern' in self.fields:
-            if user.is_superuser or user.is_staff:
+            if user.is_superuser or (user.is_staff and agency is None):
                 self.fields['concern'].queryset = Concern.objects.all()
+            elif agency is not None:
+                self.fields['concern'].queryset = Concern.objects.filter(
+                    ofw__agency_org=agency,
+                )
             else:
                 self.fields['concern'].queryset = Concern.objects.filter(user=user)
+
+        if user is not None and 'agency_org' in self.fields:
+            if agency is not None:
+                self.fields['agency_org'].queryset = Agency.objects.filter(
+                    pk=agency.pk,
+                )
+                self.fields['agency_org'].initial = agency
+            else:
+                self.fields['agency_org'].queryset = Agency.objects.filter(
+                    is_active=True,
+                )
 
         for field in self.fields.values():
             widget = field.widget
@@ -78,7 +102,7 @@ class OFWProfileForm(StyledModelForm):
         fields = [
             'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
-            'city_abroad', 'employer_name', 'occupation', 'agency',
+            'city_abroad', 'employer_name', 'occupation', 'agency_org',
             'deployment_date', 'contract_end_date', 'welfare_status', 'remarks',
         ]
 
@@ -95,6 +119,9 @@ class WelfareAssessmentForm(StyledModelForm):
                 and not (self.user.is_superuser or self.user.is_staff)
                 and ofw.user_id != self.user.id):
             raise ValidationError('You can only assess OFWs that belong to you.')
+        agency = agency_for_user(self.user) if self.user is not None else None
+        if agency is not None and ofw is not None and ofw.agency_org_id != agency.id:
+            raise ValidationError('You can only assess OFWs assigned to your agency.')
         return cleaned
 
 
@@ -112,6 +139,9 @@ class CheckInForm(StyledModelForm):
                 and not (self.user.is_superuser or self.user.is_staff)
                 and ofw.user_id != self.user.id):
             raise ValidationError('You can only log check-ins for OFWs that belong to you.')
+        agency = agency_for_user(self.user) if self.user is not None else None
+        if agency is not None and ofw is not None and ofw.agency_org_id != agency.id:
+            raise ValidationError('You can only log check-ins for OFWs assigned to your agency.')
         return cleaned
 
 
@@ -130,6 +160,9 @@ class ConcernForm(StyledModelForm):
                 and not (self.user.is_superuser or self.user.is_staff)
                 and ofw.user_id != self.user.id):
             raise ValidationError('You can only report concerns for OFWs that belong to you.')
+        agency = agency_for_user(self.user) if self.user is not None else None
+        if agency is not None and ofw is not None and ofw.agency_org_id != agency.id:
+            raise ValidationError('You can only report concerns for OFWs assigned to your agency.')
         return cleaned
 
 
@@ -180,7 +213,7 @@ class OFWPortalProfileForm(StyledModelForm):
             'profile_picture',
             'first_name', 'last_name', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
-            'city_abroad', 'employer_name', 'occupation', 'agency',
+            'city_abroad', 'employer_name', 'occupation',
             'deployment_date', 'contract_end_date',
         ]
         widgets = {

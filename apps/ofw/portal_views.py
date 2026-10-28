@@ -228,6 +228,7 @@ def portal_checkins(request):
                     else Notification.Level.SUCCESS
                 ),
                 exclude_user=request.user,
+                agency=profile.agency_org,
             )
             messages.success(request, 'Thank you! Your check-in has been recorded.')
             return redirect('ofw:portal_checkins')
@@ -286,6 +287,7 @@ def portal_concerns(request):
                     else Notification.Level.WARNING
                 ),
                 exclude_user=request.user,
+                agency=profile.agency_org,
             )
             if proof_files:
                 messages.success(

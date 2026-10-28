@@ -66,7 +66,7 @@
             <dt class="col-5 text-muted">Occupation</dt>
             <dd class="col-7">{{ profile.occupation|default:"—" }}</dd>
             <dt class="col-5 text-muted">Agency</dt>
-            <dd class="col-7">{{ profile.agency|default:"—" }}</dd>
+            <dd class="col-7">{% if profile.agency_org %}{{ profile.agency_org.name }}{% else %}{{ profile.agency|default:"—" }}{% endif %}</dd>
             <dt class="col-5 text-muted">Deployment Date</dt>
             <dd class="col-7">{{ profile.deployment_date|date:"M d, Y"|default:"—" }}</dd>
             <dt class="col-5 text-muted">Contract End</dt>

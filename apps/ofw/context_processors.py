@@ -1,4 +1,7 @@
-"""Template context shared by the notification bell and sidebar badges."""
+"""Template context shared by the notification bell, sidebar badges and agency
+branding."""
+
+from apps.users.agencies import agency_for_user
 
 from .models import Notification
 
@@ -12,4 +15,5 @@ def notifications(request):
     return {
         'unread_notifications_count': queryset.filter(is_read=False).count(),
         'recent_notifications': list(queryset[:6]),
+        'current_agency': agency_for_user(user),
     }

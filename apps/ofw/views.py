@@ -191,13 +191,14 @@ _profiles = crud.make_crud(
         {'field': 'passport_number', 'label': 'Passport'},
         {'field': 'age', 'label': 'Age'},
         {'field': 'country', 'label': 'Country'},
+        {'field': 'agency_org', 'label': 'Agency'},
         {'field': 'employer_name', 'label': 'Employer'},
         {'field': 'occupation', 'label': 'Occupation'},
         {'field': 'get_welfare_status_display', 'label': 'Welfare Status',
          'badge': _welfare_badge, 'raw_field': 'welfare_status'},
     ],
     search_fields=['first_name', 'last_name', 'passport_number', 'country',
-                   'employer_name', 'occupation'],
+                   'agency_org__name', 'employer_name', 'occupation'],
     order_by=['last_name', 'first_name'],
     title='OFW Profiles',
     entity='OFW profile',
@@ -386,12 +387,7 @@ def profile_delete_all_ajax(request):
 
 @login_required(login_url='login')
 def profile_detail(request, pk):
-    queryset = (
-        OFWProfile.objects.all()
-        if request.user.is_superuser or request.user.is_staff
-        else OFWProfile.objects.filter(user=request.user)
-    )
-    profile = get_object_or_404(queryset, pk=pk)
+    profile = get_object_or_404(crud._scoped(request.user, OFWProfile), pk=pk)
     context = {
         'profile': profile,
         'welfare_badge': _welfare_badge.get(profile.welfare_status, 'bg-secondary-lt text-secondary'),
@@ -512,9 +508,8 @@ def concern_list_ajax(request):
 
 
 def concern_get_ajax(request, pk):
-    if request.user.is_staff or request.user.is_superuser:
-        concern = get_object_or_404(Concern, pk=pk)
-        mark_concern_read_by_management(concern, request.user)
+    concern = get_object_or_404(crud._scoped(request.user, Concern), pk=pk)
+    mark_concern_read_by_management(concern, request.user)
     return _concerns['get_ajax'](request, pk)
 
 
@@ -583,12 +578,11 @@ def report_delete_all_ajax(request):
 
 def dashboard_stats(user):
     """Aggregate monitoring metrics shown on the dashboard."""
-    sees_all = user.is_superuser or user.is_staff
-    profiles = OFWProfile.objects.all() if sees_all else OFWProfile.objects.filter(user=user)
-    checkins = CheckIn.objects.all() if sees_all else CheckIn.objects.filter(user=user)
-    concerns = Concern.objects.all() if sees_all else Concern.objects.filter(user=user)
-    contacts = EmergencyContact.objects.all() if sees_all else EmergencyContact.objects.filter(user=user)
-    reports = MonitoringReport.objects.all() if sees_all else MonitoringReport.objects.filter(user=user)
+    profiles = crud._scoped(user, OFWProfile)
+    checkins = crud._scoped(user, CheckIn)
+    concerns = crud._scoped(user, Concern)
+    contacts = crud._scoped(user, EmergencyContact)
+    reports = crud._scoped(user, MonitoringReport)
 
     month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     at_risk = profiles.filter(

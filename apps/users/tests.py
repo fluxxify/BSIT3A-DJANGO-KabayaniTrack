@@ -83,3 +83,93 @@ class UserManagementAccessTests(TestCase):
         self.ofw.refresh_from_db()
         self.assertTrue(self.ofw.check_password('NewPassw0rd!23'))
         self.assertFalse(self.ofw.check_password('Passw0rd!23'))
+
+
+class AgencyWorkspaceTests(TestCase):
+    """Agency links, registration assignment and scoped dashboards."""
+
+    def setUp(self):
+        from apps.ofw.models import OFWProfile
+        from apps.users.models import Agency, AgencyStaff
+
+        self.Agency = Agency
+        self.AgencyStaff = AgencyStaff
+        self.OFWProfile = OFWProfile
+
+        self.agency_a = Agency.objects.create(name='Alpha Agency', slug='alpha')
+        self.agency_b = Agency.objects.create(name='Beta Agency', slug='beta')
+
+        self.staff_a = User.objects.create_user(
+            username='alpha_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.staff_a, agency=self.agency_a)
+
+        self.ofw_a = self.OFWProfile.objects.create(
+            first_name='Ana', last_name='Alpha', agency_org=self.agency_a,
+        )
+        self.ofw_b = self.OFWProfile.objects.create(
+            first_name='Ben', last_name='Beta', agency_org=self.agency_b,
+        )
+
+    def test_landing_page_shows_agency_and_portal_links(self):
+        response = self.client.get(
+            reverse('agency_landing', args=[self.agency_a.slug])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.agency_a.name)
+        self.assertContains(
+            response, reverse('agency_register', args=[self.agency_a.slug])
+        )
+
+    def test_registration_through_agency_link_assigns_agency(self):
+        response = self.client.post(
+            reverse('agency_register', args=[self.agency_a.slug]),
+            {
+                'username': 'agency_new_ofw',
+                'first_name': 'Nico',
+                'last_name': 'Cruz',
+                'email': 'agency_new_ofw@example.com',
+                'password': 'Str0ngPassw0rd!',
+                'confirm_password': 'Str0ngPassw0rd!',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        profile = self.OFWProfile.objects.get(
+            user__username='agency_new_ofw',
+        )
+        self.assertEqual(profile.agency_org, self.agency_a)
+        self.assertEqual(profile.agency, self.agency_a.name)
+
+    def test_dashboard_only_counts_own_agency_ofws(self):
+        self.client.force_login(self.staff_a)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['stats']['kpi']['ofw_total'], 1)
+        self.assertContains(response, 'Alpha Agency')
+
+    def test_agency_staff_cannot_open_other_agency_ofw(self):
+        self.client.force_login(self.staff_a)
+
+        allowed = self.client.get(
+            reverse('ofw:profile_detail', args=[self.ofw_a.pk])
+        )
+        blocked = self.client.get(
+            reverse('ofw:profile_detail', args=[self.ofw_b.pk])
+        )
+
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(blocked.status_code, 404)
+
+    def test_superuser_still_sees_every_agency(self):
+        admin = User.objects.create_superuser(
+            username='agency_root', email='root@example.com',
+            password='Passw0rd!23',
+        )
+        self.client.force_login(admin)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['stats']['kpi']['ofw_total'], 2)

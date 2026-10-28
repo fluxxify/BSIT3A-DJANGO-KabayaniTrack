@@ -18,17 +18,41 @@ from django.urls import reverse
 from django.utils.html import escape
 from django.views.decorators.http import require_POST
 
+from apps.users.agencies import agency_for_user
+
+from .models import EmergencyContact, MonitoringReport, OFWProfile
+
 PER_PAGE = 10
 
 
 def _scoped(user, model):
     """Return the queryset of records the user is allowed to see.
 
-    Management users (staff and superusers) see everything; OFW accounts only
-    their own records.
+    Superusers and legacy staff without an agency see everything.  Agency
+    staff only see records belonging to their own agency.  OFW accounts only
+    see their own records.
     """
-    if user.is_superuser or user.is_staff:
+    if user.is_superuser:
         return model.objects.all()
+
+    agency = agency_for_user(user)
+    if user.is_staff:
+        if agency is None:
+            # Legacy global staff account.
+            return model.objects.all()
+        if model is OFWProfile:
+            return model.objects.filter(agency_org=agency)
+        if model is EmergencyContact:
+            return model.objects.filter(
+                Q(user__isnull=True) |
+                Q(user__ofw_profiles__agency_org=agency)
+            ).distinct()
+        if model is MonitoringReport:
+            return model.objects.filter(agency=agency)
+        if hasattr(model, 'ofw'):
+            return model.objects.filter(ofw__agency_org=agency)
+        return model.objects.none()
+
     return model.objects.filter(user=user)
 
 
@@ -302,8 +326,17 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             return JsonResponse({'error': ' '.join(errors)}, status=400)
 
         obj = form.save(commit=False)
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            if hasattr(obj, 'agency_org'):
+                obj.agency_org = agency
+            if model is MonitoringReport:
+                obj.agency = agency
         if not obj.pk and hasattr(obj, 'user'):
-            obj.user = request.user
+            # An agency officer adding a paper profile should not turn that
+            # profile into their own OFW portal account.
+            if not (model is OFWProfile and agency is not None):
+                obj.user = request.user
         obj.save()
 
         if on_save:

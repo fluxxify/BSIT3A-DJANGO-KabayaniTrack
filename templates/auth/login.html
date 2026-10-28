@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
   <title>
-    Sign in - KabayaniTrack
+    Sign in{% if agency %} - {{ agency.name }}{% endif %} - KabayaniTrack
   </title>
   <link href="{% static 'libs/jsvectormap/dist/jsvectormap.css' %}" rel="stylesheet" />
   <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
@@ -33,8 +33,24 @@
             <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack logo" class="dh-brand-logo" style="width:2.5rem; height:2.5rem;">
           </div>
           <div class="dh-brand-name lh-1" style="font-size: 2rem;">KabayaniTrack</div>
-          <div class="text-muted fw-semibold text-uppercase mt-1" style="font-size:.68rem; letter-spacing:.08em;">OFW Monitoring System</div>
+          <div class="text-muted fw-semibold text-uppercase mt-1" style="font-size:.68rem; letter-spacing:.08em;">
+            {% if agency %}Agency Portal{% else %}OFW Monitoring System{% endif %}
+          </div>
         </div>
+
+        {% if agency %}
+        <div class="alert alert-azure d-flex align-items-start gap-2" role="alert">
+          <i class="fas fa-building mt-1"></i>
+          <div>
+            <div class="fw-bold">{{ agency.name }}</div>
+            <div class="text-muted small">
+              Signing in to the {{ agency.name }} workspace.
+              {% if agency.address %}{{ agency.address }}{% endif %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
         <h2 class="h3 text-center mb-4">Sign in to start your session</h2>
 
         {% include 'theme/messages.html' %}
@@ -60,7 +76,7 @@
             </button>
             <div class="text-center text-secondary mt-3">
               Don't have an account?
-              <a href="{% url 'register' %}" class="text-primary fw-bold">Register</a>
+              <a href="{{ register_url }}" class="text-primary fw-bold">Register</a>
             </div>
           </div>
           </div>
@@ -90,7 +106,7 @@
 
     if (remaining <= 0) {
       clearInterval(interval);
-      window.location.href = "{% url 'login' %}";
+      window.location.href = "{{ login_url }}";
     }
 
   }, 1000);

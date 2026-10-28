@@ -8,7 +8,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -63,6 +63,39 @@ def _home_url_name(user):
     return 'ofw:portal' if is_ofw(user) else 'dashboard'
 
 
+def _agency_for_slug(agency_slug):
+    if not agency_slug:
+        return None
+    from apps.users.models import Agency
+
+    return get_object_or_404(Agency, slug=agency_slug, is_active=True)
+
+
+def _auth_context(agency):
+    if agency is None:
+        return {
+            'agency': None,
+            'register_url': reverse('register'),
+            'login_url': reverse('login'),
+        }
+    return {
+        'agency': agency,
+        'register_url': reverse('agency_register', args=[agency.slug]),
+        'login_url': reverse('agency_login', args=[agency.slug]),
+    }
+
+
+def agency_landing(request, agency_slug):
+    agency = _agency_for_slug(agency_slug)
+    if request.user.is_authenticated:
+        return redirect(_home_url_name(request.user))
+    return render(request, 'auth/agency_landing.html', {
+        'agency': agency,
+        'register_url': reverse('agency_register', args=[agency.slug]),
+        'login_url': reverse('agency_login', args=[agency.slug]),
+    })
+
+
 def _validate_registration_data(data):
     errors = {}
 
@@ -112,10 +145,12 @@ def _validate_registration_data(data):
 
 
 @require_http_methods(['GET', 'POST'])
-def login_view(request):
+def login_view(request, agency_slug=None):
+    agency = _agency_for_slug(agency_slug)
     if request.user.is_authenticated:
         return redirect(_home_url_name(request.user))
 
+    context = _auth_context(agency)
     failed_attempts, remaining = _get_lock_state(request)
     if remaining is not None:
         messages.error(
@@ -125,11 +160,11 @@ def login_view(request):
         )
         return render(
             request, 'auth/login.html',
-            {'locked': True, 'remaining': remaining},
+            {**context, 'locked': True, 'remaining': remaining},
         )
 
     if request.method == 'GET':
-        return render(request, 'auth/login.html')
+        return render(request, 'auth/login.html', context)
 
     username = request.POST.get('username', '').strip()
     password = request.POST.get('password', '')
@@ -153,12 +188,15 @@ def login_view(request):
         messages.error(request, LOCKED_MESSAGE, extra_tags='lock')
         return render(
             request, 'auth/login.html',
-            {'locked': True, 'remaining': remaining},
+            {**context, 'locked': True, 'remaining': remaining},
         )
 
     remaining_attempts = MAX_FAILED_ATTEMPTS - failed_attempts
     messages.error(request, f'{INVALID_LOGIN_MESSAGE} {remaining_attempts} attempts remaining.')
-    return render(request, 'auth/login.html', {'username': username})
+    return render(
+        request, 'auth/login.html',
+        {**context, 'username': username},
+    )
 
 
 def logout_view(request):
@@ -180,12 +218,15 @@ def home(request):
 
 
 @require_http_methods(['GET', 'POST'])
-def register_view(request):
+def register_view(request, agency_slug=None):
+    agency = _agency_for_slug(agency_slug)
     if request.user.is_authenticated:
         return redirect('dashboard')
 
+    context = _auth_context(agency)
+
     if request.method == 'GET':
-        return render(request, 'auth/register.html')
+        return render(request, 'auth/register.html', context)
 
     form_data = {
         'username': request.POST.get('username', ''),
@@ -201,7 +242,7 @@ def register_view(request):
     if errors:
         return render(
             request, 'auth/register.html',
-            {'errors': errors, 'form_data': form_data},
+            {**context, 'errors': errors, 'form_data': form_data},
         )
 
     from apps.ofw.models import Notification, OFWProfile
@@ -226,6 +267,8 @@ def register_view(request):
             last_name=form_data['last_name'].strip(),
             email=form_data['email'].strip(),
             country='',
+            agency_org=agency,
+            agency=agency.name if agency else '',
         )
 
     # Notifications are useful but must never block a successful registration.
@@ -239,6 +282,7 @@ def register_view(request):
             ),
             url=reverse('ofw:profile_detail', args=[profile.pk]),
             level=Notification.Level.SUCCESS,
+            agency=agency,
         )
         notify(
             user,

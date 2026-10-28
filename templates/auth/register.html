@@ -9,7 +9,7 @@
   />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
   <title>
-    Create account - KabayaniTrack
+    Create account{% if agency %} - {{ agency.name }}{% endif %} - KabayaniTrack
 </title>
 <link rel="icon" href="./favicon-dev.ico" type="image/x-icon" />
 <link rel="shortcut icon" href="./favicon-dev.ico" type="image/x-icon" />
@@ -41,8 +41,23 @@ rel="stylesheet"
                     <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack logo" class="dh-brand-logo" style="width:2.5rem; height:2.5rem;">
                 </div>
                 <div class="dh-brand-name lh-1" style="font-size: 2rem;">KabayaniTrack</div>
-                <div class="text-muted fw-semibold text-uppercase mt-1" style="font-size:.68rem; letter-spacing:.08em;">OFW Monitoring System</div>
+                <div class="text-muted fw-semibold text-uppercase mt-1" style="font-size:.68rem; letter-spacing:.08em;">
+                    {% if agency %}Agency Portal{% else %}OFW Monitoring System{% endif %}
+                </div>
             </div>
+
+            {% if agency %}
+            <div class="alert alert-azure d-flex align-items-start gap-2" role="alert">
+                <i class="fas fa-building mt-1"></i>
+                <div>
+                    <div class="fw-bold">{{ agency.name }}</div>
+                    <div class="text-muted small">
+                        Your account will be linked to this agency automatically.
+                        {% if agency.address %}{{ agency.address }}{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
           <div class="card card-md">
             <div class="card-body">
@@ -58,7 +73,7 @@ rel="stylesheet"
                 </div>
                 {% endif %}
 
-                <form method="POST" action="{% url 'register' %}">
+                <form method="POST" action="{{ register_url }}">
                     {% csrf_token %}
 
                     <!-- First Name & Last Name -->
@@ -185,7 +200,7 @@ rel="stylesheet"
 
         <div class="text-center text-secondary mt-3">
             Already have an account?
-            <a href="{% url 'login' %}" class="text-primary fw-bold">Login</a>
+            <a href="{{ login_url }}" class="text-primary fw-bold">Login</a>
         </div>
 
     </div>

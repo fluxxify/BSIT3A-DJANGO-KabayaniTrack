@@ -1,0 +1,106 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>{{ agency.name }} - KabayaniTrack</title>
+  <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-flags.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-socials.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-payments.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-vendors.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-marketing.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/tabler-themes.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/app-theme.css' %}" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body class="antialiased">
+  <script src="{% static 'js/tabler-theme.js' %}"></script>
+
+  <div class="page page-center">
+    <div class="container container-tight py-4">
+
+      <div class="text-center mb-4">
+        <div class="d-flex justify-content-center mb-2">
+          <img src="{% static 'img/kabayanitrack-logo.svg' %}" alt="KabayaniTrack logo" class="dh-brand-logo" style="width:2.5rem; height:2.5rem;">
+        </div>
+        <div class="dh-brand-name lh-1" style="font-size: 2rem;">KabayaniTrack</div>
+        <div class="text-muted fw-semibold text-uppercase mt-1" style="font-size:.68rem; letter-spacing:.08em;">Agency Portal</div>
+      </div>
+
+      <div class="card card-md">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <span class="avatar avatar-lg rounded bg-azure-lt text-azure">
+              <i class="fas fa-building fa-lg"></i>
+            </span>
+            <div>
+              <h2 class="h2 mb-0">{{ agency.name }}</h2>
+              {% if agency.category %}
+              <div class="text-muted">{{ agency.category }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if agency.description %}
+          <p class="text-muted">{{ agency.description }}</p>
+          {% endif %}
+
+          <div class="list-group list-group-flush mb-4">
+            {% if agency.address %}
+            <div class="list-group-item px-0 d-flex gap-2">
+              <i class="fas fa-location-dot text-secondary mt-1"></i>
+              <div>{{ agency.address }}</div>
+            </div>
+            {% endif %}
+            {% if agency.phone %}
+            <div class="list-group-item px-0 d-flex gap-2">
+              <i class="fas fa-phone text-secondary mt-1"></i>
+              <div><a href="tel:{{ agency.phone }}" class="text-reset">{{ agency.phone }}</a></div>
+            </div>
+            {% endif %}
+            {% if agency.email %}
+            <div class="list-group-item px-0 d-flex gap-2">
+              <i class="fas fa-envelope text-secondary mt-1"></i>
+              <div><a href="mailto:{{ agency.email }}" class="text-reset">{{ agency.email }}</a></div>
+            </div>
+            {% endif %}
+            {% if agency.website %}
+            <div class="list-group-item px-0 d-flex gap-2">
+              <i class="fas fa-globe text-secondary mt-1"></i>
+              <div>
+                <a href="{{ agency.website }}" target="_blank" rel="noopener" class="text-reset">
+                  {{ agency.website }}
+                </a>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="d-grid gap-2">
+            <a href="{{ register_url }}" class="btn btn-primary w-100">
+              <i class="fas fa-user-plus me-1"></i> Register as OFW
+            </a>
+            <a href="{{ login_url }}" class="btn btn-outline-secondary w-100">
+              <i class="fas fa-sign-in-alt me-1"></i> Agency / OFW Sign in
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center text-secondary mt-3">
+        <a href="/" class="text-secondary">KabayaniTrack home</a>
+      </div>
+
+    </div>
+  </div>
+
+  {% include 'theme/settings.html' %}
+
+  <script src="{% static 'js/tabler.js' %}" defer></script>
+  <script src="{% static 'js/flash-messages.js' %}" defer></script>
+</body>
+</html>
