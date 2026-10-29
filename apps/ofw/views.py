@@ -993,7 +993,13 @@ def safe_locations_page(request):
     if not request.user.is_superuser:
         agency = agency_for_user(request.user)
         if agency is not None:
-            locations = locations.filter(ofwprofiles__agency_org=agency).distinct()
+            # Only show safe locations in countries where this agency has OFWs.
+            agency_countries = OFWProfile.objects.filter(
+                agency_org=agency
+            ).exclude(country='').values_list('country', flat=True).distinct()
+            locations = locations.filter(country__in=agency_countries)
+        else:
+            locations = locations.none()
 
     country_filter = request.GET.get('country', '').strip()
     if country_filter:
