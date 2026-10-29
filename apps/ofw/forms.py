@@ -253,10 +253,6 @@ class OFWPortalProfileForm(StyledModelForm):
             'JPG, PNG, WEBP or GIF. Maximum 5 MB. Leave empty to keep your '
             'current photo.'
         )
-        self.fields['middle_name'].help_text = 'Optional.'
-        self.fields['middle_name'].label = 'Middle Name (Optional)'
-        self.fields['suffix'].help_text = 'Optional.'
-        self.fields['suffix'].label = 'Suffix (Optional)'
         self.fields['passport_number'].help_text = (
             'Maximum 20 characters. Letters and numbers only.'
         )
