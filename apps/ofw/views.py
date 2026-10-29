@@ -22,7 +22,7 @@ from .forms import (
     OFWProfileForm,
     WelfareAssessmentForm,
 )
-from .locations import COUNTRY_GEO
+from .locations import COUNTRY_GEO, canonical_country
 from .models import (
     CheckIn,
     Concern,
