@@ -1139,7 +1139,7 @@ def ofw_emergency_sos(request):
     if not is_ofw(request.user):
         return redirect('dashboard')
 
-    profile = _profile_for(request.user)
+    profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()
     location_country = canonical_country(profile.country) if profile and profile.country else ''
     location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
 
