@@ -1149,7 +1149,7 @@ def ofw_emergency_sos(request):
         safe_locations = safe_locations.filter(country__iexact=location_country)
     if location_city:
         safe_locations = safe_locations.filter(
-            models.Q(city__iexact=location_city) | models.Q(city='')
+            Q(city__iexact=location_city) | Q(city='')
         )
     safe_locations = safe_locations.order_by('location_type', 'name')[:10]
 
