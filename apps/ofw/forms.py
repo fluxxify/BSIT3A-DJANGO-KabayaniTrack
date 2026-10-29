@@ -1,9 +1,11 @@
 """ModelForms for the OFW monitoring domain with Bootstrap-friendly widgets."""
 
 import os
+import re
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 
 from apps.users.agencies import agency_for_user
 from apps.users.models import Agency
@@ -230,6 +232,14 @@ class OFWPortalProfileForm(StyledModelForm):
                 'autocomplete': 'off',
                 'placeholder': 'Select or type your city',
             }),
+            'passport_number': forms.TextInput(attrs={
+                'maxlength': '20',
+                'placeholder': 'e.g. P1234567A',
+            }),
+            'contact_number': forms.TextInput(attrs={
+                'maxlength': '20',
+                'placeholder': '+63 917 000 0000',
+            }),
         }
 
     def __init__(self, *args, **kwargs):
@@ -243,6 +253,38 @@ class OFWPortalProfileForm(StyledModelForm):
             'JPG, PNG, WEBP or GIF. Maximum 5 MB. Leave empty to keep your '
             'current photo.'
         )
+        self.fields['middle_name'].help_text = 'Optional.'
+        self.fields['middle_name'].label = 'Middle Name (Optional)'
+        self.fields['suffix'].help_text = 'Optional.'
+        self.fields['suffix'].label = 'Suffix (Optional)'
+        self.fields['passport_number'].help_text = (
+            'Maximum 20 characters. Letters and numbers only.'
+        )
+        self.fields['contact_number'].help_text = (
+            'Maximum 20 characters. Example: +63 917 000 0000.'
+        )
+
+    def clean_passport_number(self):
+        value = (self.cleaned_data.get('passport_number') or '').strip()
+        if not value:
+            return value
+        if len(value) > 20:
+            raise ValidationError('Passport number must be 20 characters or less.')
+        if not re.fullmatch(r'[A-Za-z0-9]+', value):
+            raise ValidationError('Passport number must contain letters and numbers only.')
+        return value
+
+    def clean_contact_number(self):
+        value = (self.cleaned_data.get('contact_number') or '').strip()
+        if not value:
+            return value
+        if len(value) > 20:
+            raise ValidationError('Contact number must be 20 characters or less.')
+        if not re.fullmatch(r'[+0-9\s\-\(\)]+', value):
+            raise ValidationError(
+                'Enter a valid contact number (digits, +, spaces, dashes, parentheses only).'
+            )
+        return value
 
     def clean_profile_picture(self):
         picture = self.cleaned_data.get('profile_picture')
