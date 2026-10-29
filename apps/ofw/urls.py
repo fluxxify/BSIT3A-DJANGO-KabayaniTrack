@@ -79,4 +79,30 @@ urlpatterns = [
     path('reports/ajax/save/', views.report_save_ajax, name='report_save_ajax'),
     path('reports/ajax/delete/<int:pk>/', views.report_delete_ajax, name='report_delete_ajax'),
     path('reports/ajax/delete-all/', views.report_delete_all_ajax, name='report_delete_all_ajax'),
+
+    # --- Emergency warning & location tracker ---
+
+    # Inactive OFW accounts (admin/agency warning dashboard)
+    path('inactive-ofws/', views.inactive_ofws_page, name='inactive_ofws'),
+
+    # Emergency alerts
+    path('emergency-alerts/', views.emergency_alerts_page, name='emergency_alerts'),
+    path('emergency-alerts/<int:pk>/acknowledge/', views.acknowledge_alert, name='acknowledge_alert'),
+    path('emergency-alerts/<int:pk>/escalate/', views.escalate_to_police, name='escalate_to_police'),
+
+    # Police reports
+    path('police-reports/', views.police_reports_page, name='police_reports'),
+    path('police-reports/<int:pk>/submit/', views.police_report_submit, name='police_report_submit'),
+
+    # Safe locations
+    path('safe-locations/', views.safe_locations_page, name='safe_locations'),
+    path('safe-locations/save/', views.safe_location_save, name='safe_location_save'),
+    path('safe-locations/<int:pk>/delete/', views.safe_location_delete, name='safe_location_delete'),
+
+    # Location tracker
+    path('location-tracker/', views.location_tracker_page, name='location_tracker'),
+    path('location-tracker/ping/', views.location_tracker_ping, name='location_tracker_ping'),
+
+    # OFW emergency SOS (portal)
+    path('portal/emergency-sos/', views.ofw_emergency_sos, name='portal_emergency_sos'),
 ]

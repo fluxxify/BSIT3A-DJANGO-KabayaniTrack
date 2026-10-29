@@ -1,0 +1,213 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">Emergency SOS</div>
+          <h2 class="page-title mb-0">Emergency Assistance</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  {% if profile %}
+  <div class="alert alert-danger alert-dismissible fade show py-2">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <div>
+      If you are in immediate danger, call your local emergency number first,
+      then use the safe places below to find the nearest police station,
+      hospital, or embassy near your location.
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+
+  <!-- Your Location -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-user me-2"></i>Your Profile</h5>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <p class="mb-1"><strong>Name:</strong> {{ profile.full_name }}</p>
+          <p class="mb-1"><strong>Country:</strong> {{ profile.country|default:"Not set" }}</p>
+          <p class="mb-1"><strong>City:</strong> {{ profile.city_abroad|default:"Not set" }}</p>
+        </div>
+        <div class="col-md-6">
+          <p class="mb-1"><strong>Employer:</strong> {{ profile.employer_name|default:"Not set" }}</p>
+          <p class="mb-1"><strong>Occupation:</strong> {{ profile.occupation|default:"Not set" }}</p>
+          <p class="mb-1"><strong>Welfare:</strong>
+            <span class="badge bg-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}-lt text-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}">
+              {{ profile.get_welfare_status_display }}
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Emergency Location Ping -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-location-crosshairs me-2"></i>Send Emergency Location</h5>
+    </div>
+    <div class="card-body">
+      <p class="text-muted small">Share your current GPS location with management so they can guide you to safety.</p>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-danger btn-lg" id="sendLocationBtn">
+          <i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)
+        </button>
+      </div>
+      <div id="locationResult" class="mt-3"></div>
+    </div>
+  </div>
+
+  <!-- Safe Places Near You -->
+  <div class="card">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-shield-alt me-2"></i>Safe Places Near {{ location_country|default:"your location" }}</h5>
+    </div>
+    <div class="card-body">
+      {% if safe_locations %}
+      <div class="row row-deck row-cards">
+        {% for loc in safe_locations %}
+        <div class="col-sm-6 col-lg-4">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="card-title mb-0">{{ loc.name }}</h6>
+                <span class="badge bg-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}-lt text-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}">
+                  {{ loc.get_location_type_display }}
+                </span>
+              </div>
+              <p class="card-text text-muted small">
+                {% if loc.city %}{{ loc.city }}, {% endif %}{{ loc.country }}
+                {% if loc.address %}<br>{{ loc.address }}{% endif %}
+                {% if loc.phone %}<br>{{ loc.phone }}{% endif %}
+              </p>
+            </div>
+            <div class="card-footer d-flex gap-2">
+              {% if loc.phone %}
+              <a href="tel:{{ loc.phone }}" class="btn btn-sm btn-success flex-grow-1">
+                <i class="fas fa-phone"></i> Call
+              </a>
+              {% endif %}
+              {% if loc.has_coords %}
+              <a href="https://www.google.com/maps/search/?api=1&query={{ loc.latitude }},{{ loc.longitude }}" target="_blank" class="btn btn-sm btn-primary flex-grow-1">
+                <i class="fas fa-map-marker-alt"></i> Directions
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-muted text-center py-4">
+        <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
+        <p>No safe locations registered for {{ location_country|default:"your country" }} yet.</p>
+        <p class="text-muted small">Ask your agency to add police stations, hospitals, or embassies near your work location.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Location Pings -->
+  {% if recent_pings %}
+  <div class="card mt-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-history me-2"></i>Recent Location Pings</h5>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr><th>Latitude</th><th>Longitude</th><th>Type</th><th class="text-end">Recorded</th></tr>
+        </thead>
+        <tbody>
+          {% for ping in recent_pings %}
+          <tr>
+            <td>{{ ping.latitude }}</td>
+            <td>{{ ping.longitude }}</td>
+            <td><span class="badge bg-{% if ping.is_emergency %}danger{% else %}secondary{% endif %}-lt text-{% if ping.is_emergency %}danger{% else %}secondary{% endif %}">
+              {% if ping.is_emergency %}Emergency{% else %}Standard{% endif %}
+            </span></td>
+            <td class="text-end text-muted">{{ ping.recorded_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-user-slash fa-3x mb-3 text-muted"></i>
+    <p>No OFW profile found. Please complete your profile first.</p>
+    <a href="{% url 'ofw:portal_profile' %}" class="btn btn-primary">Complete Profile</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var btn = document.getElementById('sendLocationBtn');
+  var result = document.getElementById('locationResult');
+  if (!btn) return;
+
+  btn.addEventListener('click', function () {
+    if (!navigator.geolocation) {
+      result.innerHTML = '<div class="alert alert-warning">Geolocation is not supported by your browser.</div>';
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting location...';
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        var lat = pos.coords.latitude.toFixed(6);
+        var lng = pos.coords.longitude.toFixed(6);
+        var acc = pos.coords.accuracy ? Math.round(pos.coords.accuracy) + ' m' : 'unknown';
+        result.innerHTML = '<div class="alert alert-success">Location captured: ' + lat + ', ' + lng + ' (accuracy: ' + acc + '). Sending...</div>';
+        fetch('{% url "ofw:location_tracker_ping" %}', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lng) + '&is_emergency=1'
+        })
+          .then(function (resp) { return resp.json(); })
+          .then(function (data) {
+            if (data.status === 'ok') {
+              result.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Emergency location sent to management!</div>';
+              btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
+              btn.classList.replace('btn-danger', 'btn-success');
+              setTimeout(function () { location.reload(); }, 1500);
+            } else {
+              result.innerHTML = '<div class="alert alert-danger">Failed to send: ' + (data.error || 'unknown error') + '</div>';
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
+            }
+          })
+          .catch(function (err) {
+            result.innerHTML = '<div class="alert alert-danger">Network error: ' + err.message + '</div>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
+          });
+      },
+      function (err) {
+        result.innerHTML = '<div class="alert alert-danger">Unable to get location: ' + err.message + '</div>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+})();
+</script>
+{% endblock %}

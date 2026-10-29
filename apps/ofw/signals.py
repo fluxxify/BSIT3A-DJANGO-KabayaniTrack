@@ -4,19 +4,30 @@ Django cascades database rows, but it does not remove files from storage or
 clean up notifications that point at a record that no longer exists.  These
 handlers keep the media directory and notification centre consistent with the
 database.
+
+Also tracks OFW account activity so management and agency staff can see which
+OFWs have been inactive for 3-5 days and need a welfare check / police escalation.
 """
 
+from django.contrib.auth.models import User
+from django.contrib.auth.signals import user_logged_in
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
     CheckIn,
     Concern,
     ConcernProof,
+    EmergencyAlert,
+    LocationTracker,
     MonitoringReport,
     Notification,
+    OFWActivity,
     OFWProfile,
+    PoliceReport,
+    SafeLocation,
 )
 
 
@@ -116,3 +127,42 @@ def delete_replaced_report_attachment(sender, instance, **kwargs):
         _delete_stored_name(instance.attachment.storage, old_name)
     if hasattr(instance, '_replaced_report_attachment_name'):
         del instance._replaced_report_attachment_name
+
+
+# ---------------------------------------------------------------------------
+# OFW activity tracking (inactive account detection + emergency alerts)
+# ---------------------------------------------------------------------------
+
+
+@receiver(post_save, sender=User)
+def ensure_ofw_activity(sender, instance, created, **kwargs):
+    """Create an OFWActivity row for every new OFW (non-staff) user."""
+    if created and not instance.is_staff and not instance.is_superuser:
+        OFWActivity.objects.get_or_create(user=instance)
+
+
+@receiver(post_save, sender=OFWProfile)
+def update_activity_on_profile_change(sender, instance, **kwargs):
+    """Bump last_activity_at whenever an OFW profile is updated."""
+    if instance.user_id:
+        activity, _ = OFWActivity.objects.get_or_create(user_id=instance.user_id)
+        activity.last_activity_at = timezone.now()
+        activity.is_account_active = True
+        activity.days_inactive = 0
+        activity.save(update_fields=['last_activity_at', 'is_account_active', 'days_inactive', 'updated_at'])
+
+
+@receiver(user_logged_in)
+def update_activity_on_login(sender, request, user, **kwargs):
+    """Bump last_login_at / last_activity_at when an OFW signs in."""
+    if not user.is_staff and not user.is_superuser:
+        activity, _ = OFWActivity.objects.get_or_create(user=user)
+        now = timezone.now()
+        activity.last_login_at = now
+        activity.last_activity_at = now
+        activity.is_account_active = True
+        activity.days_inactive = 0
+        activity.save(update_fields=[
+            'last_login_at', 'last_activity_at',
+            'is_account_active', 'days_inactive', 'updated_at',
+        ])

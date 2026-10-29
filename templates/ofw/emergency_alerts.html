@@ -1,0 +1,113 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <h2 class="page-title mb-0">{{ page_title }}</h2>
+        </div>
+        <div class="col-auto text-end">
+          <a href="?status=all" class="btn btn-sm btn-outline-secondary">{{ status_filter|title }} only → All</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <div class="badge bg-{% if status_filter == 'open' %}danger{% else %}secondary{% endif %}-lt text-{% if status_filter == 'open' %}danger{% else %}secondary{% endif %}">
+      Open alerts awaiting action
+    </div>
+    <div class="badge bg-info-lt text-info">
+      Acknowledged = management called OFW
+    </div>
+    <div class="badge bg-danger-lt text-danger">
+      Escalated = police report created
+    </div>
+  </div>
+
+  {% if alerts %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>OFW</th>
+            <th>Agency</th>
+            <th>Country</th>
+            <th class="w-1">Level</th>
+            <th class="w-1">Status</th>
+            <th class="text-end w-1">Created</th>
+            <th class="w-1">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for alert in alerts %}
+          <tr>
+            <td>
+              <a href="{% url 'ofw:profile_detail' alert.ofw.pk %}" class="text-decoration-none fw-medium">
+                {{ alert.ofw.full_name }}
+              </a>
+              <div class="text-muted small">{{ alert.ofw.user.username }}</div>
+            </td>
+            <td>
+              {% if alert.ofw.agency_org %}{{ alert.ofw.agency_org.name }}{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>{{ alert.ofw.country|default:"Not set" }}</td>
+            <td>
+              <span class="badge bg-{% if alert.level == 'danger' %}danger{% elif alert.level == 'critical' %}danger{% else %}warning{% endif %}-lt text-{% if alert.level == 'danger' %}danger{% elif alert.level == 'critical' %}danger{% else %}warning{% endif %}">
+                {{ alert.get_level_display }}
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-{% if alert.status == 'open' %}danger{% elif alert.status == 'acknowledged' %}info{% else %}success{% endif %}-lt text-{% if alert.status == 'open' %}danger{% elif alert.status == 'acknowledged' %}info{% else %}success{% endif %}">
+                {{ alert.get_status_display }}
+              </span>
+            </td>
+            <td class="text-end text-muted">{{ alert.created_at|date:"M d, Y H:i" }}</td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end">
+                {% if alert.status == 'open' %}
+                <form method="post" action="{% url 'ofw:acknowledge_alert' alert.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-primary" onclick="return confirm('Mark as called OFW?')">
+                    <i class="fas fa-phone"></i> Called
+                  </button>
+                </form>
+                <form method="post" action="{% url 'ofw:escalate_to_police' alert.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Escalate to police? No response from OFW.')">
+                    <i class="fas fa-exclamation-triangle"></i> Police
+                  </button>
+                </form>
+                {% elif alert.status == 'acknowledged' %}
+                <form method="post" action="{% url 'ofw:escalate_to_police' alert.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Escalate to police?')">
+                    <i class="fas fa-exclamation-triangle"></i> Escalate
+                  </button>
+                </form>
+                {% elif alert.police_report %}
+                <a href="{% url 'ofw:police_reports' %}" class="btn btn-sm btn-outline-secondary">
+                  <i class="fas fa-file-alt"></i> Report
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-bell-slash fa-3x mb-3"></i>
+    <p>No {{ status_filter }} emergency alerts.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

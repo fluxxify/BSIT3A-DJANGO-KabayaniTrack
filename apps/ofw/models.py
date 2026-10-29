@@ -433,6 +433,212 @@ class Notification(models.Model):
         return f'{self.title} → {self.recipient}'
 
 
+class OFWActivity(models.Model):
+    """Tracks OFW account activity for auto-inactive detection.
+
+    An OFW account is considered inactive when the user has not logged in
+    or updated their profile for the INACTIVE_THRESHOLD days (3-5 days).
+    Management and agency staff see warning notifications so they can call
+    the OFW and, if there is no response, escalate to the police.
+    """
+
+    INACTIVE_THRESHOLD_DAYS = 3
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        related_name='ofw_activity',
+        on_delete=models.CASCADE,
+    )
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    last_activity_at = models.DateTimeField(null=True, blank=True,
+        help_text='Last profile update, check-in, or any portal action.')
+    is_account_active = models.BooleanField(default=True)
+    days_inactive = models.PositiveIntegerField(default=0)
+    warning_sent_at = models.DateTimeField(null=True, blank=True,
+        help_text='When the inactivity warning was last sent to management.')
+    escalated_to_police_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tblactivitylog'
+
+    def __str__(self):
+        return f'{self.user.username} — {"active" if self.is_account_active else "inactive"} ({self.days_inactive} days)'
+
+    @property
+    def is_warning_due(self):
+        """True when inactive past the threshold and no warning has been sent."""
+        if self.is_account_active:
+            return False
+        if self.warning_sent_at is not None:
+            return False
+        return self.days_inactive >= self.INACTIVE_THRESHOLD_DAYS
+
+    @property
+    def is_escalation_due(self):
+        """True when inactive past threshold, warned, but not yet escalated."""
+        if self.is_account_active:
+            return False
+        if self.escalated_to_police_at is not None:
+            return False
+        return self.warning_sent_at is not None and self.days_inactive >= self.INACTIVE_THRESHOLD_DAYS
+
+
+class EmergencyAlert(models.Model):
+    """Priority warning raised for an inactive or distressed OFW.
+
+    Admin and agency staff receive these so they can call the OFW directly.
+    """
+
+    class Level(models.TextChoices):
+        WARNING = 'warning', 'Warning'
+        DANGER = 'danger', 'Danger'
+        CRITICAL = 'critical', 'Critical'
+
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Open'
+        ACKNOWLEDGED = 'acknowledged', 'Called OFW'
+        ESCALATED = 'escalated', 'Escalated to Police'
+        RESOLVED = 'resolved', 'Resolved'
+
+    ofw = models.ForeignKey(
+        OFWProfile,
+        related_name='emergency_alerts',
+        on_delete=models.CASCADE,
+    )
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    level = models.CharField(max_length=10, choices=Level.choices, default=Level.WARNING)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    acknowledged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='acknowledged_alerts',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    escalated_to_police = models.BooleanField(default=False)
+    police_report = models.ForeignKey(
+        'PoliceReport',
+        related_name='alerts',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tblemergencyalert'
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f'{self.ofw.full_name} — {self.get_level_display()} ({self.get_status_display()})'
+
+
+class PoliceReport(models.Model):
+    """Re-report to local police when an unresponsive OFW cannot be reached."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        SUBMITTED = 'submitted', 'Submitted to Police'
+        RESPONDED = 'responded', 'Police Responded'
+        CLOSED = 'closed', 'Closed'
+
+    ofw = models.ForeignKey(
+        OFWProfile,
+        related_name='police_reports',
+        on_delete=models.CASCADE,
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    police_station = models.CharField(max_length=200, blank=True,
+        help_text='Name of the police station near the OFW location.')
+    police_contact = models.CharField(max_length=60, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='police_reports',
+        on_delete=models.CASCADE,
+    )
+    reported_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tblpolicereport'
+        ordering = ['-reported_at', '-id']
+
+    def __str__(self):
+        return f'Police report — {self.ofw.full_name}'
+
+
+class SafeLocation(models.Model):
+    """Safe places (police stations, hospitals, embassies) near OFW work locations.
+
+    Used by the emergency location tracker to guide an OFW in danger to the
+    nearest safe place.
+    """
+
+    class LocationType(models.TextChoices):
+        POLICE_STATION = 'police_station', 'Police Station'
+        HOSPITAL = 'hospital', 'Hospital / Medical'
+        EMBASSY = 'embassy', 'Embassy / Consulate'
+        POLO = 'polo', 'POLO / Labor Office'
+        OWWA = 'owwa', 'OWWA Office'
+        FIRE = 'fire', 'Fire / Rescue'
+        OTHER = 'other', 'Other Safe Place'
+
+    name = models.CharField(max_length=200)
+    location_type = models.CharField(max_length=30, choices=LocationType.choices, default=LocationType.OTHER)
+    country = models.CharField(max_length=120)
+    city = models.CharField(max_length=120, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    phone = models.CharField(max_length=60, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tblsafelocation'
+        ordering = ['country', 'city', 'name']
+
+    def __str__(self):
+        return f'{self.name} ({self.get_location_type_display()}) — {self.city}, {self.country}'
+
+    @property
+    def has_coords(self):
+        return self.latitude is not None and self.longitude is not None
+
+
+class LocationTracker(models.Model):
+    """Real-time location pings for an OFW during an emergency.
+
+    When an OFW triggers SOS, their location can be tracked and shared with
+    management and emergency responders.
+    """
+
+    ofw = models.ForeignKey(
+        OFWProfile,
+        related_name='location_pings',
+        on_delete=models.CASCADE,
+    )
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    accuracy_meters = models.PositiveIntegerField(null=True, blank=True)
+    is_emergency = models.BooleanField(default=False,
+        help_text='True when this ping was sent during an SOS emergency.')
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tbllocationtracker'
+        ordering = ['-recorded_at']
+
+    def __str__(self):
+        return f'{self.ofw.full_name} @ {self.latitude},{self.longitude}'
+
+
 class MonitoringReport(models.Model):
     """A consolidated monitoring report covering a reporting period."""
 

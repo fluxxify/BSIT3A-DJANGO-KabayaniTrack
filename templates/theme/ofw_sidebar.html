@@ -69,6 +69,22 @@
           </a>
         </li>
 
+        <li class="nav-item">
+          <span class="dh-nav-section">Emergency</span>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_emergency_sos' %}active{% endif %}" href="{% url 'ofw:portal_emergency_sos' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-exclamation-triangle text-danger"></i></span>
+            <span class="nav-link-title">Emergency SOS</span>
+          </a>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_contacts' %}active{% endif %}" href="{% url 'ofw:safe_locations' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-shield-alt text-info"></i></span>
+            <span class="nav-link-title">Safe Places Near Me</span>
+          </a>
+        </li>
+
         <li class="nav-item mt-auto dh-nav-sidebar-footer">
           <div class="dh-user-card">
             <span class="d-flex align-items-center gap-2 text-white min-w-0 w-100">

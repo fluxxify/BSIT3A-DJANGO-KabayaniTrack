@@ -1,0 +1,110 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <h2 class="page-title mb-0">{{ page_title }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="alert alert-info alert-dismissible fade show py-2">
+    <i class="fas fa-file-alt me-2"></i>
+    <div>
+      Police reports are created when an unresponsive OFW cannot be reached after
+      an inactivity warning. Submit the report to the local police station near
+      the OFW's location.
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+
+  {% if reports %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>OFW</th>
+            <th>Reported By</th>
+            <th class="w-1">Status</th>
+            <th class="text-end w-1">Reported</th>
+            <th class="w-1">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for report in reports %}
+          <tr>
+            <td>
+              <a href="{% url 'ofw:profile_detail' report.ofw.pk %}" class="text-decoration-none fw-medium">
+                {{ report.ofw.full_name }}
+              </a>
+              <div class="text-muted small">{{ report.ofw.country|default:"Not set" }} / {{ report.ofw.city_abroad|default:"-" }}</div>
+            </td>
+            <td class="text-muted">{{ report.reported_by.username }}</td>
+            <td>
+              <span class="badge bg-{% if report.status == 'submitted' %}success{% elif report.status == 'responded' %}info{% else %}warning{% endif %}-lt text-{% if report.status == 'submitted' %}success{% elif report.status == 'responded' %}info{% else %}warning{% endif %}">
+                {{ report.get_status_display }}
+              </span>
+            </td>
+            <td class="text-end text-muted">{{ report.reported_at|date:"M d, Y H:i" }}</td>
+            <td class="text-end">
+              {% if report.status == 'draft' %}
+              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#submitModal{{ report.pk }}">
+                <i class="fas fa-paper-plane"></i> Submit
+              </button>
+              {% else %}
+              <span class="badge bg-secondary-lt text-secondary">Submitted</span>
+              {% endif %}
+            </td>
+          </tr>
+
+          <div class="modal modal-blur fade" id="submitModal{{ report.pk }}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title">Submit Police Report</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <form method="post" action="{% url 'ofw:police_report_submit' report.pk %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                      <label class="form-label">Police Station <span class="text-danger">*</span></label>
+                      <input type="text" name="police_station" class="form-control" placeholder="e.g. Riyadh Central Police Station" required>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Police Contact Number</label>
+                      <input type="text" name="police_contact" class="form-control" placeholder="+966 11 000 0000">
+                    </div>
+                    <div class="mb-3 text-muted small">
+                      Submitting will mark this report as sent to local police. The OFW's
+                      emergency contacts will be notified.
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <button type="submit" class="btn btn-primary">Submit to Police</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-file-alt fa-3x mb-3 text-muted"></i>
+    <p>No police reports yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <h2 class="page-title mb-0">{{ page_title }}</h2>
+        </div>
+        <div class="col-auto text-end">
+          <a href="{% if emergency_only %}{% url 'ofw:location_tracker' %}{% else %}?emergency=1{% endif %}" class="btn btn-sm btn-outline-{% if emergency_only %}secondary{% else %}primary{% endif %}">
+            {% if emergency_only %}Show All{% else %}Emergency Only{% endif %}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="alert alert-info alert-dismissible fade show py-2">
+    <i class="fas fa-location-crosshairs me-2"></i>
+    <div>
+      Location pings are recorded when an OFW triggers SOS or when management
+      logs an emergency location. Use this to guide the OFW to the nearest safe place.
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+
+  {% if pings %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>OFW</th>
+            <th class="text-end w-1">Latitude</th>
+            <th class="text-end w-1">Longitude</th>
+            <th class="w-1">Type</th>
+            <th class="text-end w-1">Recorded</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ping in pings %}
+          <tr {% if ping.is_emergency %}class="table-danger"{% endif %}>
+            <td>
+              <a href="{% url 'ofw:profile_detail' ping.ofw.pk %}" class="text-decoration-none fw-medium">
+                {{ ping.ofw.full_name }}
+              </a>
+              <div class="text-muted small">{{ ping.ofw.country|default:"Not set" }}</div>
+            </td>
+            <td class="text-end">{{ ping.latitude }}</td>
+            <td class="text-end">{{ ping.longitude }}</td>
+            <td>
+              <span class="badge bg-{% if ping.is_emergency %}danger{% else %}secondary{% endif %}-lt text-{% if ping.is_emergency %}danger{% else %}secondary{% endif %}">
+                {% if ping.is_emergency %}Emergency SOS{% else %}Standard{% endif %}
+              </span>
+            </td>
+            <td class="text-end text-muted">{{ ping.recorded_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-location-crosshairs fa-3x mb-3 text-muted"></i>
+    <p>No location pings recorded yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

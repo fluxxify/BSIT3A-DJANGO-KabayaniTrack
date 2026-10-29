@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -27,11 +27,16 @@ from .models import (
     CheckIn,
     Concern,
     ConcernProof,
+    EmergencyAlert,
     EmergencyContact,
+    LocationTracker,
     MonitoringReport,
     Notification,
+    OFWActivity,
     OFWProfile,
+    PoliceReport,
     RiskLevel,
+    SafeLocation,
     WelfareAssessment,
     WelfareStatus,
 )
@@ -593,6 +598,33 @@ def dashboard_stats(user):
     new_ofws_month = profiles.filter(created_at__gte=month_start).count()
     incomplete_profiles = profiles.filter(country='').count()
 
+    # Inactive OFW accounts (no login/activity for 3+ days)
+    inactive_activities = OFWActivity.objects.filter(
+        is_account_active=False,
+        days_inactive__gte=OFWActivity.INACTIVE_THRESHOLD_DAYS,
+    )
+    if not user.is_superuser:
+        from apps.users.agencies import agency_for_user
+        agency = agency_for_user(user)
+        if agency is not None:
+            inactive_activities = inactive_activities.filter(
+                user__ofw_profiles__agency_org=agency
+            ).distinct()
+        else:
+            inactive_activities = inactive_activities.none()
+    inactive_ofw_count = inactive_activities.count()
+
+    # Open emergency alerts
+    open_alerts = EmergencyAlert.objects.filter(status=EmergencyAlert.Status.OPEN)
+    if not user.is_superuser:
+        from apps.users.agencies import agency_for_user
+        agency = agency_for_user(user)
+        if agency is not None:
+            open_alerts = open_alerts.filter(ofw__agency_org=agency)
+        else:
+            open_alerts = open_alerts.none()
+    open_alerts_count = open_alerts.count()
+
     welfare_rows = profiles.values('welfare_status').annotate(total=Count('id'))
     welfare_labels = dict(WelfareStatus.choices)
     welfare_chart = [
@@ -695,6 +727,8 @@ def dashboard_stats(user):
             'open_concerns': open_concerns.count(),
             'contacts_total': contacts.count(),
             'reports_total': reports.count(),
+            'inactive_ofws': inactive_ofw_count,
+            'open_emergency_alerts': open_alerts_count,
         },
         'links': {
             'ofw_total': reverse('ofw:profile_list'),
@@ -713,6 +747,8 @@ def dashboard_stats(user):
             'contacts_total': reverse('ofw:contact_list'),
             'reports_total': reverse('ofw:report_list'),
             'welfare_status': reverse('ofw:profile_list'),
+            'inactive_ofws': reverse('ofw:inactive_ofws'),
+            'emergency_alerts': reverse('ofw:emergency_alerts'),
         },
         'recent_ofws': recent_ofws,
         'new_ofws_month': new_ofws_month,
@@ -731,3 +767,408 @@ def dashboard_stats(user):
         'map_ofws_json': json.dumps(map_ofws),
         'country_links_json': json.dumps(country_links),
     }
+
+
+# ---------------------------------------------------------------------------
+# Inactive OFW detection & emergency warning views (Admin / Agency)
+# ---------------------------------------------------------------------------
+
+
+def _management_scope(user):
+    """Return OFWProfiles visible to this management user."""
+    from apps.users.agencies import agency_for_user
+
+    if user.is_superuser:
+        return OFWProfile.objects.all()
+    agency = agency_for_user(user)
+    if agency is not None:
+        return OFWProfile.objects.filter(agency_org=agency)
+    if user.is_staff:
+        return OFWProfile.objects.all()
+    return OFWProfile.objects.none()
+
+
+@login_required(login_url='login')
+def inactive_ofws_page(request):
+    """List OFWs whose accounts have been inactive for 3+ days.
+
+    Admin sees all; agency staff see only their agency's OFWs.
+    """
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_authenticated):
+        return redirect('dashboard')
+
+    profiles = _management_scope(request.user).select_related('user', 'agency_org')
+    activities = OFWActivity.objects.select_related('user').all()
+    activity_map = {a.user_id: a for a in activities}
+
+    inactive_rows = []
+    for profile in profiles:
+        activity = activity_map.get(profile.user_id)
+        if activity is None:
+            continue
+        if not activity.is_account_active and activity.days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS:
+            inactive_rows.append({
+                'profile': profile,
+                'activity': activity,
+                'user': profile.user,
+            })
+
+    inactive_rows.sort(key=lambda r: r['activity'].days_inactive, reverse=True)
+
+    return render(request, 'ofw/inactive_ofws.html', {
+        'inactive_rows': inactive_rows,
+        'page_title': 'Inactive OFW Accounts',
+        'page_pretitle': 'Emergency Warning',
+    })
+
+
+@login_required(login_url='login')
+def emergency_alerts_page(request):
+    """List open emergency alerts for inactive or distressed OFWs."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    from apps.users.agencies import agency_for_user
+
+    alerts_qs = EmergencyAlert.objects.select_related('ofw__user', 'ofw__agency_org', 'acknowledged_by')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            alerts_qs = alerts_qs.filter(ofw__agency_org=agency)
+        else:
+            alerts_qs = alerts_qs.none()
+
+    status_filter = request.GET.get('status', 'open')
+    if status_filter == 'open':
+        alerts_qs = alerts_qs.filter(status=EmergencyAlert.Status.OPEN)
+    elif status_filter == 'all':
+        pass
+    else:
+        alerts_qs = alerts_qs.filter(status=status_filter)
+
+    return render(request, 'ofw/emergency_alerts.html', {
+        'alerts': alerts_qs.order_by('-created_at'),
+        'status_filter': status_filter,
+        'page_title': 'Emergency Alerts',
+        'page_pretitle': 'Inactive / At-Risk OFWs',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def acknowledge_alert(request, pk):
+    """Mark an alert as acknowledged (management called the OFW)."""
+    alert = get_object_or_404(EmergencyAlert, pk=pk)
+    alert.status = EmergencyAlert.Status.ACKNOWLEDGED
+    alert.acknowledged_by = request.user
+    alert.acknowledged_at = timezone.now()
+    alert.save(update_fields=['status', 'acknowledged_by', 'acknowledged_at', 'updated_at'])
+
+    notify(
+        request.user,
+        'Emergency alert acknowledged',
+        f'You acknowledged the alert for {alert.ofw.full_name}. '
+        f'Next step: call the OFW directly.',
+        url=reverse('ofw:emergency_alerts'),
+        level=Notification.Level.SUCCESS,
+    )
+    return redirect('ofw:emergency_alerts')
+
+
+@login_required(login_url='login')
+@require_POST
+def escalate_to_police(request, pk):
+    """Escalate an alert to a police report when the OFW does not respond."""
+    alert = get_object_or_404(EmergencyAlert, pk=pk)
+
+    from apps.users.agencies import agency_for_user
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is None or alert.ofw.agency_org_id != agency.id:
+            return redirect('ofw:emergency_alerts')
+
+    # Create the police report
+    report = PoliceReport.objects.create(
+        ofw=alert.ofw,
+        title=f'Missing / Unresponsive OFW — {alert.ofw.full_name}',
+        description=(
+            f'OFW {alert.ofw.full_name} has been inactive for '
+            f'{alert.ofw.ofw_activity.days_inactive} days. '
+            f'Management called but received no response. '
+            f'Last known country: {alert.ofw.country or "not set"}, '
+            f'city: {alert.ofw.city_abroad or "not set"}. '
+            f'Employer: {alert.ofw.employer_name or "not set"}.'
+        ),
+        police_station='',
+        police_contact='',
+        status=PoliceReport.Status.DRAFT,
+        reported_by=request.user,
+    )
+
+    alert.status = EmergencyAlert.Status.ESCALATED
+    alert.escalated_to_police = True
+    alert.police_report = report
+    alert.save(update_fields=['status', 'escalated_to_police', 'police_report', 'updated_at'])
+
+    activity = getattr(alert.ofw, 'ofw_activity', None)
+    if activity:
+        activity.escalated_to_police_at = timezone.now()
+        activity.save(update_fields=['escalated_to_police_at', 'updated_at'])
+
+    notify_managers(
+        title=f'Escalated to Police: {alert.ofw.full_name}',
+        message=(
+            f'No response from OFW after inactivity warning. '
+            f'A police report has been drafted for {alert.ofw.full_name}. '
+            f'Review and submit to local police.'
+        ),
+        url=reverse('ofw:police_reports'),
+        level=Notification.Level.DANGER,
+        agency=alert.ofw.agency_org,
+    )
+
+    return redirect('ofw:police_reports')
+
+
+@login_required(login_url='login')
+def police_reports_page(request):
+    """List police reports for unresponsive OFWs."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    from apps.users.agencies import agency_for_user
+
+    reports_qs = PoliceReport.objects.select_related('ofw__user', 'reported_by')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            reports_qs = reports_qs.filter(ofw__agency_org=agency)
+        else:
+            reports_qs = reports_qs.none()
+
+    return render(request, 'ofw/police_reports.html', {
+        'reports': reports_qs.order_by('-reported_at'),
+        'page_title': 'Police Reports',
+        'page_pretitle': 'Escalated Cases',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def police_report_submit(request, pk):
+    """Submit a drafted police report to local police."""
+    report = get_object_or_404(PoliceReport, pk=pk)
+    report.status = PoliceReport.Status.SUBMITTED
+    report.police_station = request.POST.get('police_station', '').strip()
+    report.police_contact = request.POST.get('police_contact', '').strip()
+    report.save(update_fields=['status', 'police_station', 'police_contact', 'updated_at'])
+
+    notify(
+        request.user,
+        'Police report submitted',
+        f'Report for {report.ofw.full_name} has been submitted to {report.police_station or "local police"}.',
+        url=reverse('ofw:police_reports'),
+        level=Notification.Level.SUCCESS,
+    )
+    return redirect('ofw:police_reports')
+
+
+# ---------------------------------------------------------------------------
+# Safe Locations (police stations, hospitals, embassies near OFW work areas)
+# ---------------------------------------------------------------------------
+
+
+@login_required(login_url='login')
+def safe_locations_page(request):
+    """List safe places near OFW deployment locations."""
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_authenticated):
+        return redirect('dashboard')
+
+    from apps.users.agencies import agency_for_user
+
+    locations = SafeLocation.objects.filter(is_active=True).order_by('country', 'city', 'name')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            locations = locations.filter(ofwprofiles__agency_org=agency).distinct()
+
+    country_filter = request.GET.get('country', '').strip()
+    if country_filter:
+        locations = locations.filter(country__iexact=country_filter)
+
+    countries = SafeLocation.objects.filter(is_active=True).values_list('country', flat=True).distinct().order_by('country')
+
+    return render(request, 'ofw/safe_locations.html', {
+        'locations': locations,
+        'countries': countries,
+        'country_filter': country_filter,
+        'page_title': 'Safe Locations',
+        'page_pretitle': 'Emergency Safe Places',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def safe_location_save(request):
+    """Create or update a safe location entry."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    loc_id = request.POST.get('id')
+    if loc_id:
+        location = get_object_or_404(SafeLocation, pk=loc_id)
+    else:
+        location = SafeLocation()
+
+    location.name = request.POST.get('name', '').strip()
+    location.location_type = request.POST.get('location_type', 'other')
+    location.country = request.POST.get('country', '').strip()
+    location.city = request.POST.get('city', '').strip()
+    location.address = request.POST.get('address', '').strip()
+    location.phone = request.POST.get('phone', '').strip()
+    lat = request.POST.get('latitude', '').strip()
+    lng = request.POST.get('longitude', '').strip()
+    location.latitude = lat if lat else None
+    location.longitude = lng if lng else None
+    location.is_active = request.POST.get('is_active') == 'on'
+    location.save()
+
+    return redirect('ofw:safe_locations')
+
+
+@login_required(login_url='login')
+@require_POST
+def safe_location_delete(request, pk):
+    location = get_object_or_404(SafeLocation, pk=pk)
+    location.is_active = False
+    location.save(update_fields=['is_active', 'updated_at'])
+    return redirect('ofw:safe_locations')
+
+
+# ---------------------------------------------------------------------------
+# Location Tracker (real-time location pings during emergency)
+# ---------------------------------------------------------------------------
+
+
+@login_required(login_url='login')
+def location_tracker_page(request):
+    """View recent location pings for OFWs (emergency tracking)."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    from apps.users.agencies import agency_for_user
+
+    pings_qs = LocationTracker.objects.select_related('ofw__user').order_by('-recorded_at')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            pings_qs = pings_qs.filter(ofw__agency_org=agency)
+        else:
+            pings_qs = pings_qs.none()
+
+    emergency_only = request.GET.get('emergency') == '1'
+    if emergency_only:
+        pings_qs = pings_qs.filter(is_emergency=True)
+
+    return render(request, 'ofw/location_tracker.html', {
+        'pings': pings_qs[:50],
+        'emergency_only': emergency_only,
+        'page_title': 'Location Tracker',
+        'page_pretitle': 'Emergency Location Monitoring',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def location_tracker_ping(request):
+    """OFW or management submits a location ping during an emergency."""
+    profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()
+    if profile is None:
+        return JsonResponse({'error': 'No OFW profile found.'}, status=400)
+
+    lat = request.POST.get('latitude', '').strip()
+    lng = request.POST.get('longitude', '').strip()
+    is_emergency = request.POST.get('is_emergency') == '1'
+
+    if not lat or not lng:
+        return JsonResponse({'error': 'Latitude and longitude are required.'}, status=400)
+
+    ping = LocationTracker.objects.create(
+        ofw=profile,
+        latitude=lat,
+        longitude=lng,
+        is_emergency=is_emergency,
+    )
+
+    if is_emergency:
+        notify_managers(
+            title=f'Emergency location ping from {profile.full_name}',
+            message=(
+                f'{profile.full_name} sent an emergency location ping. '
+                f'Latitude: {lat}, Longitude: {lng}. '
+                f'Guide them to the nearest safe place.'
+            ),
+            url=reverse('ofw:location_tracker'),
+            level=Notification.Level.DANGER,
+            agency=profile.agency_org,
+            exclude_user=request.user,
+        )
+
+    return JsonResponse({'status': 'ok', 'id': ping.pk})
+
+
+# ---------------------------------------------------------------------------
+# OFW Emergency SOS (portal side - safe places guidance)
+# ---------------------------------------------------------------------------
+
+
+@login_required(login_url='login')
+def ofw_emergency_sos(request):
+    """OFW emergency page: shows nearby safe places and one-tap emergency actions."""
+    from .roles import is_ofw
+    if not is_ofw(request.user):
+        return redirect('dashboard')
+
+    profile = _profile_for(request.user)
+    location_country = canonical_country(profile.country) if profile and profile.country else ''
+    location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
+
+    # Safe locations near the OFW's country/city
+    safe_locations = SafeLocation.objects.filter(is_active=True)
+    if location_country:
+        safe_locations = safe_locations.filter(country__iexact=location_country)
+    if location_city:
+        safe_locations = safe_locations.filter(
+            models.Q(city__iexact=location_city) | models.Q(city='')
+        )
+    safe_locations = safe_locations.order_by('location_type', 'name')[:10]
+
+    # Recent emergency location pings for this OFW
+    recent_pings = LocationTracker.objects.filter(ofw=profile).order_by('-recorded_at')[:5]
+
+    # Public hotlines
+    from .hotlines import automatic_local_hotlines, philippine_national_hotlines
+    from .models import EmergencyContact
+
+    public_contacts = list(
+        EmergencyContact.objects
+        .filter(contact_type__in=EmergencyContact.PUBLIC_TYPES)
+        .order_by('country', 'contact_type', 'name')
+    )
+    db_local = [c for c in public_contacts if canonical_country(c.country) == location_country and location_country != 'Philippines']
+    db_national = [c for c in public_contacts if canonical_country(c.country) == 'Philippines']
+
+    return render(request, 'ofw/portal/emergency_sos.html', {
+        'profile': profile,
+        'location_country': location_country,
+        'location_city': location_city,
+        'safe_locations': safe_locations,
+        'recent_pings': recent_pings,
+        'local_hotlines': db_local,
+        'national_hotlines': db_national,
+        'page_title': 'Emergency SOS',
+    })

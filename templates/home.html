@@ -82,6 +82,42 @@
       <div class="card">
         <div class="card-body">
           <div class="d-flex align-items-center">
+            <div class="subheader">Inactive OFWs (3+ days)</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2 text-warning">{{ stats.kpi.inactive_ofws }}</div>
+            <i class="fas fa-clock text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.inactive_ofws }}" class="text-decoration-none">
+            View inactive <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="subheader">Open Emergency Alerts</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2 text-danger">{{ stats.kpi.open_emergency_alerts }}</div>
+            <i class="fas fa-bell text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.emergency_alerts }}" class="text-decoration-none">
+            View alerts <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
             <div class="subheader">Check-ins This Month</div>
           </div>
           <div class="d-flex align-items-baseline">

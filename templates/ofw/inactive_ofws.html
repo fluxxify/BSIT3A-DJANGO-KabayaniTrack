@@ -1,0 +1,87 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <h2 class="page-title mb-0">{{ page_title }}</h2>
+        </div>
+        <div class="col-auto text-end">
+          {% if inactive_rows %}
+          <span class="badge bg-danger">{{ inactive_rows|length }} inactive OFW{{ inactive_rows|length|pluralize }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  {% if inactive_rows %}
+  <div class="alert alert-warning alert-dismissible fade show py-2">
+    <i class="fas fa-triangle-exclamation me-2"></i>
+    <div>
+      <strong>These OFW accounts have been inactive for 3 or more days.</strong>
+      Call them directly. If there is no response, escalate to police from the
+      <a href="{% url 'ofw:emergency_alerts' %}" class="alert-link">Emergency Alerts</a> page.
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>OFW</th>
+            <th>Username</th>
+            <th>Agency</th>
+            <th>Country / City</th>
+            <th class="text-end w-1">Days Inactive</th>
+            <th class="text-end w-1">Last Login</th>
+            <th class="w-1">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in inactive_rows %}
+          <tr>
+            <td>
+              <a href="{% url 'ofw:profile_detail' row.profile.pk %}" class="text-decoration-none fw-medium">
+                {{ row.profile.full_name }}
+              </a>
+              <div class="text-muted small">{{ row.user.email|default:"-" }}</div>
+            </td>
+            <td class="text-muted">{{ row.user.username }}</td>
+            <td>
+              {% if row.profile.agency_org %}{{ row.profile.agency_org.name }}{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>
+              {{ row.profile.country|default:"Not set" }}
+              {% if row.profile.city_abroad %}, {{ row.profile.city_abroad }}{% endif %}
+            </td>
+            <td class="text-end"><span class="badge bg-danger">{{ row.activity.days_inactive }} days</span></td>
+            <td class="text-end text-muted">{{ row.activity.last_login_at|date:"M d, Y H:i"|default:"never" }}</td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{% url 'ofw:emergency_alerts' %}" class="btn btn-sm btn-outline-warning" title="Manage Emergency Alerts">
+                  <i class="fas fa-bell"></i> Alerts
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if not inactive_rows %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+    <p>No inactive OFW accounts. All accounts are active.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
