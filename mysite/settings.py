@@ -41,7 +41,7 @@ if not SECRET_KEY:
 
 # Hosts allowed to serve the app. Dev defaults cover localhost plus any host
 # passed through the DJANGO_ALLOWED_HOSTS environment variable (e.g. a tunnel).
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.0.8.166', '192.168.137.1', '100.113.159.28']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '10.0.8.166', '192.168.137.1', '100.113.159.28', 'Fluxxify.pythonanywhere.com']
 _extra_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
 if _extra_hosts:
     ALLOWED_HOSTS += [h.strip() for h in _extra_hosts.split(',') if h.strip()]
@@ -59,6 +59,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://10.0.8.166:8000',
     'http://192.168.137.1:8000',
     'http://100.113.159.28:8000',
+    'https://Fluxxify.pythonanywhere.com',
 ]
 _extra_origins = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '')
 if _extra_origins:

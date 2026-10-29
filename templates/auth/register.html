@@ -11,8 +11,6 @@
   <title>
     Create account{% if agency %} - {{ agency.name }}{% endif %} - KabayaniTrack
 </title>
-<link rel="icon" href="./favicon-dev.ico" type="image/x-icon" />
-<link rel="shortcut icon" href="./favicon-dev.ico" type="image/x-icon" />
 <link
 href="{% static 'libs/jsvectormap/dist/jsvectormap.css' %}"
 rel="stylesheet"
@@ -78,24 +76,22 @@ rel="stylesheet"
                     <!-- First Name & Last Name -->
                     <div class="row g-3 mb-3">
                         <div class="col-6">
-                            <label class="form-label required">First Name</label>
+                            <label class="form-label required mb-1">First Name</label>
                             <input
                             type="text"
                             name="first_name"
                             class="form-control {% if errors.first_name %}is-invalid{% endif %}"
-                            placeholder=""
                             value="{{ form_data.first_name|default:'' }}">
                             {% if errors.first_name %}
                             <div class="invalid-feedback">{{ errors.first_name }}</div>
                             {% endif %}
                         </div>
                         <div class="col-6">
-                            <label class="form-label required">Last Name</label>
+                            <label class="form-label required mb-1">Last Name</label>
                             <input
                             type="text"
                             name="last_name"
                             class="form-control {% if errors.last_name %}is-invalid{% endif %}"
-                            placeholder=""
                             value="{{ form_data.last_name|default:'' }}">
                             {% if errors.last_name %}
                             <div class="invalid-feedback">{{ errors.last_name }}</div>
@@ -105,26 +101,24 @@ rel="stylesheet"
 
                     <!-- Middle Name & Suffix -->
                     <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <label class="form-label">Middle Name (Optional)</label>
+                        <div class="col-6 d-flex flex-column">
+                            <label class="form-label mb-1" style="min-height: 2.4rem; display: flex; align-items: flex-end; flex-wrap: wrap;">Middle Name&nbsp;<span class="text-secondary fw-normal">(Optional)</span></label>
                             <input
                             type="text"
                             name="middle_name"
-                            class="form-control"
-                            placeholder=""
+                            class="form-control mt-auto"
                             value="{{ form_data.middle_name|default:'' }}">
                         </div>
-                        <div class="col-6">
-                            <label class="form-label">Suffix (Optional)</label>
+                        <div class="col-6 d-flex flex-column">
+                            <label class="form-label mb-1" style="min-height: 2.4rem; display: flex; align-items: flex-end; flex-wrap: wrap;">Suffix&nbsp;<span class="text-secondary fw-normal">(Optional)</span></label>
                             <input
                             type="text"
                             name="suffix"
-                            class="form-control"
+                            class="form-control mt-auto"
                             placeholder="e.g. Jr., III"
                             value="{{ form_data.suffix|default:'' }}">
                         </div>
                     </div>
-
                     <!-- Username -->
                     <div class="mb-3">
                         <label class="form-label required">Username</label>
