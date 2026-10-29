@@ -68,7 +68,7 @@ def _agency_for_slug(agency_slug):
         return None
     from apps.users.models import Agency
 
-    return get_object_or_404(Agency, slug=agency_slug, is_active=True)
+    return get_object_or_404(Agency, slug__iexact=agency_slug.strip(), is_active=True)
 
 
 def _auth_context(agency):
