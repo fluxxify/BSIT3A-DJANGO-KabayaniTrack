@@ -32,6 +32,16 @@
   </div>
 
   {% if locations %}
+  <!-- Map Section -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-map-marked-alt me-2"></i>Safe Locations Map</h5>
+    </div>
+    <div class="card-body p-0">
+      <div id="safeLocationsMap" style="height: 420px; width: 100%;"></div>
+    </div>
+  </div>
+
   <div class="row row-deck row-cards">
     {% for loc in locations %}
     <div class="col-sm-6 col-lg-4">
@@ -71,6 +81,11 @@
           {% if loc.phone %}
           <a href="tel:{{ loc.phone }}" class="btn btn-sm btn-success flex-grow-1">
             <i class="fas fa-phone"></i> Call
+          </a>
+          {% endif %}
+          {% if loc.has_coords %}
+          <a href="https://www.google.com/maps/search/?api=1&query={{ loc.latitude }},{{ loc.longitude }}" target="_blank" class="btn btn-sm btn-primary flex-grow-1">
+            <i class="fas fa-map-marker-alt"></i> Directions
           </a>
           {% endif %}
         </div>
@@ -236,4 +251,52 @@
   {% endfor %}
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #safeLocationsMap { height: 420px; width: 100%; border-radius: 0.5rem; }
+  #locationTrackerMap { height: 420px; width: 100%; border-radius: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  var mapEl = document.getElementById('safeLocationsMap');
+  if (!mapEl) return;
+
+  var map = L.map('safeLocationsMap', { scrollWheelZoom: false });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  var markers = [];
+  var first = true;
+  var centerLat = 15, centerLng = 105;
+
+  {% for loc in locations %}
+  {% if loc.has_coords %}
+  var marker{{ forloop.counter }} = L.marker([{{ loc.latitude }}, {{ loc.longitude }}]).addTo(map);
+  marker{{ forloop.counter }}.bindPopup('<b>{{ loc.name|escapejs }}</b><br>{{ loc.get_location_type_display }}<br>{{ loc.city|escapejs }}, {{ loc.country|escapejs }}{% if loc.address %}<br>{{ loc.address|escapejs }}{% endif %}{% if loc.phone %}<br>{{ loc.phone|escapejs }}{% endif %}');
+  markers.push(marker{{ forloop.counter }});
+  if (first) {
+    centerLat = {{ loc.latitude }};
+    centerLng = {{ loc.longitude }};
+    first = false;
+  }
+  {% endif %}
+  {% endfor %}
+
+  if (markers.length) {
+    var group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.15));
+  } else {
+    map.setView([centerLat, centerLng], 3);
+  }
+})();
+</script>
 {% endblock %}
