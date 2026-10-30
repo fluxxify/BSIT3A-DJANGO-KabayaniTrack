@@ -31,7 +31,7 @@ from .models import (
     OFWProfile,
     WelfareAssessment,
 )
-from .notifications import notify_managers
+from .notifications import notify, notify_managers
 from .roles import is_ofw
 from .views import (
     _concern_status_badge,
@@ -164,6 +164,14 @@ def portal_profile(request):
             obj = form.save(commit=False)
             obj.user = request.user
             obj.save()
+            notify_managers(
+                title=f'Profile updated: {obj.full_name}',
+                message='The OFW has updated their profile information.',
+                url=reverse('ofw:profile_detail', args=[obj.pk]),
+                level=Notification.Level.INFO,
+                exclude_user=request.user,
+                agency=obj.agency_org,
+            )
             messages.success(request, 'Your profile information has been saved.')
             return redirect('ofw:portal_profile')
     else:
@@ -341,6 +349,14 @@ def portal_contacts(request):
             contact = form.save(commit=False)
             contact.user = request.user
             contact.save()
+            notify_managers(
+                title=f'Emergency contact added: {contact.name}',
+                message=f'{profile.full_name} added "{contact.name}" as an emergency contact.',
+                url=reverse('ofw:contact_list'),
+                level=Notification.Level.INFO,
+                exclude_user=request.user,
+                agency=profile.agency_org,
+            )
             messages.success(
                 request,
                 f'"{contact.name}" has been added to your family emergency contacts.',
@@ -428,6 +444,15 @@ def portal_contact_edit(request, pk):
         form = FamilyContactForm(request.POST, instance=contact)
         if form.is_valid():
             form.save()
+            profile = _profile_for(request.user)
+            notify_managers(
+                title=f'Emergency contact updated: {contact.name}',
+                message=f'{profile.full_name if profile else request.user.username} updated "{contact.name}".',
+                url=reverse('ofw:contact_list'),
+                level=Notification.Level.INFO,
+                exclude_user=request.user,
+                agency=profile.agency_org if profile else None,
+            )
             messages.success(request, f'"{contact.name}" has been updated.')
             return redirect('ofw:portal_contacts')
     else:
@@ -454,7 +479,16 @@ def portal_contact_delete(request, pk):
 
     if request.method == 'POST':
         name = contact.name
+        profile = _profile_for(request.user)
         contact.delete()
+        notify_managers(
+            title=f'Emergency contact removed: {name}',
+            message=f'{profile.full_name if profile else request.user.username} removed "{name}" from emergency contacts.',
+            url=reverse('ofw:contact_list'),
+            level=Notification.Level.INFO,
+            exclude_user=request.user,
+            agency=profile.agency_org if profile else None,
+        )
         messages.success(request, f'"{name}" has been removed from your emergency contacts.')
 
     return redirect('ofw:portal_contacts')
