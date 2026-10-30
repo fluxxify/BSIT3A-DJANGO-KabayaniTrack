@@ -220,7 +220,7 @@ class OFWPortalProfileForm(StyledModelForm):
         ]
         labels = {
             'middle_name': 'Middle Name (Optional)',
-            'suffix': 'Suffix (Choices/Optional)',
+            'suffix': 'Suffix (Optional)',
         }
         widgets = {
             'profile_picture': forms.ClearableFileInput(attrs={
