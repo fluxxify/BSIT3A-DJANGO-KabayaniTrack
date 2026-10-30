@@ -31,6 +31,14 @@
           </div>
           {% endif %}
           <dl class="row mb-0">
+            <dt class="col-5 text-muted">First Name</dt>
+            <dd class="col-7">{{ profile.first_name|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Middle Name</dt>
+            <dd class="col-7">{{ profile.middle_name|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Last Name</dt>
+            <dd class="col-7">{{ profile.last_name|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Suffix</dt>
+            <dd class="col-7">{{ profile.suffix|default:"—" }}</dd>
             <dt class="col-5 text-muted">Full Name</dt>
             <dd class="col-7">{{ profile.full_name }}</dd>
             <dt class="col-5 text-muted">Sex</dt>
