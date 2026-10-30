@@ -202,7 +202,7 @@ _profiles = crud.make_crud(
         {'field': 'get_welfare_status_display', 'label': 'Welfare Status',
          'badge': _welfare_badge, 'raw_field': 'welfare_status'},
     ],
-    search_fields=['first_name', 'last_name', 'passport_number', 'country',
+    search_fields=['first_name', 'middle_name', 'last_name', 'suffix', 'passport_number', 'country',
                    'agency_org__name', 'employer_name', 'occupation'],
     order_by=['last_name', 'first_name'],
     title='OFW Profiles',
