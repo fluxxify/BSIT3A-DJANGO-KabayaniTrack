@@ -40,33 +40,29 @@
               {% for field in form %}
               {% if field.name == 'profile_picture' %}
               <div class="col-12">
-                <div class="row g-3 align-items-start">
-                  <div class="col-auto">
+                <div class="d-flex flex-column align-items-center text-center">
+                  <div class="mb-3">
                     {% if profile.profile_picture %}
                     <img id="profilePicPreview" src="{{ profile.profile_picture.url }}" alt="Profile picture"
-                         class="rounded border profile-pic-preview">
+                         class="rounded-circle border" style="width:120px;height:120px;object-fit:cover;">
                     {% else %}
-                    <span id="profilePicPreview" class="d-inline-flex align-items-center justify-content-center rounded border bg-light text-muted profile-pic-preview">
-                      <i class="fas fa-user fa-2x"></i>
+                    <span id="profilePicPreview" class="d-inline-flex align-items-center justify-content-center rounded-circle border bg-light text-muted" style="width:120px;height:120px;">
+                      <i class="fas fa-user fa-3x"></i>
                     </span>
                     {% endif %}
                   </div>
-                  <div class="col">
-                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    <div class="input-group mb-2">
-                      {{ field }}
-                      <button class="btn btn-outline-secondary" type="button" id="cropToggleBtn" title="Crop photo">
-                        <i class="fas fa-crop"></i> Crop
-                      </button>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary" type="button" id="changePicBtn">
+                  <div style="display:none;">
+                    {{ field }}
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap justify-content-center">
+                    <button class="btn btn-primary" type="button" id="changePicBtn">
                       <i class="fas fa-camera me-1"></i>Update Profile Picture
                     </button>
-                    {% if field.help_text %}<div><small class="form-hint">{{ field.help_text }}</small></div>{% endif %}
-                    {% for error in field.errors %}
-                    <div class="text-danger small mt-1">{{ error }}</div>
-                    {% endfor %}
                   </div>
+                  {% if field.help_text %}<small class="form-hint mt-2">{{ field.help_text }}</small>{% endif %}
+                  {% for error in field.errors %}
+                  <div class="text-danger small mt-1">{{ error }}</div>
+                  {% endfor %}
                 </div>
               </div>
               {% else %}
@@ -169,38 +165,31 @@
             img.id = 'profilePicPreview';
             img.src = ev.target.result;
             img.alt = 'Profile picture';
-            img.className = 'rounded border profile-pic-preview';
+            img.className = 'rounded-circle border';
+            img.style.width = '120px';
+            img.style.height = '120px';
+            img.style.objectFit = 'cover';
             preview.replaceWith(img);
             preview = img;
           }
+          // Open crop modal automatically
+          if (cropModalEl && cropImage) {
+            cropImage.src = ev.target.result;
+            var modal = new bootstrap.Modal(cropModalEl);
+            modal.show();
+            setTimeout(function () {
+              if (cropper) {
+                cropper.destroy();
+              }
+              cropper = new Cropper(cropImage, {
+                aspectRatio: 1,
+                viewMode: 1,
+                autoCropArea: 0.9,
+              });
+            }, 200);
+          }
         };
         reader.readAsDataURL(file);
-      });
-    }
-
-    if (cropToggleBtn && cropModalEl && cropImage) {
-      cropToggleBtn.addEventListener('click', function () {
-        if (!fileInput.files[0]) {
-          alert('Please select a photo first.');
-          return;
-        }
-        var reader = new FileReader();
-        reader.onload = function (ev) {
-          cropImage.src = ev.target.result;
-          var modal = new bootstrap.Modal(cropModalEl);
-          modal.show();
-          setTimeout(function () {
-            if (cropper) {
-              cropper.destroy();
-            }
-            cropper = new Cropper(cropImage, {
-              aspectRatio: 1,
-              viewMode: 1,
-              autoCropArea: 0.8,
-            });
-          }, 200);
-        };
-        reader.readAsDataURL(fileInput.files[0]);
       });
     }
 
@@ -220,12 +209,19 @@
           var url = canvas.toDataURL('image/jpeg');
           if (preview && preview.tagName === 'IMG') {
             preview.src = url;
+            preview.className = 'rounded-circle border';
+            preview.style.width = '120px';
+            preview.style.height = '120px';
+            preview.style.objectFit = 'cover';
           } else if (preview) {
             var img = document.createElement('img');
             img.id = 'profilePicPreview';
             img.src = url;
             img.alt = 'Profile picture';
-            img.className = 'rounded border profile-pic-preview';
+            img.className = 'rounded-circle border';
+            img.style.width = '120px';
+            img.style.height = '120px';
+            img.style.objectFit = 'cover';
             preview.replaceWith(img);
             preview = img;
           }
