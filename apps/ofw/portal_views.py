@@ -41,6 +41,18 @@ from .views import (
 )
 
 
+def _concern_title(concern):
+    """Build a short title from an OFW's description.
+
+    OFWs no longer type a title, but the management console and database still
+    expect one, so derive it from the report itself.
+    """
+    text = ' '.join((concern.description or '').split())
+    if text:
+        return text[:200]
+    return f'{concern.get_category_display()} concern'
+
+
 def _guard(request):
     """Redirect management users away from the OFW portal (returns None if OK)."""
     if is_ofw(request.user):
@@ -291,6 +303,7 @@ def portal_concerns(request):
             concern = form.save(commit=False)
             concern.ofw = profile
             concern.user = request.user
+            concern.title = _concern_title(concern)
             concern.reported_date = timezone.localdate()
             concern.status = Concern.Status.OPEN
             concern.save()

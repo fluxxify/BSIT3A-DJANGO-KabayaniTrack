@@ -201,7 +201,6 @@ class OFWPortalTests(TestCase):
 
     def test_self_concern_created_and_linked(self):
         response = self.client.post(reverse('ofw:portal_concerns'), {
-            'title': 'Delayed salary',
             'category': 'salary',
             'severity': 'high',
             'description': 'Two months unpaid',
@@ -209,6 +208,7 @@ class OFWPortalTests(TestCase):
         self.assertEqual(response.status_code, 302)
         concern = Concern.objects.filter(ofw=self.profile, user=self.user).first()
         self.assertIsNotNone(concern)
+        self.assertEqual(concern.title, 'Two months unpaid')
         self.assertEqual(concern.status, Concern.Status.OPEN)
 
 
@@ -277,14 +277,14 @@ class ConcernProofUploadTests(TestCase):
         photo = SimpleUploadedFile('proof.jpg', b'\xff\xd8\xff fakejpg', 'image/jpeg')
         video = SimpleUploadedFile('proof.mp4', b'\x00\x00\x00 fakemp4', 'video/mp4')
         response = self.client.post(reverse('ofw:portal_concerns'), {
-            'title': 'Being hurt by employer',
             'category': 'abuse',
             'severity': 'critical',
             'description': 'Physically harmed at work',
             'proof_files': [photo, video],
         })
         self.assertEqual(response.status_code, 302)
-        concern = Concern.objects.get(ofw=self.profile, title='Being hurt by employer')
+        concern = Concern.objects.get(ofw=self.profile, description='Physically harmed at work')
+        self.assertEqual(concern.title, 'Physically harmed at work')
         proofs = concern.proofs.all()
         self.assertEqual(proofs.count(), 2)
         self.assertTrue(any(p.is_image for p in proofs))
@@ -296,7 +296,6 @@ class ConcernProofUploadTests(TestCase):
     def test_rejects_disallowed_file_type(self):
         bad = SimpleUploadedFile('notes.exe', b'MZ binary', 'application/octet-stream')
         response = self.client.post(reverse('ofw:portal_concerns'), {
-            'title': 'Suspicious demand',
             'category': 'other',
             'severity': 'low',
             'description': 'Agency asked for payment',
@@ -304,18 +303,30 @@ class ConcernProofUploadTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'not an accepted file type')
-        self.assertFalse(Concern.objects.filter(title='Suspicious demand').exists())
+        self.assertFalse(
+            Concern.objects.filter(description='Agency asked for payment').exists()
+        )
 
     def test_concern_without_proof_still_works(self):
         response = self.client.post(reverse('ofw:portal_concerns'), {
-            'title': 'No proof concern',
             'category': 'health',
             'severity': 'medium',
             'description': 'Just text',
         })
         self.assertEqual(response.status_code, 302)
-        concern = Concern.objects.get(title='No proof concern')
+        concern = Concern.objects.get(ofw=self.profile)
+        self.assertEqual(concern.title, 'Just text')
         self.assertEqual(concern.proofs.count(), 0)
+
+    def test_concern_without_description_uses_category_as_title(self):
+        response = self.client.post(reverse('ofw:portal_concerns'), {
+            'category': 'health',
+            'severity': 'low',
+            'description': '',
+        })
+        self.assertEqual(response.status_code, 302)
+        concern = Concern.objects.get(ofw=self.profile)
+        self.assertEqual(concern.title, 'Health / Medical concern')
 
     def test_portal_page_renders_with_proof_field(self):
         response = self.client.get(reverse('ofw:portal_concerns'))
@@ -329,7 +340,11 @@ class ConcernProofUploadTests(TestCase):
         self.assertContains(response, 'id="concernCameraModal"')
         self.assertContains(response, 'id="concern-camera-video"')
         self.assertContains(response, 'id="concern-camera-shutter"')
+        self.assertContains(response, 'id="concern-camera-record"')
+        self.assertContains(response, 'id="concern-camera-timer"')
+        self.assertContains(response, 'Record Video')
         self.assertContains(response, 'id="concern-proof-preview"')
+        self.assertNotContains(response, 'name="title"')
 
     def test_management_detail_shows_proofs(self):
         concern = Concern.objects.create(
@@ -364,7 +379,6 @@ class ConcernProofUploadTests(TestCase):
 
     def test_admin_sees_ofw_submission_in_console(self):
         self.client.post(reverse('ofw:portal_concerns'), {
-            'title': 'Passport withheld',
             'category': 'documents',
             'severity': 'critical',
             'description': 'Employer took my passport',
@@ -374,7 +388,7 @@ class ConcernProofUploadTests(TestCase):
         )
         self.client.force_login(admin)
         response = self.client.get(reverse('ofw:concern_list'))
-        self.assertContains(response, 'Passport withheld')
+        self.assertContains(response, 'Employer took my passport')
 
     def test_admin_form_lists_ofw_owned_profiles(self):
         admin = User.objects.create_superuser(
@@ -1138,7 +1152,6 @@ class NotificationTests(TestCase):
     def test_ofw_concern_notifies_managers(self):
         self.client.force_login(self.ofw_user)
         response = self.client.post(reverse('ofw:portal_concerns'), {
-            'title': 'Unpaid overtime',
             'category': 'salary',
             'severity': 'high',
             'description': 'No overtime pay for two months',
@@ -1149,7 +1162,7 @@ class NotificationTests(TestCase):
         self.assertIsNotNone(notification)
         self.assertIn('New concern from Liza Cruz', notification.title)
         self.assertEqual(notification.level, Notification.Level.DANGER)
-        concern = Concern.objects.get(title='Unpaid overtime')
+        concern = Concern.objects.get(description='No overtime pay for two months')
         self.assertEqual(notification.url, reverse('ofw:concern_detail', args=[concern.pk]))
 
     def test_ofw_checkin_notifies_managers(self):

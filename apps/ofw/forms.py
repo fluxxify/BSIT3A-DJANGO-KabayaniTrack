@@ -360,8 +360,8 @@ class OFWSelfConcernForm(StyledModelForm):
         required=False,
         label='Photo / Video Proof',
         help_text=(
-            'Tap "Open Camera" to take a photo with your phone or PC webcam, '
-            'or upload existing photos/videos as proof '
+            'Tap "Open Camera" to take a photo or record a video with your '
+            'phone or PC webcam, or upload existing photos/videos as proof '
             '(e.g. evidence of maltreatment). '
             f'Up to {ConcernProof.MAX_FILES} files, '
             f'{ConcernProof.MAX_FILE_SIZE // (1024 * 1024)} MB each. '
@@ -380,7 +380,7 @@ class OFWSelfConcernForm(StyledModelForm):
 
     class Meta:
         model = Concern
-        fields = ['title', 'category', 'severity', 'description']
+        fields = ['category', 'severity', 'description']
 
     def clean_proof_files(self):
         files = self.cleaned_data.get('proof_files') or []

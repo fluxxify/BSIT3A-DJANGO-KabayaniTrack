@@ -1,4 +1,21 @@
 {% extends "theme/base.html" %}
+{% block extra_css %}
+<style>
+  .record-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #d63939;
+    vertical-align: middle;
+  }
+  .record-dot-live { background: #fff; animation: record-pulse 1s ease-in-out infinite; }
+  @keyframes record-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -66,7 +83,10 @@
             <tbody>
               {% for row in concern_rows %}
               <tr>
-                <td>{{ row.obj.title }}</td>
+                <td>
+                  {{ row.obj.title|truncatechars:90 }}
+                  <div class="text-muted small">{{ row.obj.get_category_display }}</div>
+                </td>
                 <td><span class="badge {{ row.severity_badge }}">{{ row.obj.get_severity_display }}</span></td>
                 <td><span class="badge {{ row.status_badge }}">{{ row.obj.get_status_display }}</span></td>
                 <td>
@@ -110,16 +130,21 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="concernCameraTitle">
-          <i class="fas fa-camera me-2"></i>Take a Photo
+          <i class="fas fa-camera me-2"></i>Take a Photo or Record a Video
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="rounded overflow-hidden bg-dark" style="height: min(60vh, 420px);">
+        <div class="rounded overflow-hidden bg-dark position-relative" style="height: min(60vh, 420px);">
           <video id="concern-camera-video" autoplay playsinline muted
                  class="w-100 h-100" style="object-fit: cover;"></video>
           <img id="concern-camera-snapshot" alt="Captured photo"
                class="w-100 h-100 d-none" style="object-fit: contain;">
+          <div id="concern-camera-recording"
+               class="position-absolute top-0 start-0 m-2 badge bg-danger d-none">
+            <span class="record-dot record-dot-live me-1"></span>
+            <span id="concern-camera-timer">0:00</span>
+          </div>
         </div>
         <canvas id="concern-camera-canvas" class="d-none"></canvas>
         <div id="concern-camera-error" class="alert alert-warning mt-3 d-none" role="alert"></div>
@@ -128,8 +153,8 @@
           Use file picker instead
         </button>
         <p class="text-muted small mt-2 mb-0" id="concern-camera-hint">
-          Center the photo and tap Capture. Your browser may ask for camera
-          permission the first time.
+          Take a photo or record a video, then attach it as proof. Your browser
+          may ask for camera and microphone permission the first time.
         </p>
       </div>
       <div class="modal-footer">
@@ -138,6 +163,9 @@
         </button>
         <button type="button" class="btn btn-outline-secondary d-none" id="concern-camera-retake">
           <i class="fas fa-rotate-left me-1"></i>Retake
+        </button>
+        <button type="button" class="btn btn-outline-danger" id="concern-camera-record">
+          <span class="record-dot"></span>Record Video
         </button>
         <button type="button" class="btn btn-warning" id="concern-camera-shutter">
           <i class="fas fa-camera me-1"></i>Capture
@@ -176,9 +204,13 @@
     var useBtn = document.getElementById('concern-camera-use');
     var switchBtn = document.getElementById('concern-camera-switch');
     var fallbackBtn = document.getElementById('concern-camera-fallback');
+    var recordBtn = document.getElementById('concern-camera-record');
+    var recordingBadge = document.getElementById('concern-camera-recording');
+    var timerEl = document.getElementById('concern-camera-timer');
     var hasCameraUi = !!(
       modalEl && video && snapshot && canvas && errorBox && hint &&
-      shutterBtn && retakeBtn && useBtn && switchBtn && fallbackBtn
+      shutterBtn && retakeBtn && useBtn && switchBtn && fallbackBtn &&
+      recordBtn && recordingBadge && timerEl
     );
 
     var cameraModal = null;
@@ -186,6 +218,12 @@
     var cameraDevices = [];
     var cameraDeviceIndex = 0;
     var cameraRequestId = 0;
+
+    var recorder = null;
+    var recordedChunks = [];
+    var recordingMime = '';
+    var recordingTimer = null;
+    var discardRecording = false;
 
     function currentFiles() {
       return Array.prototype.slice.call(proofInput.files || []);
@@ -335,8 +373,196 @@
       if (video) video.srcObject = null;
     }
 
+    function pickRecordingMime() {
+      var types = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4'
+      ];
+      if (!window.MediaRecorder || typeof MediaRecorder.isTypeSupported !== 'function') {
+        return '';
+      }
+      for (var i = 0; i < types.length; i += 1) {
+        if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+      }
+      return '';
+    }
+
+    function isRecording() {
+      return !!(recorder && recorder.state === 'recording');
+    }
+
+    function cameraFileTimestamp() {
+      var now = new Date();
+      return 'camera-' + now.getFullYear() +
+        ('0' + (now.getMonth() + 1)).slice(-2) +
+        ('0' + now.getDate()).slice(-2) + '-' +
+        ('0' + now.getHours()).slice(-2) +
+        ('0' + now.getMinutes()).slice(-2) +
+        ('0' + now.getSeconds()).slice(-2);
+    }
+
+    function formatDuration(ms) {
+      var total = Math.floor(ms / 1000);
+      return Math.floor(total / 60) + ':' + ('0' + (total % 60)).slice(-2);
+    }
+
+    function resetRecordUi() {
+      if (!hasCameraUi) return;
+      if (recordingTimer) {
+        window.clearInterval(recordingTimer);
+        recordingTimer = null;
+      }
+      recordingBadge.classList.add('d-none');
+      recordBtn.classList.remove('d-none');
+      recordBtn.classList.add('btn-outline-danger');
+      recordBtn.classList.remove('btn-danger');
+      recordBtn.innerHTML = '<span class="record-dot"></span>Record Video';
+      recordBtn.removeAttribute('aria-pressed');
+    }
+
+    async function ensureAudioStream() {
+      if (cameraStream && cameraStream.getAudioTracks().length) {
+        return cameraStream;
+      }
+      var stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: videoConstraints(true)
+      });
+      stopCamera();
+      cameraStream = stream;
+      video.srcObject = stream;
+      try { await video.play(); } catch (error) { /* autoplay can be blocked */ }
+      return stream;
+    }
+
+    async function startRecording() {
+      if (isRecording()) return;
+      if (!window.MediaRecorder) {
+        showCameraError('This browser cannot record video. Please use Upload from Gallery / Files instead.');
+        return;
+      }
+      var mime = pickRecordingMime();
+      if (!mime) {
+        showCameraError('Video recording is not supported in this browser. Please upload a video instead.');
+        return;
+      }
+
+      errorBox.classList.add('d-none');
+      fallbackBtn.classList.add('d-none');
+      hint.textContent = 'Starting the microphone...';
+
+      var stream;
+      try {
+        stream = await ensureAudioStream();
+      } catch (error) {
+        showCameraError('Camera and microphone access are needed to record a video. ' + cameraErrorMessage(error));
+        return;
+      }
+      if (video.classList.contains('d-none')) return;
+
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: mime });
+      } catch (error) {
+        try {
+          recorder = new MediaRecorder(stream);
+          mime = recorder.mimeType || 'video/webm';
+        } catch (fallbackError) {
+          recorder = null;
+          showCameraError('This browser cannot record video. Please upload a video instead.');
+          return;
+        }
+      }
+
+      recordingMime = mime;
+      recordedChunks = [];
+      discardRecording = false;
+      recorder.addEventListener('dataavailable', function (event) {
+        if (event.data && event.data.size) recordedChunks.push(event.data);
+      });
+      recorder.addEventListener('stop', finishRecording);
+
+      try {
+        recorder.start(1000);
+      } catch (error) {
+        recorder = null;
+        showCameraError('Could not start recording. Please try again or upload a video.');
+        return;
+      }
+
+      var startedAt = Date.now();
+      timerEl.textContent = '0:00';
+      recordingBadge.classList.remove('d-none');
+      recordBtn.innerHTML = '<i class="fas fa-stop me-1"></i>Stop Recording';
+      recordBtn.classList.remove('btn-outline-danger');
+      recordBtn.classList.add('btn-danger');
+      recordBtn.setAttribute('aria-pressed', 'true');
+      shutterBtn.classList.add('d-none');
+      switchBtn.classList.add('d-none');
+      retakeBtn.classList.add('d-none');
+      useBtn.classList.add('d-none');
+      hint.textContent = 'Recording... Tap Stop when you are done.';
+      recordingTimer = window.setInterval(function () {
+        timerEl.textContent = formatDuration(Date.now() - startedAt);
+      }, 500);
+    }
+
+    function stopRecording(discard) {
+      discardRecording = !!discard;
+      if (recordingTimer) {
+        window.clearInterval(recordingTimer);
+        recordingTimer = null;
+      }
+      if (recorder) {
+        if (recorder.state !== 'inactive') {
+          try { recorder.stop(); } catch (error) { recorder = null; }
+        } else {
+          recorder = null;
+        }
+      }
+      resetRecordUi();
+      if (snapshot.classList.contains('d-none')) {
+        shutterBtn.classList.remove('d-none');
+        if (cameraDevices.length > 1) switchBtn.classList.remove('d-none');
+      }
+      hint.textContent = 'Take a photo, or tap Record Video to capture a video.';
+    }
+
+    function finishRecording() {
+      var mime = recordingMime || 'video/webm';
+      var type = mime.split(';')[0];
+      var extension = type === 'video/mp4' ? 'mp4' : 'webm';
+      var blob = new Blob(recordedChunks, { type: type });
+      recordedChunks = [];
+      recorder = null;
+      if (discardRecording) {
+        discardRecording = false;
+        return;
+      }
+      if (!blob.size) {
+        showCameraError('The recording was empty. Please try again.');
+        return;
+      }
+
+      var file;
+      try {
+        file = new File([blob], cameraFileTimestamp() + '.' + extension, { type: type });
+      } catch (error) {
+        showCameraError('Your browser cannot attach the video. Please upload it instead.');
+        return;
+      }
+      var result = addFiles([file]);
+      if (result.ok) {
+        if (cameraModal) cameraModal.hide();
+      } else {
+        showCameraError(result.message);
+      }
+    }
+
     function resetCameraUi() {
       if (!hasCameraUi) return;
+      resetRecordUi();
       video.classList.remove('d-none');
       snapshot.classList.add('d-none');
       snapshot.removeAttribute('src');
@@ -347,7 +573,7 @@
       useBtn.classList.add('d-none');
       shutterBtn.classList.remove('d-none');
       switchBtn.classList.add('d-none');
-      hint.textContent = 'Center the photo and tap Capture. Your browser may ask for camera permission the first time.';
+      hint.textContent = 'Take a photo, or tap Record Video to capture a video.';
     }
 
     function showCameraError(message) {
@@ -359,7 +585,8 @@
       switchBtn.classList.add('d-none');
       retakeBtn.classList.add('d-none');
       useBtn.classList.add('d-none');
-      hint.textContent = 'You can still upload an existing photo from your device.';
+      recordBtn.classList.add('d-none');
+      hint.textContent = 'You can still upload an existing photo or video from your device.';
     }
 
     function cameraErrorMessage(error) {
@@ -376,6 +603,21 @@
       return 'Could not open the camera. You can upload a photo from your device instead.';
     }
 
+    function videoConstraints(useDeviceId) {
+      if (useDeviceId && cameraDevices.length) {
+        return { deviceId: { exact: cameraDevices[cameraDeviceIndex].deviceId } };
+      }
+      var track = cameraStream && cameraStream.getVideoTracks()[0];
+      var settings = track && track.getSettings ? track.getSettings() : {};
+      if (settings && settings.deviceId) {
+        return { deviceId: { exact: settings.deviceId } };
+      }
+      if (cameraDevices.length) {
+        return { deviceId: { exact: cameraDevices[cameraDeviceIndex].deviceId } };
+      }
+      return { facingMode: { ideal: 'environment' } };
+    }
+
     async function startCamera(useDeviceId) {
       if (!supportsLiveCamera()) {
         showCameraError('Live camera is not available here. Use the file picker instead.');
@@ -386,10 +628,7 @@
       hint.textContent = 'Starting camera...';
       var requestId = ++cameraRequestId;
 
-      var constraints = { audio: false, video: { facingMode: { ideal: 'environment' } } };
-      if (useDeviceId && cameraDevices.length) {
-        constraints.video = { deviceId: { exact: cameraDevices[cameraDeviceIndex].deviceId } };
-      }
+      var constraints = { audio: false, video: videoConstraints(useDeviceId) };
 
       try {
         var stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -400,7 +639,7 @@
         cameraStream = stream;
         video.srcObject = stream;
         try { await video.play(); } catch (error) { /* autoplay can be blocked */ }
-        hint.textContent = 'Center the photo and tap Capture.';
+        hint.textContent = 'Take a photo, or tap Record Video to capture a video.';
 
         try {
           var devices = await navigator.mediaDevices.enumerateDevices();
@@ -440,6 +679,7 @@
       snapshot.classList.remove('d-none');
       shutterBtn.classList.add('d-none');
       switchBtn.classList.add('d-none');
+      recordBtn.classList.add('d-none');
       retakeBtn.classList.remove('d-none');
       useBtn.classList.remove('d-none');
       errorBox.classList.add('d-none');
@@ -452,10 +692,11 @@
       snapshot.removeAttribute('src');
       video.classList.remove('d-none');
       shutterBtn.classList.remove('d-none');
+      recordBtn.classList.remove('d-none');
       retakeBtn.classList.add('d-none');
       useBtn.classList.add('d-none');
       if (cameraDevices.length > 1) switchBtn.classList.remove('d-none');
-      hint.textContent = 'Center the photo and tap Capture.';
+      hint.textContent = 'Take a photo, or tap Record Video to capture a video.';
     }
 
     function switchCamera() {
@@ -499,6 +740,7 @@
         startCamera(false);
       });
       modalEl.addEventListener('hidden.bs.modal', function () {
+        stopRecording(true);
         stopCamera();
         resetCameraUi();
       });
@@ -506,6 +748,13 @@
       retakeBtn.addEventListener('click', retakePhoto);
       useBtn.addEventListener('click', usePhoto);
       switchBtn.addEventListener('click', switchCamera);
+      recordBtn.addEventListener('click', function () {
+        if (isRecording()) {
+          stopRecording(false);
+        } else {
+          startRecording();
+        }
+      });
       fallbackBtn.addEventListener('click', function () {
         if (cameraModal) cameraModal.hide();
         setTimeout(function () { cameraInput.click(); }, 350);
