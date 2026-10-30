@@ -3,8 +3,12 @@ import shutil
 import tempfile
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 from apps.ofw.models import Notification, OFWProfile
 
@@ -326,3 +330,88 @@ class AuthMessageTests(TestCase):
         response = self.client.get(reverse('logout'), follow=True)
         self.assertContains(response, 'Logged out successfully.')
         self.assertContains(response, 'Sign in to start your session')
+
+
+class PasswordResetTests(TestCase):
+    """Password reset works with a real mail backend and in local dev."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='resetuser',
+            email='reset@example.com',
+            password='OldPassw0rd!',
+        )
+
+    def _post_email(self, email='reset@example.com'):
+        return self.client.post(reverse('password_reset'), {'email': email})
+
+    def test_get_renders_request_form(self):
+        response = self.client.get(reverse('password_reset'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Forgot password?')
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+    )
+    def test_existing_email_sends_reset_link(self):
+        response = self._post_email()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('reset@example.com', mail.outbox[0].to)
+        self.assertIn('/reset/', mail.outbox[0].body)
+        # The link is emailed, not rendered on the page.
+        self.assertNotContains(response, '/reset/')
+        self.assertContains(response, 'Check your email')
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+    )
+    def test_unknown_email_looks_the_same_and_sends_nothing(self):
+        response = self._post_email('nobody@example.com')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(response, 'Check your email')
+        self.assertNotContains(response, '/reset/')
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend'
+    )
+    def test_console_backend_shows_link_on_page(self):
+        response = self._post_email()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '/reset/')
+        self.assertContains(response, 'Reset your password')
+
+    def test_unusable_password_gets_no_link(self):
+        self.user.set_unusable_password()
+        self.user.save(update_fields=['password'])
+
+        response = self._post_email()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, '/reset/')
+
+    def test_reset_link_sets_new_password(self):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        url = reverse('password_reset_confirm', kwargs={
+            'uidb64': uid, 'token': token,
+        })
+
+        # Django validates the token on GET and redirects to the "set-password"
+        # URL that keeps the token in the session.
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        set_password_url = response.url
+
+        response = self.client.post(set_password_url, {
+            'new_password1': 'BrandNewPassw0rd!',
+            'new_password2': 'BrandNewPassw0rd!',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('BrandNewPassw0rd!'))
