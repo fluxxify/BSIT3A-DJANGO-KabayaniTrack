@@ -2,8 +2,8 @@
 
 **The Errors**
 
-Eduardo S. Caballeda Jr.
+# Eduardo S. Caballeda Jr.
 
-John Paul B. Canoy
+# John Paul B. Canoy
 
-Xymer John A. Adino
+# Xymer John A. Adino
