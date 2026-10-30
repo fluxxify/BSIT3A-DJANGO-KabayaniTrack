@@ -118,7 +118,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<div class="modal modal-blur fade" id="cropModal" tabindex="-1" aria-hidden="true">
+<div class="modal modal-blur fade" id="cropModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
@@ -126,9 +126,12 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="img-container" style="max-height:400px;">
-          <img id="cropImage" src="" alt="Image to crop" style="max-width:100%; display:block;">
+        <div class="img-container" style="max-height:60vh;">
+          <img id="cropImage" src="" alt="Image to crop" style="display:block; max-width:100%;">
         </div>
+        <p class="text-muted small mt-2 mb-0">
+          Drag the photo to reposition it and use the handles to zoom. It is saved as a square.
+        </p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -140,121 +143,170 @@
 <script src="{% static 'libs/cropperjs/cropper.min.js' %}"></script>
 <script>
   (function () {
+    var MAX_BYTES = 5 * 1024 * 1024;
+    var ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
     var fileInput = document.getElementById('id_profile_picture');
     var changePicBtn = document.getElementById('changePicBtn');
-    var cropToggleBtn = document.getElementById('cropToggleBtn');
     var preview = document.getElementById('profilePicPreview');
     var cropModalEl = document.getElementById('cropModal');
     var cropImage = document.getElementById('cropImage');
     var applyCropBtn = document.getElementById('applyCropBtn');
+
     var cropper = null;
     var originalFile = null;
+    var appliedFile = null;
+    var originalPreviewHtml = null;
+    var cropped = false;
+
+    function setInputFile(file) {
+      if (!fileInput) return;
+      if (!file) {
+        fileInput.value = '';
+        return;
+      }
+      var transfer = new DataTransfer();
+      transfer.items.add(file);
+      fileInput.files = transfer.files;
+    }
+
+    function setPreview(src) {
+      if (!preview) return;
+      if (preview.tagName === 'IMG') {
+        preview.src = src;
+        return;
+      }
+      var img = document.createElement('img');
+      img.id = 'profilePicPreview';
+      img.alt = 'Profile picture';
+      img.className = 'rounded-circle border';
+      img.style.width = '120px';
+      img.style.height = '120px';
+      img.style.objectFit = 'cover';
+      img.src = src;
+      preview.replaceWith(img);
+      preview = img;
+    }
+
+    function restorePreview() {
+      if (!preview || !originalPreviewHtml) return;
+      var template = document.createElement('template');
+      template.innerHTML = originalPreviewHtml.trim();
+      var node = template.content.firstElementChild;
+      if (!node) return;
+      preview.replaceWith(node);
+      preview = document.getElementById('profilePicPreview');
+      originalPreviewHtml = null;
+    }
+
+    function destroyCropper() {
+      if (!cropper) return;
+      try { cropper.destroy(); } catch (err) {}
+      cropper = null;
+    }
+
+    function initCropper() {
+      if (!cropModalEl || !cropImage || !cropImage.naturalWidth) return;
+      if (typeof Cropper === 'undefined') {
+        window.alert('The image cropper could not be loaded. Please refresh the page and try again.');
+        return;
+      }
+      destroyCropper();
+      cropper = new Cropper(cropImage, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.9,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+    }
+
+    function initCropperWhenReady() {
+      if (!cropImage) return;
+      if (cropImage.complete && cropImage.naturalWidth) {
+        initCropper();
+        return;
+      }
+      cropImage.addEventListener('load', function onLoad() {
+        cropImage.removeEventListener('load', onLoad);
+        initCropper();
+      });
+    }
 
     if (changePicBtn && fileInput) {
       changePicBtn.addEventListener('click', function () {
+        fileInput.value = '';
         fileInput.click();
       });
     }
 
     if (fileInput) {
-      fileInput.addEventListener('change', function (e) {
-        var file = e.target.files[0];
+      fileInput.addEventListener('change', function () {
+        var file = fileInput.files && fileInput.files[0];
         if (!file) return;
+
+        if (ALLOWED_TYPES.indexOf(file.type) === -1) {
+          window.alert('Please choose a JPG, PNG, WEBP or GIF image.');
+          setInputFile(appliedFile);
+          return;
+        }
+        if (file.size > MAX_BYTES) {
+          window.alert('Your profile picture must be 5 MB or smaller.');
+          setInputFile(appliedFile);
+          return;
+        }
+
         originalFile = file;
+        cropped = false;
+        originalPreviewHtml = preview ? preview.outerHTML : null;
+
         var reader = new FileReader();
-        reader.onload = function (ev) {
-          if (preview && preview.tagName === 'IMG') {
-            preview.src = ev.target.result;
-          } else if (preview) {
-            var img = document.createElement('img');
-            img.id = 'profilePicPreview';
-            img.src = ev.target.result;
-            img.alt = 'Profile picture';
-            img.className = 'rounded-circle border';
-            img.style.width = '120px';
-            img.style.height = '120px';
-            img.style.objectFit = 'cover';
-            preview.replaceWith(img);
-            preview = img;
-          }
-          // Open crop modal automatically
-          if (cropModalEl && cropImage) {
-            if (cropper) {
-              cropper.destroy();
-              cropper = null;
-            }
-            cropImage.src = ev.target.result;
-            var modal = new bootstrap.Modal(cropModalEl, { backdrop: 'static', keyboard: false });
-            modal.show();
-            
-            cropModalEl.addEventListener('shown.bs.modal', function initCrop() {
-              cropModalEl.removeEventListener('shown.bs.modal', initCrop);
-              setTimeout(function () {
-                if (cropper) {
-                  cropper.destroy();
-                }
-                cropper = new Cropper(cropImage, {
-                  aspectRatio: 1,
-                  viewMode: 1,
-                  autoCropArea: 0.9,
-                  dragMode: 'move',
-                  cropBoxResizable: true,
-                  cropBoxMovable: true,
-                });
-              }, 50);
-            });
-            
-            // Scroll to crop modal
-            setTimeout(function () {
-              try {
-                cropModalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              } catch (e) {}
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }, 100);
-          }
+        reader.onload = function (event) {
+          setPreview(event.target.result);
+          if (!cropModalEl || !cropImage) return;
+          destroyCropper();
+          cropImage.src = event.target.result;
+          bootstrap.Modal.getOrCreateInstance(cropModalEl).show();
         };
         reader.readAsDataURL(file);
       });
     }
 
-    if (applyCropBtn && cropModalEl) {
+    if (cropModalEl) {
+      cropModalEl.addEventListener('shown.bs.modal', initCropperWhenReady);
+      cropModalEl.addEventListener('hidden.bs.modal', function () {
+        destroyCropper();
+        if (cropped) return;
+        setInputFile(appliedFile);
+        restorePreview();
+        originalFile = null;
+      });
+    }
+
+    if (applyCropBtn && fileInput) {
       applyCropBtn.addEventListener('click', function () {
         if (!cropper) return;
         var canvas = cropper.getCroppedCanvas({
           width: 512,
           height: 512,
+          imageSmoothingQuality: 'high',
         });
+        if (!canvas) return;
         canvas.toBlob(function (blob) {
           if (!blob) return;
-          var file = new File([blob], originalFile ? originalFile.name.replace(/\.[^/.]+$/, '') + '.jpg' : 'profile.jpg', { type: 'image/jpeg' });
-          var dataTransfer = new DataTransfer();
-          dataTransfer.items.add(file);
-          fileInput.files = dataTransfer.files;
-          var url = canvas.toDataURL('image/jpeg');
-          if (preview && preview.tagName === 'IMG') {
-            preview.src = url;
-            preview.className = 'rounded-circle border';
-            preview.style.width = '120px';
-            preview.style.height = '120px';
-            preview.style.objectFit = 'cover';
-          } else if (preview) {
-            var img = document.createElement('img');
-            img.id = 'profilePicPreview';
-            img.src = url;
-            img.alt = 'Profile picture';
-            img.className = 'rounded-circle border';
-            img.style.width = '120px';
-            img.style.height = '120px';
-            img.style.objectFit = 'cover';
-            preview.replaceWith(img);
-            preview = img;
-          }
+          var baseName = (originalFile && originalFile.name)
+            ? originalFile.name.replace(/\.[^/.]+$/, '')
+            : 'profile';
+          var file = new File([blob], baseName + '.jpg', { type: 'image/jpeg' });
+          appliedFile = file;
+          setInputFile(file);
+          setPreview(canvas.toDataURL('image/jpeg', 0.9));
+          cropped = true;
+          destroyCropper();
           var modal = bootstrap.Modal.getInstance(cropModalEl);
           if (modal) modal.hide();
-          if (cropper) {
-            cropper.destroy();
-            cropper = null;
-          }
         }, 'image/jpeg', 0.9);
       });
     }
