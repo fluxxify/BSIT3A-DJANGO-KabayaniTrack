@@ -122,7 +122,7 @@
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Crop Profile Picture</h5>
+        <h5 class="modal-title">Crop &amp; Update Profile Picture</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -132,7 +132,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="applyCropBtn"><i class="fas fa-check me-1"></i>Apply Crop</button>
+        <button type="button" class="btn btn-primary" id="applyCropBtn"><i class="fas fa-camera me-1"></i>Update Profile Picture</button>
       </div>
     </div>
   </div>
@@ -179,19 +179,38 @@
           }
           // Open crop modal automatically
           if (cropModalEl && cropImage) {
+            if (cropper) {
+              cropper.destroy();
+              cropper = null;
+            }
             cropImage.src = ev.target.result;
-            var modal = new bootstrap.Modal(cropModalEl);
+            var modal = new bootstrap.Modal(cropModalEl, { backdrop: 'static', keyboard: false });
             modal.show();
+            
+            cropModalEl.addEventListener('shown.bs.modal', function initCrop() {
+              cropModalEl.removeEventListener('shown.bs.modal', initCrop);
+              setTimeout(function () {
+                if (cropper) {
+                  cropper.destroy();
+                }
+                cropper = new Cropper(cropImage, {
+                  aspectRatio: 1,
+                  viewMode: 1,
+                  autoCropArea: 0.9,
+                  dragMode: 'move',
+                  cropBoxResizable: true,
+                  cropBoxMovable: true,
+                });
+              }, 50);
+            });
+            
+            // Scroll to crop modal
             setTimeout(function () {
-              if (cropper) {
-                cropper.destroy();
-              }
-              cropper = new Cropper(cropImage, {
-                aspectRatio: 1,
-                viewMode: 1,
-                autoCropArea: 0.9,
-              });
-            }, 200);
+              try {
+                cropModalEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } catch (e) {}
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 100);
           }
         };
         reader.readAsDataURL(file);
