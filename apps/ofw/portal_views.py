@@ -159,6 +159,22 @@ def portal_profile(request):
     profile = _profile_for(request.user)
 
     if request.method == 'POST':
+        if request.POST.get('remove_profile_picture') == '1' and profile:
+            if profile.profile_picture:
+                profile.profile_picture.delete(save=False)
+            profile.profile_picture = None
+            profile.save(update_fields=['profile_picture'])
+            notify_managers(
+                title=f'Profile updated: {profile.full_name}',
+                message='The OFW has removed their profile picture.',
+                url=reverse('ofw:profile_detail', args=[profile.pk]),
+                level=Notification.Level.INFO,
+                exclude_user=request.user,
+                agency=profile.agency_org,
+            )
+            messages.success(request, 'Profile picture removed.')
+            return redirect('ofw:portal_profile')
+
         form = OFWPortalProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             obj = form.save(commit=False)
@@ -172,7 +188,10 @@ def portal_profile(request):
                 exclude_user=request.user,
                 agency=obj.agency_org,
             )
-            messages.success(request, 'Your profile information has been saved.')
+            if request.FILES.get('profile_picture'):
+                messages.success(request, 'Profile picture updated successfully.')
+            else:
+                messages.success(request, 'Your profile information has been saved.')
             return redirect('ofw:portal_profile')
     else:
         form = OFWPortalProfileForm(instance=profile)
