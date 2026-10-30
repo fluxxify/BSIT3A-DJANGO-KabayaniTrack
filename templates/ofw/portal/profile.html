@@ -1,4 +1,12 @@
 {% extends "theme/base.html" %}
+{% load static %}
+{% block extra_css %}
+<link href="{% static 'libs/cropperjs/cropper.css' %}" rel="stylesheet">
+<style>
+  .profile-pic-preview { width:96px;height:96px;object-fit:cover; }
+  .cropper-container { max-height: 400px; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -33,22 +41,33 @@
               {% if field.name == 'profile_picture' %}
               <div class="col-12">
                 <div class="d-flex flex-wrap align-items-center gap-3">
-                  {% if profile.profile_picture %}
-                  <img src="{{ profile.profile_picture.url }}" alt="Profile picture"
-                       class="rounded border" style="width:96px;height:96px;object-fit:cover;">
-                  {% else %}
-                  <span class="d-inline-flex align-items-center justify-content-center rounded border bg-light text-muted"
-                        style="width:96px;height:96px;">
-                    <i class="fas fa-user fa-2x"></i>
-                  </span>
-                  {% endif %}
+                  <div>
+                    {% if profile.profile_picture %}
+                    <img id="profilePicPreview" src="{{ profile.profile_picture.url }}" alt="Profile picture"
+                         class="rounded border profile-pic-preview">
+                    {% else %}
+                    <span id="profilePicPreview" class="d-inline-flex align-items-center justify-content-center rounded border bg-light text-muted profile-pic-preview">
+                      <i class="fas fa-user fa-2x"></i>
+                    </span>
+                    {% endif %}
+                  </div>
                   <div class="flex-grow-1" style="min-width:220px;">
                     <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
+                    <div class="input-group">
+                      {{ field }}
+                      <button class="btn btn-outline-secondary" type="button" id="cropToggleBtn" title="Crop photo">
+                        <i class="fas fa-crop"></i> Crop
+                      </button>
+                    </div>
                     {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
                     {% for error in field.errors %}
                     <div class="text-danger small mt-1">{{ error }}</div>
                     {% endfor %}
+                    <div class="mt-2">
+                      <button class="btn btn-sm btn-outline-primary" type="button" id="changePicBtn">
+                        <i class="fas fa-camera me-1"></i>Update Profile Picture
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -100,8 +119,128 @@
 {% endblock %}
 
 {% block extra_js %}
+<div class="modal modal-blur fade" id="cropModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Crop Profile Picture</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="img-container" style="max-height:400px;">
+          <img id="cropImage" src="" alt="Image to crop" style="max-width:100%; display:block;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="applyCropBtn"><i class="fas fa-check me-1"></i>Apply Crop</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="{% static 'libs/cropperjs/cropper.min.js' %}"></script>
 <script>
   (function () {
+    var fileInput = document.getElementById('id_profile_picture');
+    var changePicBtn = document.getElementById('changePicBtn');
+    var cropToggleBtn = document.getElementById('cropToggleBtn');
+    var preview = document.getElementById('profilePicPreview');
+    var cropModalEl = document.getElementById('cropModal');
+    var cropImage = document.getElementById('cropImage');
+    var applyCropBtn = document.getElementById('applyCropBtn');
+    var cropper = null;
+    var originalFile = null;
+
+    if (changePicBtn && fileInput) {
+      changePicBtn.addEventListener('click', function () {
+        fileInput.click();
+      });
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener('change', function (e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        originalFile = file;
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          if (preview && preview.tagName === 'IMG') {
+            preview.src = ev.target.result;
+          } else if (preview) {
+            var img = document.createElement('img');
+            img.id = 'profilePicPreview';
+            img.src = ev.target.result;
+            img.alt = 'Profile picture';
+            img.className = 'rounded border profile-pic-preview';
+            preview.replaceWith(img);
+            preview = img;
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (cropToggleBtn && cropModalEl && cropImage) {
+      cropToggleBtn.addEventListener('click', function () {
+        if (!fileInput.files[0]) {
+          alert('Please select a photo first.');
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          cropImage.src = ev.target.result;
+          var modal = new bootstrap.Modal(cropModalEl);
+          modal.show();
+          setTimeout(function () {
+            if (cropper) {
+              cropper.destroy();
+            }
+            cropper = new Cropper(cropImage, {
+              aspectRatio: 1,
+              viewMode: 1,
+              autoCropArea: 0.8,
+            });
+          }, 200);
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      });
+    }
+
+    if (applyCropBtn && cropModalEl) {
+      applyCropBtn.addEventListener('click', function () {
+        if (!cropper) return;
+        var canvas = cropper.getCroppedCanvas({
+          width: 512,
+          height: 512,
+        });
+        canvas.toBlob(function (blob) {
+          if (!blob) return;
+          var file = new File([blob], originalFile ? originalFile.name.replace(/\.[^/.]+$/, '') + '.jpg' : 'profile.jpg', { type: 'image/jpeg' });
+          var dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          fileInput.files = dataTransfer.files;
+          var url = canvas.toDataURL('image/jpeg');
+          if (preview && preview.tagName === 'IMG') {
+            preview.src = url;
+          } else if (preview) {
+            var img = document.createElement('img');
+            img.id = 'profilePicPreview';
+            img.src = url;
+            img.alt = 'Profile picture';
+            img.className = 'rounded border profile-pic-preview';
+            preview.replaceWith(img);
+            preview = img;
+          }
+          var modal = bootstrap.Modal.getInstance(cropModalEl);
+          if (modal) modal.hide();
+          if (cropper) {
+            cropper.destroy();
+            cropper = null;
+          }
+        }, 'image/jpeg', 0.9);
+      });
+    }
+
     var citiesUrl = "{% url 'ofw:portal_cities' %}";
     var countryField = document.getElementById('id_country');
     var cityField = document.getElementById('id_city_abroad');
