@@ -1,6 +1,4 @@
-# KabayaniTrack
-
-A web-based monitoring system for Overseas Filipino Workers (OFW's)
+# KabayaniTrack: A web-based monitoring system for Overseas Filipino Workers (OFW's)
 
 **The Errors**
 
