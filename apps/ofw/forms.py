@@ -218,6 +218,10 @@ class OFWPortalProfileForm(StyledModelForm):
             'city_abroad', 'employer_name', 'occupation',
             'deployment_date', 'contract_end_date',
         ]
+        labels = {
+            'middle_name': 'Middle Name (Optional)',
+            'suffix': 'Suffix (Choices/Optional)',
+        }
         widgets = {
             'profile_picture': forms.ClearableFileInput(attrs={
                 'accept': 'image/jpeg,image/png,image/webp,image/gif',
