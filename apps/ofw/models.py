@@ -54,10 +54,20 @@ class OFWProfile(models.Model):
         blank=True,
         help_text='Optional photo so the management team can recognise you.',
     )
+    SUFFIX_CHOICES = [
+        ('', 'None'),
+        ('Jr.', 'Jr.'),
+        ('Sr.', 'Sr.'),
+        ('II', 'II'),
+        ('III', 'III'),
+        ('IV', 'IV'),
+        ('V', 'V'),
+    ]
+
     first_name = models.CharField(max_length=120)
     middle_name = models.CharField(max_length=120, blank=True)
     last_name = models.CharField(max_length=120)
-    suffix = models.CharField(max_length=30, blank=True)
+    suffix = models.CharField(max_length=30, blank=True, choices=SUFFIX_CHOICES)
     passport_number = models.CharField(max_length=40, blank=True)
     birth_date = models.DateField(null=True, blank=True)
     age = models.PositiveIntegerField(
