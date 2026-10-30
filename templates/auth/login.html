@@ -57,9 +57,10 @@
             <input type="text" class="form-control" name="username" autocomplete="off" value="{{ username|default:'' }}" {% if locked %}disabled{% endif %}>
           </div>
           <div class="mb-2">
-            <label class="form-label">
-              Password
-            </label>
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <label class="form-label mb-0">Password</label>
+              <a href="{% url 'password_reset' %}" class="form-label-description">Forgot password?</a>
+            </div>
             <div class="input-group input-group-flat">
               <input type="password" class="form-control" name="password" autocomplete="off" {% if locked %}disabled{% endif %}>
             </div>
