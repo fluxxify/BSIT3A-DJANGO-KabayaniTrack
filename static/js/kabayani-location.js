@@ -199,15 +199,22 @@
 
     var android = /Android/i.test(navigator.userAgent || '');
     var box = document.createElement('div');
-    box.className = 'alert alert-warning';
-    box.innerHTML =
-      '<div class="fw-bold mb-1"><i class="fas fa-triangle-exclamation me-1"></i>' +
-      'Open this page in Chrome or Safari</div>' +
-      '<div class="small">Messenger and Facebook block location access. ' +
-      'Use a real browser to share your live location.</div>';
+    box.className = 'kabayani-inapp-help';
+    box.setAttribute('role', 'note');
+
+    var head = document.createElement('div');
+    head.className = 'kbi-head';
+    head.innerHTML =
+      '<i class="fas fa-triangle-exclamation kbi-icon" aria-hidden="true"></i>' +
+      '<div class="kbi-copy">' +
+      '<div class="kbi-title">Open this page in Chrome or Safari</div>' +
+      '<div class="kbi-text">Messenger and Facebook block location access. ' +
+      'Use a real browser to share your live location.</div>' +
+      '</div>';
+    box.appendChild(head);
 
     var actions = document.createElement('div');
-    actions.className = 'd-flex flex-wrap gap-2 mt-2';
+    actions.className = 'kbi-actions';
 
     if (android) {
       var open = document.createElement('a');
@@ -233,7 +240,7 @@
 
     if (!android) {
       var hint = document.createElement('div');
-      hint.className = 'small mt-2';
+      hint.className = 'kbi-hint';
       hint.textContent = 'On iPhone: tap ••• at the top, then "Open in Safari".';
       box.appendChild(hint);
     }

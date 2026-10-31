@@ -328,6 +328,70 @@
   padding-right: 0;
 }
 
+/* ------------------------------------------- In-app browser (Messenger) help */
+
+.kabayani-inapp-help {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  background: #fff8e1;
+  border: 1px solid #f0d998;
+  border-radius: 0.7rem;
+}
+
+.kbi-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.kbi-icon {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+  color: #b7791f;
+  font-size: 1.05rem;
+}
+
+.kbi-copy { min-width: 0; }
+
+.kbi-title {
+  color: #7a5200;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.kbi-text {
+  margin-top: 0.15rem;
+  color: #7a5200;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.kbi-actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.kbi-actions .btn {
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.kbi-hint {
+  margin-top: 0.5rem;
+  color: #7a5200;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+@media (min-width: 576px) {
+  .kbi-actions {
+    grid-template-columns: auto auto;
+    justify-content: start;
+  }
+}
+
 /* ------------------------------------------------------------------ Mobile */
 
 @media (max-width: 575.98px) {
