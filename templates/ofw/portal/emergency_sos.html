@@ -56,7 +56,7 @@
   </div>
 
   <!-- Send Emergency Location Ping -->
-  <div class="card mb-3">
+  <div class="card mb-3" id="sendLocationCard">
     <div class="card-header">
       <h5 class="card-title mb-0"><i class="fas fa-location-crosshairs me-2"></i>Send Emergency Location</h5>
     </div>
@@ -327,6 +327,11 @@
         restoreButton();
       });
   });
+  var helpBox = KabayaniLocation.inAppHelpBox();
+  var sendCard = document.getElementById('sendLocationCard');
+  if (helpBox && sendCard && sendCard.parentNode) {
+    sendCard.parentNode.insertBefore(helpBox, sendCard);
+  }
 })();
 </script>
 <script>

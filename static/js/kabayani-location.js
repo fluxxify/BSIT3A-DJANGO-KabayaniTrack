@@ -151,6 +151,96 @@
     return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|Twitter|Snapchat|MicroMessenger|; wv\)/i.test(ua);
   }
 
+  function externalBrowserUrl() {
+    var url = window.location.href;
+    if (/Android/i.test(navigator.userAgent || '') && /^https?:/i.test(url)) {
+      var withoutScheme = url.replace(/^https?:\/\//, '');
+      return 'intent://' + withoutScheme +
+        '#Intent;scheme=https;package=com.android.chrome;' +
+        'S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+    }
+    return url;
+  }
+
+  function legacyCopy(text) {
+    try {
+      var field = document.createElement('textarea');
+      field.value = text;
+      field.setAttribute('readonly', 'readonly');
+      field.style.position = 'fixed';
+      field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.select();
+      var copied = document.execCommand('copy');
+      document.body.removeChild(field);
+      return copied;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function copyCurrentLink() {
+    var url = window.location.href;
+    if (navigator.clipboard && window.isSecureContext !== false) {
+      return navigator.clipboard.writeText(url)
+        .then(function () { return true; })
+        .catch(function () { return legacyCopy(url); });
+    }
+    return Promise.resolve(legacyCopy(url));
+  }
+
+  /**
+   * Build an "you are in an in-app browser" help box, or null when not needed.
+   * In-app browsers (Messenger, Facebook, Instagram) block geolocation and
+   * there is no web API to override that, so guide the user to a real browser.
+   */
+  function inAppHelpBox() {
+    if (!isInAppBrowser()) return null;
+
+    var android = /Android/i.test(navigator.userAgent || '');
+    var box = document.createElement('div');
+    box.className = 'alert alert-warning';
+    box.innerHTML =
+      '<div class="fw-bold mb-1"><i class="fas fa-triangle-exclamation me-1"></i>' +
+      'Opening this page inside Messenger/Facebook blocks location</div>' +
+      '<div class="small">Open it in Chrome or Safari to share your live location ' +
+      'and see the nearest safe places.</div>';
+
+    var actions = document.createElement('div');
+    actions.className = 'd-flex flex-wrap gap-2 mt-2';
+
+    if (android) {
+      var open = document.createElement('a');
+      open.className = 'btn btn-sm btn-primary';
+      open.href = externalBrowserUrl();
+      open.innerHTML = '<i class="fas fa-up-right-from-square me-1"></i>Open in Chrome';
+      actions.appendChild(open);
+    }
+
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'btn btn-sm btn-outline-secondary';
+    copy.innerHTML = '<i class="fas fa-copy me-1"></i>Copy link';
+    copy.addEventListener('click', function () {
+      copyCurrentLink().then(function (ok) {
+        copy.innerHTML = ok
+          ? '<i class="fas fa-check me-1"></i>Link copied'
+          : '<i class="fas fa-xmark me-1"></i>Copy failed';
+      });
+    });
+    actions.appendChild(copy);
+    box.appendChild(actions);
+
+    if (!android) {
+      var hint = document.createElement('div');
+      hint.className = 'small mt-2';
+      hint.textContent = 'On iPhone: tap the ••• menu at the top, then "Open in Safari".';
+      box.appendChild(hint);
+    }
+
+    return box;
+  }
+
   function permissionState() {
     if (!navigator.permissions || !navigator.permissions.query) {
       return Promise.resolve('unknown');
@@ -199,6 +289,9 @@
     describeError: describeError,
     permissionState: permissionState,
     isInAppBrowser: isInAppBrowser,
+    externalBrowserUrl: externalBrowserUrl,
+    copyCurrentLink: copyCurrentLink,
+    inAppHelpBox: inAppHelpBox,
     formatDistance: formatDistance
   };
 })(window);

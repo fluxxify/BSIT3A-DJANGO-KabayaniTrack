@@ -288,6 +288,14 @@
 <script src="{% static 'js/kabayani-location.js' %}"></script>
 <script>
 (function () {
+  if (window.KabayaniLocation) {
+    var helpBox = KabayaniLocation.inAppHelpBox();
+    var nearCard = document.getElementById('nearMeCard');
+    if (helpBox && nearCard && nearCard.parentNode) {
+      nearCard.parentNode.insertBefore(helpBox, nearCard);
+    }
+  }
+
   var mapEl = document.getElementById('safeLocationsMap');
   if (!mapEl) return;
 
