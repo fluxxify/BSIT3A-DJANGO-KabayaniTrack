@@ -32,32 +32,43 @@
 </div>
 {% endif %}
 
-<form method="GET" class="sp-filter mb-3">
-  <div class="input-group input-group-sm">
-    <span class="input-group-text"><i class="fas fa-search"></i></span>
-    <input type="text" name="country" value="{{ country_filter }}" class="form-control" placeholder="Filter by country">
-    <button type="submit" class="btn btn-outline-secondary">Filter</button>
+<div class="sp-tools mb-3">
+  <div class="sp-search">
+    <i class="fas fa-search" aria-hidden="true"></i>
+    <input type="search" id="safeSearch" class="form-control" placeholder="Search name or city" autocomplete="off">
+  </div>
+  {% if countries|length > 1 %}
+  <form method="GET" class="sp-country">
+    <select name="country" class="form-select" onchange="this.form.submit()" aria-label="Filter by country">
+      <option value="">All countries</option>
+      {% for country in countries %}
+      <option value="{{ country }}" {% if country|lower == country_filter|lower %}selected{% endif %}>{{ country }}</option>
+      {% endfor %}
+    </select>
     {% if country_filter %}
     <a href="{% url 'ofw:safe_locations' %}" class="btn btn-ghost-secondary">Clear</a>
     {% endif %}
-  </div>
-</form>
-
-{% if locations %}
-<!-- Map Section -->
-<div class="card mb-3">
-  <div class="card-header">
-    <h5 class="card-title mb-0"><i class="fas fa-map-marked-alt me-2"></i>Safe Locations Map</h5>
-  </div>
-  <div class="card-body p-0">
-    <div id="safeLocationsMap" class="sp-map"></div>
-  </div>
+  </form>
+  {% endif %}
 </div>
 
+<div class="sp-chips mb-3" role="group" aria-label="Filter by safe place type">
+  <button type="button" class="sp-chip is-active" data-type="all">All</button>
+  <button type="button" class="sp-chip" data-type="police_station">Police</button>
+  <button type="button" class="sp-chip" data-type="hospital">Hospital</button>
+  <button type="button" class="sp-chip" data-type="embassy">Embassy</button>
+  <button type="button" class="sp-chip" data-type="polo">POLO</button>
+  <button type="button" class="sp-chip" data-type="owwa">OWWA</button>
+  <button type="button" class="sp-chip" data-type="fire">Fire</button>
+</div>
+
+{% if locations %}
 <div class="row row-deck row-cards" id="locationsList">
   {% for loc in locations %}
   <div class="col-sm-6 col-lg-4 loc-card"
        data-id="{{ loc.pk }}"
+       data-type="{{ loc.location_type }}"
+       data-search="{{ loc.name|lower }} {{ loc.city|lower }} {{ loc.address|lower }} {{ loc.country|lower }}"
        data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
        data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
     <div class="card h-100 sp-card">
@@ -114,12 +125,27 @@
     </div>
   </div>
   {% endfor %}
+</div>
+<div class="text-center mt-3 d-none" id="locationsMoreWrap">
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="locationsMoreBtn">
+    Show all safe places
+  </button>
+</div>
+
+<div id="locationsEmpty" class="text-muted text-center py-4 d-none">
+  <i class="fas fa-circle-info fa-2x mb-2 text-muted"></i>
+  <p class="mb-0 small">No safe places match your search or filter.</p>
+</div>
+
+<!-- Map Section -->
+<div class="card mt-3">
+  <div class="card-header">
+    <h5 class="card-title mb-0"><i class="fas fa-map-marked-alt me-2"></i>Safe Locations Map</h5>
   </div>
-  <div class="text-center mt-3 d-none" id="locationsMoreWrap">
-    <button type="button" class="btn btn-sm btn-outline-secondary" id="locationsMoreBtn">
-      Show all safe places
-    </button>
+  <div class="card-body p-0">
+    <div id="safeLocationsMap" class="sp-map"></div>
   </div>
+</div>
 
   {% else %}
   <div class="text-muted text-center py-5">
@@ -405,49 +431,102 @@
       card.classList.remove('border-primary');
       list.appendChild(card);
     });
-    if (cards.length) {
-      var nearestCard = cards[0].querySelector('.sp-card');
-      if (nearestCard) nearestCard.classList.add('sp-nearest');
-    }
     applyLimit(cards);
+    highlightNearest(cards);
   }
 
   var moreWrap = document.getElementById('locationsMoreWrap');
   var moreBtn = document.getElementById('locationsMoreBtn');
+  var emptyEl = document.getElementById('locationsEmpty');
+  var searchEl = document.getElementById('safeSearch');
+  var chips = Array.prototype.slice.call(document.querySelectorAll('.sp-chip'));
+  var activeType = 'all';
   var showAllCards = false;
   var MAX_VISIBLE = 6;
 
+  function cardMatches(card) {
+    if (activeType !== 'all' && card.getAttribute('data-type') !== activeType) {
+      return false;
+    }
+    var query = searchEl ? searchEl.value.trim().toLowerCase() : '';
+    if (!query) return true;
+    return (card.getAttribute('data-search') || '').indexOf(query) !== -1;
+  }
+
   function applyLimit(cards) {
-    if (!cards.length) return;
-    cards.forEach(function (card, index) {
-      if (!showAllCards && index >= MAX_VISIBLE) {
+    if (!cards || !cards.length) {
+      if (emptyEl) emptyEl.classList.remove('d-none');
+      if (moreWrap) moreWrap.classList.add('d-none');
+      return;
+    }
+
+    var matched = 0;
+    cards.forEach(function (card) {
+      if (!cardMatches(card)) {
+        card.classList.add('d-none');
+        return;
+      }
+      matched += 1;
+      if (!showAllCards && matched > MAX_VISIBLE) {
         card.classList.add('d-none');
       } else {
         card.classList.remove('d-none');
       }
     });
+
     if (moreWrap) {
-      moreWrap.classList.toggle('d-none', showAllCards || cards.length <= MAX_VISIBLE);
+      moreWrap.classList.toggle('d-none', showAllCards || matched <= MAX_VISIBLE);
       if (moreBtn && !showAllCards) {
-        moreBtn.textContent = 'Show all ' + cards.length + ' safe places';
+        moreBtn.textContent = 'Show all ' + matched + ' safe places';
       }
     }
+    if (emptyEl) emptyEl.classList.toggle('d-none', matched > 0);
+  }
+
+  function highlightNearest(cards) {
+    cards.forEach(function (card) {
+      var inner = card.querySelector('.sp-card');
+      if (inner) inner.classList.remove('sp-nearest');
+    });
+    var firstVisible = cards.filter(function (card) {
+      return !card.classList.contains('d-none');
+    })[0];
+    if (firstVisible) {
+      var nearestCard = firstVisible.querySelector('.sp-card');
+      if (nearestCard) nearestCard.classList.add('sp-nearest');
+    }
+  }
+
+  function refreshFilters(resetLimit) {
+    if (resetLimit) showAllCards = false;
+    var list = document.getElementById('locationsList');
+    if (!list) return;
+    var cards = Array.prototype.slice.call(list.querySelectorAll('.loc-card'));
+    applyLimit(cards);
+    highlightNearest(cards);
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chips.forEach(function (other) { other.classList.remove('is-active'); });
+      chip.classList.add('is-active');
+      activeType = chip.getAttribute('data-type') || 'all';
+      refreshFilters(true);
+    });
+  });
+
+  if (searchEl) {
+    searchEl.addEventListener('input', function () { refreshFilters(true); });
   }
 
   if (moreBtn) {
     moreBtn.addEventListener('click', function () {
       showAllCards = true;
-      var list = document.getElementById('locationsList');
-      if (list) {
-        applyLimit(Array.prototype.slice.call(list.querySelectorAll('.loc-card')));
-      }
+      refreshFilters(false);
     });
   }
 
-  var initialCards = document.getElementById('locationsList');
-  if (initialCards) {
-    applyLimit(Array.prototype.slice.call(initialCards.querySelectorAll('.loc-card')));
-  }
+  refreshFilters(false);
 
   function reorderFromServer(nearest) {
     var list = document.getElementById('locationsList');
@@ -476,6 +555,7 @@
       var firstCard = byId[String(nearest[0].id)].querySelector('.sp-card');
       if (firstCard) firstCard.classList.add('sp-nearest');
     }
+    refreshFilters(false);
   }
 
   function loadContext(lat, lng) {

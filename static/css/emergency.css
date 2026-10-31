@@ -216,7 +216,69 @@
 .sp-status-ok { color: #2fb344; }
 .sp-status-warn { color: #b7791f; }
 
-.sp-filter { max-width: 380px; }
+.sp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sp-search {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.sp-search i {
+  position: absolute;
+  top: 50%;
+  left: 0.8rem;
+  transform: translateY(-50%);
+  color: #8a97a8;
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.sp-search .form-control { padding-left: 2.2rem; }
+
+.sp-country {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sp-country .form-select { min-width: 150px; }
+
+.sp-chips {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sp-chips::-webkit-scrollbar { display: none; }
+
+.sp-chip {
+  flex: 0 0 auto;
+  padding: 0.38rem 0.85rem;
+  background: #fff;
+  border: 1px solid #d7dfe9;
+  border-radius: 999px;
+  color: #4b5b70;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sp-chip:hover { border-color: #a9bcd4; }
+
+.sp-chip.is-active {
+  background: #206bc4;
+  border-color: #206bc4;
+  color: #fff;
+}
 
 .sp-map { height: 420px; width: 100%; }
 
@@ -408,7 +470,9 @@
 
   .sp-nearme-body { flex-direction: column; align-items: stretch; gap: 0.6rem; }
   .sp-nearme-body .btn { width: 100%; }
-  .sp-filter { max-width: none; }
+  .sp-tools { flex-direction: column; }
+  .sp-search { flex-basis: auto; }
+  .sp-country .form-select { width: 100%; }
   .sp-map { height: 280px; }
   .sp-card-actions .btn { font-size: 0.8rem; }
 }
