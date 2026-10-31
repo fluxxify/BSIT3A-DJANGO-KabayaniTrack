@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -20,6 +21,7 @@ from apps.ofw.models import (
     Concern,
     ConcernProof,
     EmergencyContact,
+    LocationTracker,
     MonitoringReport,
     Notification,
     OFWProfile,
@@ -1457,3 +1459,81 @@ class SeedSafeLocationsCommandTests(TestCase):
             country='Philippines', is_active=True
         ).count()
         self.assertEqual(first_count, second_count)
+
+class LocationContextApiTests(TestCase):
+    """The live guide asks the server where the OFW is and what is nearby."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='guideuser', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.user)
+        OFWProfile.objects.create(
+            user=self.user, first_name='Nena', last_name='Cruz',
+            country='Philippines', city_abroad='Manila',
+        )
+        self.staff = User.objects.create_user(
+            username='guidestaff', password='Passw0rd!23', is_staff=True
+        )
+        self.near = SafeLocation.objects.create(
+            name='Near Police Station',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='Philippines', city='Manila', phone='911',
+            latitude='14.582600', longitude='120.982200',
+        )
+        self.far = SafeLocation.objects.create(
+            name='Far Hospital',
+            location_type=SafeLocation.LocationType.HOSPITAL,
+            country='Philippines', city='Cebu City',
+            latitude='10.309600', longitude='123.893000',
+        )
+        self.client.force_login(self.user)
+
+    def test_context_sorts_safe_places_by_distance(self):
+        with mock.patch(
+            'apps.ofw.geo.reverse_geocode',
+            return_value={'label': 'Ermita, Manila, Philippines'},
+        ):
+            response = self.client.get(
+                reverse('ofw:location_context'),
+                {'lat': '14.5800', 'lng': '120.9800'},
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertEqual(data['you_are_here'], 'Ermita, Manila, Philippines')
+        self.assertEqual(data['nearest'][0]['name'], 'Near Police Station')
+        self.assertEqual(data['nearest'][1]['name'], 'Far Hospital')
+        first = data['nearest'][0]
+        self.assertIn('distance_text', first)
+        self.assertIn('direction', first)
+        self.assertIn('maps_url', first)
+        self.assertLess(first['distance_km'], 1)
+
+    def test_context_rejects_invalid_coordinates(self):
+        response = self.client.get(
+            reverse('ofw:location_context'), {'lat': 'abc', 'lng': '1'}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_context_requires_login(self):
+        self.client.logout()
+        response = self.client.get(
+            reverse('ofw:location_context'), {'lat': '14.58', 'lng': '120.98'}
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_emergency_ping_notification_mentions_nearest_place(self):
+        response = self.client.post(reverse('ofw:location_tracker_ping'), {
+            'latitude': '14.5800',
+            'longitude': '120.9800',
+            'accuracy': '12',
+            'is_emergency': '1',
+        })
+        self.assertEqual(response.status_code, 200)
+        ping = LocationTracker.objects.get(ofw__user=self.user)
+        self.assertEqual(ping.accuracy_meters, 12)
+        notification = Notification.objects.filter(recipient=self.staff).first()
+        self.assertIsNotNone(notification)
+        self.assertIn('Near Police Station', notification.message)
+        self.assertIn('Nearest safe place', notification.message)

@@ -65,6 +65,62 @@
     </div>
   </div>
 
+  <!-- Live emergency guidance (shown after the location is sent) -->
+  <div class="card mb-3 d-none border-danger" id="emergencyGuide">
+    <div class="card-header bg-danger">
+      <h5 class="card-title mb-0 text-white">
+        <i class="fas fa-headset me-2"></i>Emergency Guidance — stay with us
+      </h5>
+    </div>
+    <div class="card-body">
+      <div id="guideYouAreHere" class="alert alert-info py-2 small d-none"></div>
+
+      <div class="row g-3 align-items-center">
+        <div class="col-md-7">
+          <div class="text-muted small text-uppercase fw-bold">Nearest safe place</div>
+          <div id="guidePlaceName" class="h3 mb-1">Locating…</div>
+          <div id="guidePlaceMeta" class="text-muted small"></div>
+        </div>
+        <div class="col-md-5 text-md-end">
+          <div class="d-flex align-items-center justify-content-md-end gap-3">
+            <div id="guideCompass" class="guide-compass" aria-hidden="true">
+              <i class="fas fa-location-arrow"></i>
+            </div>
+            <div>
+              <div id="guideDistance" class="h2 mb-0 text-danger fw-bold">—</div>
+              <div id="guideDirection" class="text-muted small"></div>
+              <div id="guideEta" class="text-muted small"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ol class="mt-3 mb-0 small" id="guideSteps"></ol>
+
+      <div class="d-grid gap-2 d-sm-flex mt-3">
+        <a href="tel:911" class="btn btn-danger flex-grow-1">
+          <i class="fas fa-phone me-1"></i>Call 911
+        </a>
+        <a href="#" id="guideCallPlace" class="btn btn-success flex-grow-1 d-none">
+          <i class="fas fa-phone me-1"></i>Call safe place
+        </a>
+        <a href="#" id="guideOpenMaps" target="_blank" rel="noopener" class="btn btn-primary flex-grow-1">
+          <i class="fas fa-map-marker-alt me-1"></i>Directions
+        </a>
+        <button type="button" class="btn btn-outline-secondary" id="guideStop">
+          <i class="fas fa-stop me-1"></i>Stop guide
+        </button>
+      </div>
+
+      <div class="alert alert-warning mt-3 mb-0 py-2 small">
+        <i class="fas fa-tower-broadcast me-1"></i>
+        <strong>Management has been notified</strong> with your live location and
+        the nearest safe place. Keep this page open — the distance updates as you
+        move. If you can talk safely, call 911 or the safe place below.
+      </div>
+    </div>
+  </div>
+
   <!-- Safe Places Near You -->
   <div class="card">
     <div class="card-header d-flex flex-wrap align-items-center gap-2">
@@ -167,6 +223,20 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .guide-compass {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid #d63939;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d63939;
+    font-size: 1.5rem;
+  }
+  .guide-compass i { transition: transform 0.4s ease; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -196,15 +266,23 @@
             'X-CSRFToken': '{{ csrf_token }}',
             'Content-Type': 'application/x-www-form-urlencoded'
           },
-          body: 'latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lng) + '&is_emergency=1'
+          body: 'latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lng) +
+            '&accuracy=' + encodeURIComponent(Math.round(pos.coords.accuracy || 0)) +
+            '&is_emergency=1'
         })
           .then(function (resp) { return resp.json(); })
           .then(function (data) {
             if (data.status === 'ok') {
-              result.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Emergency location sent to management!</div>';
+              result.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Emergency location sent to management. Follow the guidance below.</div>';
               btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
               btn.classList.replace('btn-danger', 'btn-success');
-              setTimeout(function () { location.reload(); }, 1500);
+              if (window.KabayaniGuide) {
+                window.KabayaniGuide.start(
+                  parseFloat(lat), parseFloat(lng), pos.coords.accuracy || 0
+                );
+              }
+              var guide = document.getElementById('emergencyGuide');
+              if (guide) guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
               result.innerHTML = '<div class="alert alert-danger">Failed to send: ' + (data.error || 'unknown error') + '</div>';
               btn.disabled = false;
@@ -225,6 +303,202 @@
       { enableHighAccuracy: true, timeout: 10000 }
     );
   });
+})();
+</script>
+<script>
+window.KabayaniGuide = (function () {
+  var guideEl, hereEl, nameEl, metaEl, distEl, dirEl, etaEl, compassEl, stepsEl;
+  var callEl, mapsEl, stopEl;
+
+  var watchId = null;
+  var target = null;
+  var lastFetchAt = 0;
+  var lastFetchLat = null;
+  var lastFetchLng = null;
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function toRad(deg) { return deg * Math.PI / 180; }
+
+  function distanceKm(lat1, lng1, lat2, lng2) {
+    var dLat = toRad(lat2 - lat1);
+    var dLng = toRad(lng2 - lng1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function bearingDeg(lat1, lng1, lat2, lng2) {
+    var y = Math.sin(toRad(lng2 - lng1)) * Math.cos(toRad(lat2));
+    var x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+      Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lng2 - lng1));
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function direction(bearing) {
+    var points = ['north', 'north-east', 'east', 'south-east',
+      'south', 'south-west', 'west', 'north-west'];
+    return points[Math.round(bearing / 45) % 8];
+  }
+
+  function formatDistance(km) {
+    if (km < 1) return Math.max(10, Math.round(km * 1000 / 10) * 10) + ' m';
+    if (km < 10) return km.toFixed(1) + ' km';
+    return Math.round(km) + ' km';
+  }
+
+  function updateLive(lat, lng) {
+    if (!target) return;
+    var km = distanceKm(lat, lng, target.latitude, target.longitude);
+    var bearing = bearingDeg(lat, lng, target.latitude, target.longitude);
+    distEl.textContent = formatDistance(km);
+    dirEl.textContent = 'Head ' + direction(bearing);
+    etaEl.textContent = '≈ ' + Math.max(1, Math.round(km / 4.5 * 60)) + ' min walk';
+    if (compassEl) {
+      var arrow = compassEl.querySelector('i');
+      if (arrow) arrow.style.transform = 'rotate(' + bearing + 'deg)';
+    }
+  }
+
+  function renderContext(data) {
+    var nearest = data.nearest || [];
+
+    if (data.you_are_here) {
+      hereEl.innerHTML = '<i class="fas fa-location-dot me-1"></i><strong>You are at:</strong> ' +
+        esc(data.you_are_here);
+      hereEl.classList.remove('d-none');
+    }
+
+    if (!nearest.length) {
+      nameEl.textContent = 'No safe place registered near you';
+      metaEl.textContent = 'Call 911 and stay on the line.';
+      distEl.textContent = '—';
+      dirEl.textContent = '';
+      etaEl.textContent = '';
+      stepsEl.innerHTML = '<li>Call <a href="tel:911">911</a> and stay on the line.</li>' +
+        '<li>Move to a crowded, well-lit place if it is safe to do so.</li>' +
+        '<li>Management has your location and will contact you.</li>';
+      return;
+    }
+
+    target = nearest[0];
+
+    nameEl.textContent = target.name;
+    var meta = [target.type];
+    if (target.city) meta.push(target.city);
+    if (target.country) meta.push(target.country);
+    metaEl.textContent = meta.join(' · ') + (target.address ? ' · ' + target.address : '');
+
+    if (target.phone) {
+      callEl.href = 'tel:' + target.phone;
+      callEl.classList.remove('d-none');
+    } else {
+      callEl.classList.add('d-none');
+    }
+    mapsEl.href = target.maps_url || '#';
+
+    var steps = [];
+    if (data.you_are_here) {
+      steps.push('You are at <strong>' + esc(data.you_are_here) + '</strong>.');
+    } else {
+      steps.push('Your live GPS position is shared with management.');
+    }
+    steps.push('Walk <strong>' + esc(target.distance_text) + '</strong> ' +
+      esc(target.direction) + ' to <strong>' + esc(target.name) + '</strong>' +
+      (target.city ? ' (' + esc(target.city) + ')' : '') + '.');
+    steps.push('If the way is not safe, call <a href="tel:911">911</a> and stay on the line.');
+    if (nearest.length > 1) {
+      var alt = nearest[1];
+      steps.push('Other option: <strong>' + esc(alt.name) + '</strong> — ' +
+        esc(alt.distance_text) + ' ' + esc(alt.direction) + '.');
+    }
+    steps.push('Management has been notified and can see your location.');
+    stepsEl.innerHTML = steps.map(function (text) { return '<li>' + text + '</li>'; }).join('');
+
+    updateLive(data.latitude, data.longitude);
+  }
+
+  function loadContext(lat, lng) {
+    lastFetchAt = Date.now();
+    lastFetchLat = lat;
+    lastFetchLng = lng;
+    fetch('{% url "ofw:location_context" %}?lat=' + encodeURIComponent(lat) +
+          '&lng=' + encodeURIComponent(lng), { headers: { 'Accept': 'application/json' } })
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) {
+        if (data.status === 'ok') renderContext(data);
+        else nameEl.textContent = 'Unable to load nearby safe places';
+      })
+      .catch(function () {
+        nameEl.textContent = 'Unable to load nearby safe places';
+        metaEl.textContent = 'Call 911 and stay on the line.';
+      });
+  }
+
+  function maybeRefresh(lat, lng) {
+    var moved = (lastFetchLat === null) ||
+      distanceKm(lat, lng, lastFetchLat, lastFetchLng) > 0.3;
+    if (moved || Date.now() - lastFetchAt > 60000) {
+      loadContext(lat, lng);
+    }
+  }
+
+  function startWatch() {
+    if (watchId !== null || !navigator.geolocation) return;
+    watchId = navigator.geolocation.watchPosition(
+      function (pos) {
+        updateLive(pos.coords.latitude, pos.coords.longitude);
+        maybeRefresh(pos.coords.latitude, pos.coords.longitude);
+      },
+      function () { /* keep the last known distance */ },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+  }
+
+  function stopWatch() {
+    if (watchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+    watchId = null;
+  }
+
+  function start(lat, lng) {
+    guideEl.classList.remove('d-none');
+    nameEl.textContent = 'Locating the nearest safe place…';
+    metaEl.textContent = '';
+    stepsEl.innerHTML = '';
+    target = null;
+    loadContext(lat, lng);
+    startWatch();
+  }
+
+  function stop() {
+    stopWatch();
+    guideEl.classList.add('d-none');
+  }
+
+  guideEl = document.getElementById('emergencyGuide');
+  hereEl = document.getElementById('guideYouAreHere');
+  nameEl = document.getElementById('guidePlaceName');
+  metaEl = document.getElementById('guidePlaceMeta');
+  distEl = document.getElementById('guideDistance');
+  dirEl = document.getElementById('guideDirection');
+  etaEl = document.getElementById('guideEta');
+  compassEl = document.getElementById('guideCompass');
+  stepsEl = document.getElementById('guideSteps');
+  callEl = document.getElementById('guideCallPlace');
+  mapsEl = document.getElementById('guideOpenMaps');
+  stopEl = document.getElementById('guideStop');
+
+  if (stopEl) stopEl.addEventListener('click', stop);
+  window.addEventListener('pagehide', stopWatch);
+
+  return { start: start, stop: stop };
 })();
 </script>
 <script>

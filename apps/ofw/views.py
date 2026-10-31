@@ -40,7 +40,11 @@ from .models import (
     WelfareAssessment,
     WelfareStatus,
 )
-from .notifications import mark_concern_read_by_management, notify
+from .notifications import (
+    mark_concern_read_by_management,
+    notify,
+    notify_managers,
+)
 
 _welfare_badge = {
     'active': 'bg-success-lt text-success',
@@ -1105,23 +1109,42 @@ def location_tracker_ping(request):
     lat = request.POST.get('latitude', '').strip()
     lng = request.POST.get('longitude', '').strip()
     is_emergency = request.POST.get('is_emergency') == '1'
+    accuracy = request.POST.get('accuracy', '').strip()
 
     if not lat or not lng:
         return JsonResponse({'error': 'Latitude and longitude are required.'}, status=400)
+
+    try:
+        accuracy_value = int(float(accuracy)) if accuracy else None
+    except (TypeError, ValueError):
+        accuracy_value = None
+    if accuracy_value is not None and accuracy_value < 0:
+        accuracy_value = None
 
     ping = LocationTracker.objects.create(
         ofw=profile,
         latitude=lat,
         longitude=lng,
+        accuracy_meters=accuracy_value,
         is_emergency=is_emergency,
     )
 
     if is_emergency:
+        nearest = nearest_safe_places(lat, lng, limit=1)
+        hint = ''
+        if nearest:
+            place = nearest[0]
+            hint = (
+                f'Nearest safe place: {place["name"]} '
+                f'({place["distance_text"]} {place["direction"]}) in '
+                f'{place["city"] or place["country"]}. '
+            )
         notify_managers(
             title=f'Emergency location ping from {profile.full_name}',
             message=(
                 f'{profile.full_name} sent an emergency location ping. '
                 f'Latitude: {lat}, Longitude: {lng}. '
+                f'{hint}'
                 f'Guide them to the nearest safe place.'
             ),
             url=reverse('ofw:location_tracker'),
@@ -1131,6 +1154,103 @@ def location_tracker_ping(request):
         )
 
     return JsonResponse({'status': 'ok', 'id': ping.pk})
+
+
+def nearest_safe_places(lat, lng, limit=6, locations=None):
+    """Return active safe places sorted by distance from a coordinate.
+
+    Each row carries the prepared labels the templates and the live guide need,
+    so the heavy maths stays on the server.
+    """
+    from .geo import (
+        bearing_degrees,
+        compass_direction,
+        distance_km,
+        format_distance,
+        walking_minutes,
+    )
+
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        return []
+
+    if locations is None:
+        locations = SafeLocation.objects.filter(is_active=True)
+
+    rows = []
+    for place in locations:
+        if not place.has_coords:
+            continue
+        place_lat = float(place.latitude)
+        place_lng = float(place.longitude)
+        km = distance_km(lat, lng, place_lat, place_lng)
+        bearing = bearing_degrees(lat, lng, place_lat, place_lng)
+        rows.append({
+            'id': place.pk,
+            'name': place.name,
+            'type': place.get_location_type_display(),
+            'type_key': place.location_type,
+            'city': place.city,
+            'country': place.country,
+            'address': place.address,
+            'phone': place.phone,
+            'latitude': place_lat,
+            'longitude': place_lng,
+            'distance_km': round(km, 3),
+            'distance_text': format_distance(km),
+            'walking_minutes': walking_minutes(km),
+            'bearing': round(bearing, 1),
+            'direction': compass_direction(bearing),
+            'maps_url': (
+                'https://www.google.com/maps/dir/?api=1&destination='
+                f'{place_lat},{place_lng}'
+            ),
+        })
+
+    rows.sort(key=lambda row: row['distance_km'])
+    if limit:
+        rows = rows[:limit]
+    return rows
+
+
+@login_required(login_url='login')
+def location_context(request):
+    """Where am I, and which safe places are closest? (JSON for the portal)."""
+    from .geo import reverse_geocode
+
+    lat = request.GET.get('lat', '').strip()
+    lng = request.GET.get('lng', '').strip()
+
+    try:
+        lat_value = float(lat)
+        lng_value = float(lng)
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {'status': 'error', 'error': 'Valid lat and lng are required.'},
+            status=400,
+        )
+
+    if not (-90 <= lat_value <= 90) or not (-180 <= lng_value <= 180):
+        return JsonResponse(
+            {'status': 'error', 'error': 'Coordinates are out of range.'},
+            status=400,
+        )
+
+    here = reverse_geocode(lat_value, lng_value)
+    nearest = nearest_safe_places(lat_value, lng_value, limit=8)
+
+    return JsonResponse({
+        'status': 'ok',
+        'you_are_here': here.get('label') or '',
+        'city': here.get('city') or '',
+        'region': here.get('region') or '',
+        'country': here.get('country') or '',
+        'latitude': lat_value,
+        'longitude': lng_value,
+        'nearest': nearest,
+    })
 
 
 # ---------------------------------------------------------------------------

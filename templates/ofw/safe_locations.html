@@ -21,6 +21,7 @@
   <br>
 
   {% if near_me %}
+  <div id="youAreHere" class="alert alert-info d-none" role="status"></div>
   <div class="card mb-3 border-primary" id="nearMeCard">
     <div class="card-body d-flex flex-wrap align-items-center gap-3">
       <button type="button" class="btn btn-primary" id="useMyLocationBtn">
@@ -58,6 +59,7 @@
   <div class="row row-deck row-cards" id="locationsList">
     {% for loc in locations %}
     <div class="col-sm-6 col-lg-4 loc-card"
+         data-id="{{ loc.pk }}"
          data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
          data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
       <div class="card h-100">
@@ -385,6 +387,60 @@
     if (cards.length) cards[0].classList.add('border-primary');
   }
 
+  function reorderFromServer(nearest) {
+    var list = document.getElementById('locationsList');
+    if (!list) return;
+
+    var byId = {};
+    Array.prototype.forEach.call(list.querySelectorAll('.loc-card'), function (card) {
+      byId[card.getAttribute('data-id')] = card;
+      card.classList.remove('border-primary');
+    });
+
+    nearest.forEach(function (place) {
+      var card = byId[String(place.id)];
+      if (!card) return;
+      var badge = card.querySelector('.loc-distance');
+      if (badge) {
+        badge.textContent = place.distance_text + ' away · ≈' +
+          place.walking_minutes + ' min walk';
+        badge.classList.remove('d-none');
+      }
+      list.appendChild(card);
+    });
+
+    if (nearest.length && byId[String(nearest[0].id)]) {
+      byId[String(nearest[0].id)].classList.add('border-primary');
+    }
+  }
+
+  function loadContext(lat, lng) {
+    var banner = document.getElementById('youAreHere');
+    fetch('{% url "ofw:location_context" %}?lat=' + encodeURIComponent(lat) +
+          '&lng=' + encodeURIComponent(lng), {
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.status !== 'ok') return;
+        if (banner && data.you_are_here) {
+          banner.innerHTML = '<i class="fas fa-location-dot me-1"></i>' +
+            '<strong>You are at:</strong> ' + esc(data.you_are_here);
+          banner.classList.remove('d-none');
+        }
+        if (data.nearest && data.nearest.length) {
+          reorderFromServer(data.nearest);
+        }
+      })
+      .catch(function () {
+        if (banner && !banner.textContent) {
+          banner.innerHTML = '<i class="fas fa-location-dot me-1"></i>' +
+            '<strong>Your GPS position is active.</strong> Showing the closest registered safe places.';
+          banner.classList.remove('d-none');
+        }
+      });
+  }
+
   function showLocated(lat, lng, accuracy) {
     if (userMarker) map.removeLayer(userMarker);
     if (userCircle) map.removeLayer(userCircle);
@@ -411,6 +467,7 @@
     }
 
     sortCards(lat, lng);
+    loadContext(lat, lng);
     statusEl.className = 'text-success small flex-grow-1';
     statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Location on — nearest safe places are listed first.';
     btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Update Location';

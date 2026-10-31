@@ -102,6 +102,7 @@ urlpatterns = [
     # Location tracker
     path('location-tracker/', views.location_tracker_page, name='location_tracker'),
     path('location-tracker/ping/', views.location_tracker_ping, name='location_tracker_ping'),
+    path('location-context/', views.location_context, name='location_context'),
 
     # OFW emergency SOS (portal)
     path('portal/emergency-sos/', views.ofw_emergency_sos, name='portal_emergency_sos'),
