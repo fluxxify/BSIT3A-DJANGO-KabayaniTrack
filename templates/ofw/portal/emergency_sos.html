@@ -295,12 +295,12 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'css/emergency.css' %}" />
+<link rel="stylesheet" href="{% static 'css/emergency.css' %}?v=20261031a" />
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'js/kabayani-location.js' %}"></script>
+<script src="{% static 'js/kabayani-location.js' %}?v=20261031a"></script>
 <script>
 (function () {
   var btn = document.getElementById('sendLocationBtn');
