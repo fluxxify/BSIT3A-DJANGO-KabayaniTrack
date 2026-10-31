@@ -102,7 +102,7 @@
 
         <li class="nav-item">
           <span class="dh-nav-section">
-            Emergency Warning
+            OFW Emergency Response
           </span>
         </li>
         <li class="nav-item">
@@ -110,7 +110,7 @@
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-clock text-warning"></i>
             </span>
-            <span class="nav-link-title">Inactive OFWs</span>
+            <span class="nav-link-title">OFW Activity Warning</span>
           </a>
         </li>
         <li class="nav-item">
@@ -118,26 +118,10 @@
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-bell text-danger"></i>
             </span>
-            <span class="nav-link-title">OFW Welfare Alerts</span>
+            <span class="nav-link-title">Emergency SOS Calls</span>
             {% if unread_notifications_count %}
             <span class="badge bg-danger ms-auto">{{ unread_notifications_count }}</span>
             {% endif %}
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'police_reports' %}active{% endif %}" href="{% url 'ofw:police_reports' %}">
-            <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-exclamation-triangle text-danger"></i>
-            </span>
-            <span class="nav-link-title">OFW Escalations</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'safe_locations' %}active{% endif %}" href="{% url 'ofw:safe_locations' %}">
-            <span class="nav-link-icon d-md-none d-lg-inline-block">
-              <i class="nav-icon fas fa-shield-alt text-info"></i>
-            </span>
-            <span class="nav-link-title">OFW Safe Places</span>
           </a>
         </li>
         <li class="nav-item">
@@ -145,9 +129,26 @@
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-location-crosshairs text-primary"></i>
             </span>
-            <span class="nav-link-title">OFW Location Pings</span>
+            <span class="nav-link-title">Live GPS Map</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'safe_locations' %}active{% endif %}" href="{% url 'ofw:safe_locations' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-shield-alt text-info"></i>
+            </span>
+            <span class="nav-link-title">Safe Place Guide</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'police_reports' %}active{% endif %}" href="{% url 'ofw:police_reports' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-exclamation-triangle text-danger"></i>
+            </span>
+            <span class="nav-link-title">Police Escalation</span>
+          </a>
+        </li>
+
         {% if user.is_superuser %}
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.app_name == 'users' %}active{% endif %}" href="{% url 'users:user_list' %}">
