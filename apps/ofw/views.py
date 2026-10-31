@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -982,15 +982,20 @@ def police_report_submit(request, pk):
 
 @login_required(login_url='login')
 def safe_locations_page(request):
-    """List safe places near OFW deployment locations."""
-    if not (request.user.is_superuser or request.user.is_staff or request.user.is_authenticated):
-        return redirect('dashboard')
+    """List safe places near OFW deployment locations.
 
+    Management accounts see the console list (scoped to their agency).  OFWs
+    see every active safe place and the page sorts them by their live GPS
+    position, so turning on location shows the nearest ones first.
+    """
     from apps.users.agencies import agency_for_user
+    from .roles import is_ofw
+
+    near_me = is_ofw(request.user)
 
     locations = SafeLocation.objects.filter(is_active=True).order_by('country', 'city', 'name')
 
-    if not request.user.is_superuser:
+    if not near_me and not request.user.is_superuser:
         agency = agency_for_user(request.user)
         if agency is not None:
             # Only show safe locations in countries where this agency has OFWs.
@@ -1011,7 +1016,8 @@ def safe_locations_page(request):
         'locations': locations,
         'countries': countries,
         'country_filter': country_filter,
-        'page_title': 'Safe Locations',
+        'near_me': near_me,
+        'page_title': 'Safe Places Near Me' if near_me else 'Safe Locations',
         'page_pretitle': 'Emergency Safe Places',
     })
 
@@ -1143,15 +1149,32 @@ def ofw_emergency_sos(request):
     location_country = canonical_country(profile.country) if profile and profile.country else ''
     location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
 
-    # Safe locations near the OFW's country/city
-    safe_locations = SafeLocation.objects.filter(is_active=True)
-    if location_country:
-        safe_locations = safe_locations.filter(country__iexact=location_country)
-    if location_city:
-        safe_locations = safe_locations.filter(
-            Q(city__iexact=location_city) | Q(city='')
-        )
-    safe_locations = safe_locations.order_by('location_type', 'name')[:10]
+    # Safe locations near the OFW's country/city.  Fall back to the Philippines
+    # (then to every registered place) so the SOS page always has something
+    # useful to show while testing or before an agency registers local sites.
+    all_locations = list(
+        SafeLocation.objects.filter(is_active=True).order_by('location_type', 'name')
+    )
+    safe_locations = [
+        loc for loc in all_locations
+        if location_country and canonical_country(loc.country) == location_country
+    ] if location_country else all_locations
+
+    if location_city and safe_locations:
+        city_lower = location_city.strip().lower()
+        city_matches = [
+            loc for loc in safe_locations if (loc.city or '').strip().lower() == city_lower
+        ]
+        country_wide = [loc for loc in safe_locations if not (loc.city or '').strip()]
+        safe_locations = city_matches or country_wide or safe_locations
+
+    if not safe_locations:
+        safe_locations = [
+            loc for loc in all_locations
+            if canonical_country(loc.country) == 'Philippines'
+        ] or all_locations
+
+    safe_locations = safe_locations[:60]
 
     # Recent emergency location pings for this OFW
     recent_pings = LocationTracker.objects.filter(ofw=profile).order_by('-recorded_at')[:5]

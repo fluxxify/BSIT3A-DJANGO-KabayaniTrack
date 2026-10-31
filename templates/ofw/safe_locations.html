@@ -20,6 +20,19 @@
   </div>
   <br>
 
+  {% if near_me %}
+  <div class="card mb-3 border-primary" id="nearMeCard">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      <button type="button" class="btn btn-primary" id="useMyLocationBtn">
+        <i class="fas fa-location-crosshairs me-2"></i>Use My Location
+      </button>
+      <div id="nearMeStatus" class="text-muted small flex-grow-1">
+        Turn on your location to see the nearest safe places first.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="d-flex flex-wrap gap-2 mb-3">
     <form method="GET" class="d-flex align-items-center" style="max-width: 300px;">
       <span class="input-group-text"><i class="ti ti-search"></i></span>
@@ -42,9 +55,11 @@
     </div>
   </div>
 
-  <div class="row row-deck row-cards">
+  <div class="row row-deck row-cards" id="locationsList">
     {% for loc in locations %}
-    <div class="col-sm-6 col-lg-4">
+    <div class="col-sm-6 col-lg-4 loc-card"
+         data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
+         data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
       <div class="card h-100">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-2">
@@ -53,6 +68,7 @@
               {{ loc.get_location_type_display }}
             </span>
           </div>
+          <p class="text-primary small fw-medium mb-2 d-none loc-distance"></p>
           <p class="card-text text-muted small">
             <i class="fas fa-map-marker-alt me-1"></i>
             {{ loc.city }}, {{ loc.country }}
@@ -84,7 +100,7 @@
           </a>
           {% endif %}
           {% if loc.has_coords %}
-          <a href="https://www.google.com/maps/search/?api=1&query={{ loc.latitude }},{{ loc.longitude }}" target="_blank" class="btn btn-sm btn-primary flex-grow-1">
+          <a href="https://www.google.com/maps/dir/?api=1&destination={{ loc.latitude }},{{ loc.longitude }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
             <i class="fas fa-map-marker-alt"></i> Directions
           </a>
           {% endif %}
@@ -271,31 +287,186 @@
   var map = L.map('safeLocationsMap', { scrollWheelZoom: false });
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  var markers = [];
-  var first = true;
-  var centerLat = 15, centerLng = 105;
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
+  var places = [];
   {% for loc in locations %}
   {% if loc.has_coords %}
-  var marker{{ forloop.counter }} = L.marker([{{ loc.latitude }}, {{ loc.longitude }}]).addTo(map);
-  marker{{ forloop.counter }}.bindPopup('<b>{{ loc.name|escapejs }}</b><br>{{ loc.get_location_type_display }}<br>{{ loc.city|escapejs }}, {{ loc.country|escapejs }}{% if loc.address %}<br>{{ loc.address|escapejs }}{% endif %}{% if loc.phone %}<br>{{ loc.phone|escapejs }}{% endif %}');
-  markers.push(marker{{ forloop.counter }});
-  if (first) {
-    centerLat = {{ loc.latitude }};
-    centerLng = {{ loc.longitude }};
-    first = false;
-  }
+  places.push({
+    id: {{ loc.pk }},
+    lat: {{ loc.latitude }}, lng: {{ loc.longitude }},
+    name: "{{ loc.name|escapejs }}",
+    type: "{{ loc.get_location_type_display|escapejs }}",
+    city: "{{ loc.city|escapejs }}",
+    country: "{{ loc.country|escapejs }}",
+    address: "{{ loc.address|escapejs }}",
+    phone: "{{ loc.phone|escapejs }}"
+  });
   {% endif %}
   {% endfor %}
 
+  var markers = [];
+  places.forEach(function (place) {
+    var marker = L.marker([place.lat, place.lng]).addTo(map);
+    var html = '<b>' + esc(place.name) + '</b><br>' + esc(place.type) +
+      '<br>' + esc(place.city) + ', ' + esc(place.country);
+    if (place.address) html += '<br>' + esc(place.address);
+    if (place.phone) html += '<br>' + esc(place.phone);
+    marker.bindPopup(html);
+    place.marker = marker;
+    markers.push(marker);
+  });
+
   if (markers.length) {
-    var group = L.featureGroup(markers);
-    map.fitBounds(group.getBounds().pad(0.15));
+    map.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
   } else {
-    map.setView([centerLat, centerLng], 3);
+    map.setView([12.8797, 121.7740], 6);
+  }
+
+  var btn = document.getElementById('useMyLocationBtn');
+  var statusEl = document.getElementById('nearMeStatus');
+  if (!btn || !statusEl) return;
+
+  var userMarker = null;
+  var userCircle = null;
+
+  function distanceKm(lat1, lng1, lat2, lng2) {
+    var toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad;
+    var dLng = (lng2 - lng1) * toRad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function formatDistance(km) {
+    if (km < 1) return Math.max(10, Math.round(km * 1000 / 10) * 10) + ' m';
+    if (km < 10) return km.toFixed(1) + ' km';
+    return Math.round(km) + ' km';
+  }
+
+  function sortCards(lat, lng) {
+    var list = document.getElementById('locationsList');
+    if (!list) return;
+    var cards = Array.prototype.slice.call(list.querySelectorAll('.loc-card'));
+    cards.forEach(function (card) {
+      var cLat = parseFloat(card.getAttribute('data-lat'));
+      var cLng = parseFloat(card.getAttribute('data-lng'));
+      var badge = card.querySelector('.loc-distance');
+      if (isNaN(cLat) || isNaN(cLng)) {
+        card.setAttribute('data-distance', '999999');
+        if (badge) badge.classList.add('d-none');
+        return;
+      }
+      var km = distanceKm(lat, lng, cLat, cLng);
+      card.setAttribute('data-distance', km);
+      if (badge) {
+        badge.textContent = formatDistance(km) + ' away';
+        badge.classList.remove('d-none');
+      }
+    });
+    cards.sort(function (a, b) {
+      return parseFloat(a.getAttribute('data-distance')) -
+        parseFloat(b.getAttribute('data-distance'));
+    });
+    cards.forEach(function (card) {
+      card.classList.remove('border-primary');
+      list.appendChild(card);
+    });
+    if (cards.length) cards[0].classList.add('border-primary');
+  }
+
+  function showLocated(lat, lng, accuracy) {
+    if (userMarker) map.removeLayer(userMarker);
+    if (userCircle) map.removeLayer(userCircle);
+
+    userMarker = L.marker([lat, lng], { zIndexOffset: 1000 }).addTo(map);
+    userMarker.bindPopup('<b>You are here</b>');
+    if (accuracy) {
+      userCircle = L.circle([lat, lng], {
+        radius: Math.min(accuracy, 5000),
+        color: '#206bc4', fillColor: '#206bc4', fillOpacity: 0.12, weight: 1
+      }).addTo(map);
+    }
+
+    var nearest = places.slice().sort(function (a, b) {
+      return distanceKm(lat, lng, a.lat, a.lng) - distanceKm(lat, lng, b.lat, b.lng);
+    }).slice(0, 5);
+
+    var bounds = [[lat, lng]];
+    nearest.forEach(function (place) { bounds.push([place.lat, place.lng]); });
+    if (bounds.length > 1) {
+      map.fitBounds(L.latLngBounds(bounds).pad(0.2), { maxZoom: 15 });
+    } else {
+      map.setView([lat, lng], 14);
+    }
+
+    sortCards(lat, lng);
+    statusEl.className = 'text-success small flex-grow-1';
+    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Location on — nearest safe places are listed first.';
+    btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Update Location';
+    btn.disabled = false;
+  }
+
+  function showError(message) {
+    statusEl.className = 'text-warning small flex-grow-1';
+    statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' + esc(message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Use My Location';
+  }
+
+  function locate() {
+    if (!navigator.geolocation) {
+      showError('This browser does not support location. Open the site on your phone or a modern browser.');
+      return;
+    }
+    if (window.isSecureContext === false) {
+      showError('Location needs HTTPS or localhost. Open the live site (https://) or http://127.0.0.1:8000 on this laptop.');
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Locating...';
+    statusEl.className = 'text-muted small flex-grow-1';
+    statusEl.textContent = 'Getting your GPS position...';
+
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        showLocated(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      },
+      function (err) {
+        var message = 'Unable to get your location.';
+        if (err && err.code === 1) {
+          message = 'Location permission denied. Allow location access in your browser settings, then try again.';
+        } else if (err && err.code === 2) {
+          message = 'Your location is unavailable. Turn on GPS / Location and try again.';
+        } else if (err && err.code === 3) {
+          message = 'Getting your location timed out. Try again.';
+        }
+        showError(message);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+    );
+  }
+
+  btn.addEventListener('click', locate);
+
+  // Try automatically once, so turning location on is enough (like Maps).
+  if (window.isSecureContext !== false) {
+    window.setTimeout(function () {
+      if (!btn.disabled) locate();
+    }, 600);
+  } else {
+    statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
+      'Location needs HTTPS or localhost. Use the live site or <code>http://127.0.0.1:8000</code>.';
   }
 })();
 </script>

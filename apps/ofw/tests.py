@@ -23,6 +23,7 @@ from apps.ofw.models import (
     MonitoringReport,
     Notification,
     OFWProfile,
+    SafeLocation,
 )
 from apps.ofw.roles import mark_as_ofw
 
@@ -1375,3 +1376,84 @@ class NotificationTests(TestCase):
                 recipient=self.ofw_user, title='Your concern has been read'
             ).exists()
         )
+
+class SafeLocationNearbyTests(TestCase):
+    """Safe places are location-aware for OFWs and fall back to PH data."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='safespot', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.user)
+        self.profile = OFWProfile.objects.create(
+            user=self.user, first_name='Mila', last_name='Reyes',
+            country='Saudi Arabia', city_abroad='Riyadh',
+        )
+        self.ph_location = SafeLocation.objects.create(
+            name='Philippine General Hospital',
+            location_type=SafeLocation.LocationType.HOSPITAL,
+            country='Philippines', city='Manila',
+            address='Taft Avenue', phone='',
+            latitude='14.578600', longitude='120.985700',
+        )
+        self.client.force_login(self.user)
+
+    def test_ofw_sees_near_me_page_with_all_active_locations(self):
+        response = self.client.get(reverse('ofw:safe_locations'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Safe Places Near Me')
+        self.assertContains(response, 'id="useMyLocationBtn"')
+        self.assertContains(response, 'class="col-sm-6 col-lg-4 loc-card"')
+        self.assertContains(response, 'Philippine General Hospital')
+        self.assertNotContains(response, 'Add Safe Location')
+
+    def test_near_me_page_hides_inactive_locations(self):
+        SafeLocation.objects.create(
+            name='Closed Police Post',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='Philippines', is_active=False,
+        )
+        response = self.client.get(reverse('ofw:safe_locations'))
+        self.assertNotContains(response, 'Closed Police Post')
+
+    def test_emergency_sos_falls_back_to_philippines(self):
+        response = self.client.get(reverse('ofw:portal_emergency_sos'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Philippine General Hospital')
+        self.assertContains(response, 'id="nearbyLocateBtn"')
+        self.assertContains(response, 'id="nearbyMap"')
+
+    def test_emergency_sos_prefers_profile_country(self):
+        SafeLocation.objects.create(
+            name='Riyadh Central Police Station',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='Saudi Arabia', city='Riyadh',
+            latitude='24.713600', longitude='46.675300',
+        )
+        response = self.client.get(reverse('ofw:portal_emergency_sos'))
+        self.assertContains(response, 'Riyadh Central Police Station')
+        self.assertNotContains(response, 'Philippine General Hospital')
+
+
+class SeedSafeLocationsCommandTests(TestCase):
+    def test_command_seeds_philippine_locations_idempotently(self):
+        from django.core.management import call_command
+
+        call_command('seed_safe_locations', verbosity=0)
+        first_count = SafeLocation.objects.filter(
+            country='Philippines', is_active=True
+        ).count()
+        self.assertGreaterEqual(first_count, 30)
+        self.assertTrue(
+            SafeLocation.objects.filter(
+                name='Philippine General Hospital',
+                latitude__isnull=False,
+                longitude__isnull=False,
+            ).exists()
+        )
+
+        call_command('seed_safe_locations', verbosity=0)
+        second_count = SafeLocation.objects.filter(
+            country='Philippines', is_active=True
+        ).count()
+        self.assertEqual(first_count, second_count)
