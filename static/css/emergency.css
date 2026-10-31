@@ -1,0 +1,150 @@
+/* Shared emergency UI styles (Safe Places Near Me + Emergency SOS). */
+
+.eg-card {
+  border: 2px solid #d63939;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(214, 57, 57, 0.16);
+}
+
+.eg-header {
+  background: #d63939;
+  color: #fff;
+  padding: 0.9rem 1.1rem;
+}
+
+.eg-body { padding: 1.1rem; }
+
+.eg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #eaf1fb;
+  color: #1b4b91;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.eg-place {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.eg-dist {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #d63939;
+  line-height: 1;
+}
+
+.eg-arrow {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 50%;
+  background: #fdecec;
+  color: #d63939;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.eg-arrow i { transition: transform 0.4s ease; }
+
+.eg-steps {
+  counter-reset: eg;
+  list-style: none;
+  padding-left: 0;
+  margin: 1.1rem 0 0;
+}
+
+.eg-steps li {
+  counter-increment: eg;
+  position: relative;
+  padding-left: 2.3rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.93rem;
+  line-height: 1.45;
+}
+
+.eg-steps li::before {
+  content: counter(eg);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  background: #d63939;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eg-actions .btn {
+  min-height: 46px;
+  font-weight: 600;
+}
+
+.eg-note {
+  background: #fff8e1;
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Safe places page */
+
+.sp-here {
+  background: #eaf1fb;
+  color: #1b4b91;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.sp-nearme {
+  background: linear-gradient(135deg, #f5f9ff, #eef4ff);
+  border-color: #c9dcff;
+}
+
+.sp-card {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.sp-card:hover {
+  box-shadow: 0 8px 22px rgba(13, 45, 92, 0.1);
+}
+
+.sp-card.sp-nearest {
+  border-color: #d63939 !important;
+  box-shadow: 0 0 0 1px rgba(214, 57, 57, 0.25);
+}
+
+.sp-distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #eaf1fb;
+  color: #1b4b91;
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+@media (max-width: 575.98px) {
+  .eg-place { font-size: 1.15rem; }
+  .eg-dist { font-size: 1.8rem; }
+  .eg-arrow { width: 56px; height: 56px; flex-basis: 56px; font-size: 1.2rem; }
+  .eg-body { padding: 0.9rem; }
+}

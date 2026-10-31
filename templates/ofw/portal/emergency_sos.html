@@ -9,6 +9,11 @@
           <div class="page-pretitle">Emergency SOS</div>
           <h2 class="page-title mb-0">Emergency Assistance</h2>
         </div>
+        <div class="col-auto">
+          <a href="tel:911" class="btn btn-danger">
+            <i class="fas fa-phone me-2"></i>Call 911
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -56,7 +61,7 @@
       <h5 class="card-title mb-0"><i class="fas fa-location-crosshairs me-2"></i>Send Emergency Location</h5>
     </div>
     <div class="card-body">
-      <p class="text-muted small">Share your current GPS location with management so they can guide you to safety.</p>
+      <p class="text-muted small">We will detect where you are, send it to management, and show the nearest safe place with directions.</p>
       <div class="d-grid gap-2">
         <button type="button" class="btn btn-danger btn-lg" id="sendLocationBtn">
           <i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)
@@ -67,28 +72,30 @@
   </div>
 
   <!-- Live emergency guidance (shown after the location is sent) -->
-  <div class="card mb-3 d-none border-danger" id="emergencyGuide">
-    <div class="card-header bg-danger">
-      <h5 class="card-title mb-0 text-white">
-        <i class="fas fa-headset me-2"></i>Emergency Guidance — stay with us
-      </h5>
+  <div class="card eg-card mb-3 d-none" id="emergencyGuide">
+    <div class="eg-header d-flex align-items-center gap-2">
+      <i class="fas fa-headset fa-lg"></i>
+      <div>
+        <div class="fw-bold">Emergency Guidance</div>
+        <div class="small opacity-75">Stay on this page — the distance updates as you move</div>
+      </div>
     </div>
-    <div class="card-body">
-      <div id="guideYouAreHere" class="alert alert-info py-2 small d-none"></div>
+    <div class="eg-body">
+      <div id="guideYouAreHere" class="eg-pill d-none mb-3"></div>
 
       <div class="row g-3 align-items-center">
         <div class="col-md-7">
-          <div class="text-muted small text-uppercase fw-bold">Nearest safe place</div>
-          <div id="guidePlaceName" class="h3 mb-1">Locating…</div>
-          <div id="guidePlaceMeta" class="text-muted small"></div>
+          <div class="text-muted small text-uppercase fw-bold mb-1">Nearest safe place</div>
+          <div id="guidePlaceName" class="eg-place">Locating…</div>
+          <div id="guidePlaceMeta" class="text-muted small mt-1"></div>
         </div>
-        <div class="col-md-5 text-md-end">
+        <div class="col-md-5">
           <div class="d-flex align-items-center justify-content-md-end gap-3">
-            <div id="guideCompass" class="guide-compass" aria-hidden="true">
+            <div id="guideCompass" class="eg-arrow" aria-hidden="true">
               <i class="fas fa-location-arrow"></i>
             </div>
-            <div>
-              <div id="guideDistance" class="h2 mb-0 text-danger fw-bold">—</div>
+            <div class="text-md-end">
+              <div id="guideDistance" class="eg-dist">—</div>
               <div id="guideDirection" class="text-muted small"></div>
               <div id="guideEta" class="text-muted small"></div>
             </div>
@@ -96,9 +103,9 @@
         </div>
       </div>
 
-      <ol class="mt-3 mb-0 small" id="guideSteps"></ol>
+      <ol class="eg-steps" id="guideSteps"></ol>
 
-      <div class="d-grid gap-2 d-sm-flex mt-3">
+      <div class="eg-actions d-grid gap-2 d-sm-flex mt-3">
         <a href="tel:911" class="btn btn-danger flex-grow-1">
           <i class="fas fa-phone me-1"></i>Call 911
         </a>
@@ -113,11 +120,11 @@
         </button>
       </div>
 
-      <div class="alert alert-warning mt-3 mb-0 py-2 small">
+      <div class="eg-note mt-3">
         <i class="fas fa-tower-broadcast me-1"></i>
         <strong>Management has been notified</strong> with your live location and
-        the nearest safe place. Keep this page open — the distance updates as you
-        move. If you can talk safely, call 911 or the safe place below.
+        the nearest safe place. Keep this page open. If you can talk safely,
+        call 911 or the safe place above.
       </div>
     </div>
   </div>
@@ -143,7 +150,7 @@
         <div class="col-sm-6 col-lg-4 nearby-card"
              data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
              data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
-          <div class="card h-100">
+          <div class="card h-100 sp-card">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start mb-2">
                 <h6 class="card-title mb-0">{{ loc.name }}</h6>
@@ -151,7 +158,7 @@
                   {{ loc.get_location_type_display }}
                 </span>
               </div>
-              <p class="text-primary small fw-medium mb-2 d-none nearby-distance"></p>
+              <div class="sp-distance d-none nearby-distance mb-2"></div>
               <p class="card-text text-muted small">
                 {% if loc.city %}{{ loc.city }}, {% endif %}{{ loc.country }}
                 {% if loc.address %}<br>{{ loc.address }}{% endif %}
@@ -224,20 +231,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  .guide-compass {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    border: 2px solid #d63939;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #d63939;
-    font-size: 1.5rem;
-  }
-  .guide-compass i { transition: transform 0.4s ease; }
-</style>
+<link rel="stylesheet" href="{% static 'css/emergency.css' %}" />
 {% endblock %}
 
 {% block extra_js %}
@@ -609,10 +603,15 @@ window.KabayaniGuide = (function () {
         parseFloat(b.getAttribute('data-distance'));
     });
     cards.forEach(function (card) {
+      var inner = card.querySelector('.sp-card');
+      if (inner) inner.classList.remove('sp-nearest');
       card.classList.remove('border-danger');
       list.appendChild(card);
     });
-    if (cards.length) cards[0].classList.add('border-danger');
+    if (cards.length) {
+      var nearestCard = cards[0].querySelector('.sp-card');
+      if (nearestCard) nearestCard.classList.add('sp-nearest');
+    }
     return cards;
   }
 

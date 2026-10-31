@@ -22,8 +22,8 @@
   <br>
 
   {% if near_me %}
-  <div id="youAreHere" class="alert alert-info d-none" role="status"></div>
-  <div class="card mb-3 border-primary" id="nearMeCard">
+  <div id="youAreHere" class="sp-here d-none mb-3" role="status"></div>
+  <div class="card sp-nearme mb-3" id="nearMeCard">
     <div class="card-body d-flex flex-wrap align-items-center gap-3">
       <button type="button" class="btn btn-primary" id="useMyLocationBtn">
         <i class="fas fa-location-crosshairs me-2"></i>Use My Location
@@ -63,7 +63,7 @@
          data-id="{{ loc.pk }}"
          data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
          data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
-      <div class="card h-100">
+      <div class="card h-100 sp-card">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <h5 class="card-title mb-0">{{ loc.name }}</h5>
@@ -71,7 +71,7 @@
               {{ loc.get_location_type_display }}
             </span>
           </div>
-          <p class="text-primary small fw-medium mb-2 d-none loc-distance"></p>
+          <div class="sp-distance d-none loc-distance mb-2"></div>
           <p class="card-text text-muted small">
             <i class="fas fa-map-marker-alt me-1"></i>
             {{ loc.city }}, {{ loc.country }}
@@ -116,9 +116,11 @@
   {% else %}
   <div class="text-muted text-center py-5">
     <i class="fas fa-map-marker-alt fa-3x mb-3 text-muted"></i>
-    <p>No safe locations found.</p>
+    <p>No safe places found yet.</p>
     {% if user.is_superuser or user.is_staff %}
     <p class="text-muted small">Add police stations, hospitals, or embassies near OFW deployment locations.</p>
+    {% else %}
+    <p class="text-muted small">Ask your agency to add police stations, hospitals, or embassies near your work location.</p>
     {% endif %}
   </div>
   {% endif %}
@@ -137,7 +139,7 @@
             {% csrf_token %}
             <div class="mb-3">
               <label class="form-label">Name <span class="text-danger">*</span></label>
-              <input type="text" name="name" class="form-control" placeholder="e.g. Riyadh Central Police Station" required>
+              <input type="text" name="name" class="form-control" placeholder="e.g. Manila Police District Headquarters" required>
             </div>
             <div class="mb-3">
               <label class="form-label">Type <span class="text-danger">*</span></label>
@@ -153,11 +155,11 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Country <span class="text-danger">*</span></label>
-              <input type="text" name="country" class="form-control" placeholder="e.g. Saudi Arabia" required>
+              <input type="text" name="country" class="form-control" placeholder="e.g. Philippines" required>
             </div>
             <div class="mb-3">
               <label class="form-label">City</label>
-              <input type="text" name="city" class="form-control" placeholder="e.g. Riyadh">
+              <input type="text" name="city" class="form-control" placeholder="e.g. Manila">
             </div>
             <div class="mb-3">
               <label class="form-label">Address</label>
@@ -165,19 +167,19 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Phone</label>
-              <input type="text" name="phone" class="form-control" placeholder="+966 11 000 0000">
+              <input type="text" name="phone" class="form-control" placeholder="+63 2 8527 0000">
             </div>
             <div class="row g-2">
               <div class="col-6">
                 <div class="mb-3">
                   <label class="form-label">Latitude</label>
-                  <input type="text" name="latitude" class="form-control" placeholder="24.7136">
+                  <input type="text" name="latitude" class="form-control" placeholder="14.5995">
                 </div>
               </div>
               <div class="col-6">
                 <div class="mb-3">
                   <label class="form-label">Longitude</label>
-                  <input type="text" name="longitude" class="form-control" placeholder="46.6753">
+                  <input type="text" name="longitude" class="form-control" placeholder="120.9842">
                 </div>
               </div>
             </div>
@@ -274,6 +276,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="{% static 'css/emergency.css' %}" />
 <style>
   #safeLocationsMap { height: 420px; width: 100%; border-radius: 0.5rem; }
   #locationTrackerMap { height: 420px; width: 100%; border-radius: 0.5rem; }
@@ -383,10 +386,15 @@
         parseFloat(b.getAttribute('data-distance'));
     });
     cards.forEach(function (card) {
+      var inner = card.querySelector('.sp-card');
+      if (inner) inner.classList.remove('sp-nearest');
       card.classList.remove('border-primary');
       list.appendChild(card);
     });
-    if (cards.length) cards[0].classList.add('border-primary');
+    if (cards.length) {
+      var nearestCard = cards[0].querySelector('.sp-card');
+      if (nearestCard) nearestCard.classList.add('sp-nearest');
+    }
   }
 
   function reorderFromServer(nearest) {
@@ -396,7 +404,8 @@
     var byId = {};
     Array.prototype.forEach.call(list.querySelectorAll('.loc-card'), function (card) {
       byId[card.getAttribute('data-id')] = card;
-      card.classList.remove('border-primary');
+      var inner = card.querySelector('.sp-card');
+      if (inner) inner.classList.remove('sp-nearest');
     });
 
     nearest.forEach(function (place) {
@@ -404,7 +413,7 @@
       if (!card) return;
       var badge = card.querySelector('.loc-distance');
       if (badge) {
-        badge.textContent = place.distance_text + ' away · ≈' +
+        badge.textContent = place.distance_text + ' away Â· â‰ˆ' +
           place.walking_minutes + ' min walk';
         badge.classList.remove('d-none');
       }
@@ -412,7 +421,8 @@
     });
 
     if (nearest.length && byId[String(nearest[0].id)]) {
-      byId[String(nearest[0].id)].classList.add('border-primary');
+      var firstCard = byId[String(nearest[0].id)].querySelector('.sp-card');
+      if (firstCard) firstCard.classList.add('sp-nearest');
     }
   }
 
@@ -471,7 +481,7 @@
     sortCards(lat, lng);
     loadContext(lat, lng);
     statusEl.className = 'text-success small flex-grow-1';
-    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Location on — nearest safe places are listed first.';
+    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Location on â€” nearest safe places are listed first.';
     btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Update Location';
     btn.disabled = false;
   }
