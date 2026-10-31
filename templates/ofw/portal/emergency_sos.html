@@ -306,6 +306,30 @@
       .catch(function (err) {
         result.innerHTML = '<div class="alert alert-danger">' +
           KabayaniLocation.describeError(err) + '</div>';
+
+        if (err && err.code === 1) {
+          var approxBtn = document.createElement('button');
+          approxBtn.type = 'button';
+          approxBtn.className = 'btn btn-outline-danger w-100';
+          approxBtn.innerHTML = '<i class="fas fa-satellite-dish me-2"></i>Use approximate location instead';
+          approxBtn.addEventListener('click', function () {
+            approxBtn.disabled = true;
+            approxBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting approximate location...';
+            KabayaniLocation.getApproximate()
+              .then(function (loc) {
+                result.innerHTML = '';
+                return sendPing(loc);
+              })
+              .catch(function () {
+                result.innerHTML = '<div class="alert alert-danger">' +
+                  'Unable to get an approximate location. Please check your internet connection, ' +
+                  'then allow location access and try again.</div>';
+                restoreButton();
+              });
+          });
+          result.appendChild(approxBtn);
+        }
+
         restoreButton();
       });
   });

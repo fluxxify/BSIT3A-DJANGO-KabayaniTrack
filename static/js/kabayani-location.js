@@ -146,13 +146,34 @@
     return tryAttempt(0);
   }
 
+  function isInAppBrowser() {
+    var ua = navigator.userAgent || '';
+    return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|Twitter|Snapchat|MicroMessenger|; wv\)/i.test(ua);
+  }
+
+  function permissionState() {
+    if (!navigator.permissions || !navigator.permissions.query) {
+      return Promise.resolve('unknown');
+    }
+    return navigator.permissions
+      .query({ name: 'geolocation' })
+      .then(function (status) { return status.state; })
+      .catch(function () { return 'unknown'; });
+  }
+
   function describeError(error, usedApproximate) {
     if (usedApproximate) {
       return 'Using an approximate location from your internet connection.';
     }
     if (!error) return 'Unable to get your location. Please try again.';
     if (error.code === 1) {
-      return 'Location permission denied. Allow location access for this site in your browser settings, then try again.';
+      if (isInAppBrowser()) {
+        return 'Location is blocked because this page was opened inside another app ' +
+          '(Facebook, Messenger, Instagram, etc.). Copy the link and open it in Chrome or Safari, then try again.';
+      }
+      return 'Location permission is blocked for this site. Tap the lock or information ' +
+        'icon next to the web address, choose Permissions, set Location to Allow, then ' +
+        'reload this page and tap the button again.';
     }
     if (error.code === 2) {
       return 'Location unavailable. Turn on your device location / GPS and try again.';
@@ -174,7 +195,10 @@
 
   global.KabayaniLocation = {
     getPosition: getPosition,
+    getApproximate: ipLocate,
     describeError: describeError,
+    permissionState: permissionState,
+    isInAppBrowser: isInAppBrowser,
     formatDistance: formatDistance
   };
 })(window);
