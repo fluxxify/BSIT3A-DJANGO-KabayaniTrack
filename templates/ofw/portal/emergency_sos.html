@@ -1,4 +1,5 @@
 {% extends "theme/base.html" %}
+{% load static %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -241,67 +242,72 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/kabayani-location.js' %}"></script>
 <script>
 (function () {
   var btn = document.getElementById('sendLocationBtn');
   var result = document.getElementById('locationResult');
   if (!btn) return;
 
+  function restoreButton() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
+  }
+
+  function sendPing(loc) {
+    var lat = loc.lat.toFixed(6);
+    var lng = loc.lng.toFixed(6);
+    var accText = loc.accuracy ? Math.round(loc.accuracy) + ' m' : 'unknown';
+    var note = loc.source === 'ip'
+      ? '<br><span class="small">Approximate location from your internet connection — turn on GPS for exact tracking.</span>'
+      : '';
+    result.innerHTML = '<div class="alert alert-success">Location captured: ' + lat + ', ' + lng +
+      ' (accuracy: ' + accText + '). Sending...' + note + '</div>';
+
+    return fetch('{% url "ofw:location_tracker_ping" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lng) +
+        '&accuracy=' + encodeURIComponent(Math.round(loc.accuracy || 0)) +
+        '&is_emergency=1'
+    })
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) {
+        if (data.status === 'ok') {
+          result.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Emergency location sent to management. Follow the guidance below.</div>';
+          btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
+          btn.classList.replace('btn-danger', 'btn-success');
+          if (window.KabayaniGuide) {
+            window.KabayaniGuide.start(loc.lat, loc.lng);
+          }
+          var guide = document.getElementById('emergencyGuide');
+          if (guide) guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          result.innerHTML = '<div class="alert alert-danger">Failed to send: ' + (data.error || 'unknown error') + '</div>';
+          restoreButton();
+        }
+      })
+      .catch(function (err) {
+        result.innerHTML = '<div class="alert alert-danger">Network error: ' + err.message + '</div>';
+        restoreButton();
+      });
+  }
+
   btn.addEventListener('click', function () {
-    if (!navigator.geolocation) {
-      result.innerHTML = '<div class="alert alert-warning">Geolocation is not supported by your browser.</div>';
-      return;
-    }
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting location...';
-    navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        var lat = pos.coords.latitude.toFixed(6);
-        var lng = pos.coords.longitude.toFixed(6);
-        var acc = pos.coords.accuracy ? Math.round(pos.coords.accuracy) + ' m' : 'unknown';
-        result.innerHTML = '<div class="alert alert-success">Location captured: ' + lat + ', ' + lng + ' (accuracy: ' + acc + '). Sending...</div>';
-        fetch('{% url "ofw:location_tracker_ping" %}', {
-          method: 'POST',
-          headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: 'latitude=' + encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lng) +
-            '&accuracy=' + encodeURIComponent(Math.round(pos.coords.accuracy || 0)) +
-            '&is_emergency=1'
-        })
-          .then(function (resp) { return resp.json(); })
-          .then(function (data) {
-            if (data.status === 'ok') {
-              result.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Emergency location sent to management. Follow the guidance below.</div>';
-              btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
-              btn.classList.replace('btn-danger', 'btn-success');
-              if (window.KabayaniGuide) {
-                window.KabayaniGuide.start(
-                  parseFloat(lat), parseFloat(lng), pos.coords.accuracy || 0
-                );
-              }
-              var guide = document.getElementById('emergencyGuide');
-              if (guide) guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else {
-              result.innerHTML = '<div class="alert alert-danger">Failed to send: ' + (data.error || 'unknown error') + '</div>';
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
-            }
-          })
-          .catch(function (err) {
-            result.innerHTML = '<div class="alert alert-danger">Network error: ' + err.message + '</div>';
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
-          });
-      },
-      function (err) {
-        result.innerHTML = '<div class="alert alert-danger">Unable to get location: ' + err.message + '</div>';
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    result.innerHTML = '<div class="alert alert-info py-2"><i class="fas fa-location-crosshairs me-2"></i>Getting your GPS position. This can take a few seconds…</div>';
+
+    KabayaniLocation.getPosition()
+      .then(sendPing)
+      .catch(function (err) {
+        result.innerHTML = '<div class="alert alert-danger">' +
+          KabayaniLocation.describeError(err) + '</div>';
+        restoreButton();
+      });
   });
 })();
 </script>
@@ -628,14 +634,6 @@ window.KabayaniGuide = (function () {
   }
 
   function locate() {
-    if (!navigator.geolocation) {
-      showError('This browser does not support location. Open this page on your phone.');
-      return;
-    }
-    if (window.isSecureContext === false) {
-      showError('Location needs HTTPS or localhost. Use the live site or http://127.0.0.1:8000.');
-      return;
-    }
     if (locateBtn) {
       locateBtn.disabled = true;
       locateBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Locating...';
@@ -643,19 +641,18 @@ window.KabayaniGuide = (function () {
     statusEl.className = 'text-muted small mb-2';
     statusEl.textContent = 'Getting your GPS position...';
 
-    navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        showLocated(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-      },
-      function (err) {
-        var message = 'Unable to get your location.';
-        if (err && err.code === 1) message = 'Location permission denied. Allow location access for this site, then try again.';
-        else if (err && err.code === 2) message = 'Location unavailable. Turn on GPS / Location and try again.';
-        else if (err && err.code === 3) message = 'Location request timed out. Try again.';
-        showError(message);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
-    );
+    KabayaniLocation.getPosition({ fast: true })
+      .then(function (loc) {
+        showLocated(loc.lat, loc.lng, loc.accuracy);
+        if (loc.source === 'ip') {
+          statusEl.className = 'text-warning small mb-2';
+          statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
+            'Using an approximate location from your internet connection. Turn on GPS for exact distance.';
+        }
+      })
+      .catch(function (err) {
+        showError(KabayaniLocation.describeError(err));
+      });
   }
 
   if (locateBtn) locateBtn.addEventListener('click', locate);

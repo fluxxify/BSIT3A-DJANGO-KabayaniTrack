@@ -1,0 +1,180 @@
+/*
+ * Shared location helper for the OFW portal.
+ *
+ * Browsers on laptops often fail to get a GPS fix indoors ("Timeout expired").
+ * This helper tries a strict GPS fix first, then a relaxed network fix, and
+ * finally falls back to an approximate location based on the public IP so the
+ * emergency pages still show useful safe places.
+ */
+(function (global) {
+  'use strict';
+
+  var GPS_ATTEMPTS = [
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+  ];
+
+  var FAST_ATTEMPTS = [
+    { enableHighAccuracy: false, timeout: 9000, maximumAge: 120000 }
+  ];
+
+  function toNumber(value) {
+    var number = parseFloat(value);
+    return isFinite(number) ? number : null;
+  }
+
+  function ipProviders() {
+    return [
+      {
+        url: 'https://ipwho.is/',
+        parse: function (data) {
+          if (!data || data.success === false) return null;
+          return {
+            lat: toNumber(data.latitude),
+            lng: toNumber(data.longitude),
+            city: data.city || '',
+            region: data.region || '',
+            country: data.country || ''
+          };
+        }
+      },
+      {
+        url: 'https://ipapi.co/json/',
+        parse: function (data) {
+          if (!data || data.error) return null;
+          return {
+            lat: toNumber(data.latitude),
+            lng: toNumber(data.longitude),
+            city: data.city || '',
+            region: data.region || '',
+            country: data.country_name || ''
+          };
+        }
+      }
+    ];
+  }
+
+  function ipLocate() {
+    var providers = ipProviders();
+    var index = 0;
+
+    return new Promise(function (resolve, reject) {
+      function next() {
+        if (index >= providers.length) {
+          reject(new Error('IP location failed'));
+          return;
+        }
+        var provider = providers[index++];
+        fetch(provider.url, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store'
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            var place = provider.parse(data);
+            if (place && place.lat !== null && place.lng !== null) {
+              place.source = 'ip';
+              place.accuracy = 3000;
+              resolve(place);
+            } else {
+              next();
+            }
+          })
+          .catch(next);
+      }
+      next();
+    });
+  }
+
+  function browserPosition(options) {
+    return new Promise(function (resolve, reject) {
+      if (!navigator.geolocation) {
+        reject({ code: 0, message: 'This browser does not support location.' });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function (position) {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy || 0,
+            source: 'gps'
+          });
+        },
+        function (error) {
+          reject({ code: error.code, message: error.message });
+        },
+        options
+      );
+    });
+  }
+
+  /**
+   * Resolve the current position.
+   *
+   * @param {{fast?: boolean}} [options] fast skips the strict GPS attempt.
+   * @returns {Promise<{lat:number,lng:number,accuracy:number,source:string}>}
+   */
+  function getPosition(options) {
+    options = options || {};
+
+    if (global.isSecureContext === false) {
+      return Promise.reject({
+        code: -1,
+        message: 'Location needs HTTPS or localhost. Open the live site or http://127.0.0.1:8000.'
+      });
+    }
+
+    var attempts = options.fast ? FAST_ATTEMPTS : GPS_ATTEMPTS;
+    var lastError = null;
+
+    function tryAttempt(index) {
+      if (index >= attempts.length) {
+        return ipLocate().catch(function () {
+          throw lastError || { code: 3, message: 'Unable to get your location.' };
+        });
+      }
+      return browserPosition(attempts[index]).catch(function (error) {
+        lastError = error;
+        // Permission denied (1) and insecure context (-1) will not improve
+        // with another attempt or an IP lookup.
+        if (error && (error.code === 1 || error.code === -1)) throw error;
+        return tryAttempt(index + 1);
+      });
+    }
+
+    return tryAttempt(0);
+  }
+
+  function describeError(error, usedApproximate) {
+    if (usedApproximate) {
+      return 'Using an approximate location from your internet connection.';
+    }
+    if (!error) return 'Unable to get your location. Please try again.';
+    if (error.code === 1) {
+      return 'Location permission denied. Allow location access for this site in your browser settings, then try again.';
+    }
+    if (error.code === 2) {
+      return 'Location unavailable. Turn on your device location / GPS and try again.';
+    }
+    if (error.code === 3) {
+      return 'Location timed out. Turn on your device location / GPS and try again.';
+    }
+    if (error.code === -1) {
+      return error.message;
+    }
+    return error.message || 'Unable to get your location.';
+  }
+
+  function formatDistance(km) {
+    if (km < 1) return Math.max(10, Math.round(km * 1000 / 10) * 10) + ' m';
+    if (km < 10) return km.toFixed(1) + ' km';
+    return Math.round(km) + ' km';
+  }
+
+  global.KabayaniLocation = {
+    getPosition: getPosition,
+    describeError: describeError,
+    formatDistance: formatDistance
+  };
+})(window);

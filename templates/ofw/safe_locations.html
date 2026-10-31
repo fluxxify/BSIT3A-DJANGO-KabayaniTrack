@@ -1,4 +1,5 @@
 {% extends "theme/base.html" %}
+{% load static %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -281,6 +282,7 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/kabayani-location.js' %}"></script>
 <script>
 (function () {
   var mapEl = document.getElementById('safeLocationsMap');
@@ -482,36 +484,25 @@
   }
 
   function locate() {
-    if (!navigator.geolocation) {
-      showError('This browser does not support location. Open the site on your phone or a modern browser.');
-      return;
-    }
-    if (window.isSecureContext === false) {
-      showError('Location needs HTTPS or localhost. Open the live site (https://) or http://127.0.0.1:8000 on this laptop.');
-      return;
-    }
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Locating...';
     statusEl.className = 'text-muted small flex-grow-1';
     statusEl.textContent = 'Getting your GPS position...';
 
-    navigator.geolocation.getCurrentPosition(
-      function (pos) {
-        showLocated(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-      },
-      function (err) {
-        var message = 'Unable to get your location.';
-        if (err && err.code === 1) {
-          message = 'Location permission denied. Allow location access in your browser settings, then try again.';
-        } else if (err && err.code === 2) {
-          message = 'Your location is unavailable. Turn on GPS / Location and try again.';
-        } else if (err && err.code === 3) {
-          message = 'Getting your location timed out. Try again.';
+    KabayaniLocation.getPosition({ fast: true })
+      .then(function (loc) {
+        showLocated(loc.lat, loc.lng, loc.accuracy);
+        if (loc.source === 'ip') {
+          statusEl.className = 'text-warning small flex-grow-1';
+          statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
+            'Using an approximate location from your internet connection. Turn on GPS for exact distance.';
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Update Location';
         }
-        showError(message);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
-    );
+      })
+      .catch(function (err) {
+        showError(KabayaniLocation.describeError(err));
+      });
   }
 
   btn.addEventListener('click', locate);
