@@ -25,15 +25,16 @@ def notify(user, title, message='', url='', level=Notification.Level.INFO):
 
 def notify_managers(title, message='', url='', level=Notification.Level.INFO,
                     exclude_user=None, agency=None):
-    """Notify active administrators and the relevant agency staff.
+    """Notify the relevant agency staff.
 
-    When ``agency`` is supplied, only that agency's staff plus all superusers
-    are notified.  Without an agency, all staff are notified (legacy/global
-    behaviour).
+    When ``agency`` is supplied, only that agency's staff are notified.
+    Without an agency, all staff are notified (legacy/global behaviour).
+    Superusers are intentionally excluded from agency-scoped notifications so
+    that an OFW's agency is the only one that sees alerts about their OFWs.
     """
     if agency is not None:
         recipients = User.objects.filter(
-            Q(is_superuser=True) | Q(agency_staff__agency=agency),
+            agency_staff__agency=agency,
             is_active=True,
         )
     else:
