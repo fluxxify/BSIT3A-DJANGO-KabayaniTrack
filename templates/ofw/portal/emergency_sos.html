@@ -24,6 +24,20 @@
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 
+<!-- Alert status to OFW -->
+{% if open_alert %}
+<div class="alert alert-{% if open_alert.level == 'critical' %}danger{% elif open_alert.level == 'danger' %}warning{% else %}info{% endif %} alert-dismissible fade show py-2 small">
+  <i class="fas fa-bell me-1"></i>
+  <strong>Management has been alerted.</strong>
+  {% if open_alert.acknowledged_by %}
+  Your emergency has been acknowledged by {{ open_alert.acknowledged_by.username }}.
+  {% else %}
+  An emergency alert is open and management/your agency has been notified.
+  {% endif %}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <!-- Location status -->
 <div id="sosStatus" class="sos-status sos-status-idle mb-3" role="status">
   <i class="fas fa-location-crosshairs"></i>

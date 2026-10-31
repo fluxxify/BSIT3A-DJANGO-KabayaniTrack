@@ -26,6 +26,7 @@ from .models import (
     CheckIn,
     Concern,
     ConcernProof,
+    EmergencyAlert,
     EmergencyContact,
     Notification,
     OFWProfile,
@@ -255,6 +256,31 @@ def portal_checkins(request):
             )
             if checkin.contact_person:
                 detail += f' Contact person: {checkin.contact_person}.'
+
+            # If the OFW reports distressed, raise an emergency alert so
+            # management and agency staff see it in the Emergency Alerts console.
+            alert = None
+            if checkin.condition == CheckIn.Condition.DISTRESSED:
+                alert, created = EmergencyAlert.objects.get_or_create(
+                    ofw=profile,
+                    status=EmergencyAlert.Status.OPEN,
+                    defaults={
+                        'title': f'Distressed check-in from {profile.full_name}',
+                        'message': (
+                            f'{profile.full_name} reported a distressed condition '
+                            f'via {checkin.get_method_display()}. {detail}'
+                        ),
+                        'level': EmergencyAlert.Level.DANGER,
+                    },
+                )
+                if not created:
+                    alert.level = EmergencyAlert.Level.DANGER
+                    alert.message = (
+                        f'{profile.full_name} reported another distressed check-in '
+                        f'via {checkin.get_method_display()}. {detail}'
+                    )
+                    alert.save(update_fields=['level', 'message', 'updated_at'])
+
             notify_managers(
                 title=f'New check-in from {profile.full_name}',
                 message=detail,

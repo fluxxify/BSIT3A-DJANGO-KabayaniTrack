@@ -1129,6 +1129,7 @@ def location_tracker_ping(request):
         is_emergency=is_emergency,
     )
 
+    alert = None
     if is_emergency:
         nearest = nearest_safe_places(lat, lng, limit=1)
         hint = ''
@@ -1139,6 +1140,26 @@ def location_tracker_ping(request):
                 f'({place["distance_text"]} {place["direction"]}) in '
                 f'{place["city"] or place["country"]}. '
             )
+        alert, created = EmergencyAlert.objects.get_or_create(
+            ofw=profile,
+            status=EmergencyAlert.Status.OPEN,
+            defaults={
+                'title': f'Emergency SOS from {profile.full_name}',
+                'message': (
+                    f'{profile.full_name} sent an emergency location ping '
+                    f'(lat: {lat}, lng: {lng}). {hint}'
+                ),
+                'level': EmergencyAlert.Level.CRITICAL,
+            },
+        )
+        if not created:
+            alert.level = EmergencyAlert.Level.CRITICAL
+            alert.message = (
+                f'{profile.full_name} sent another emergency location ping '
+                f'(lat: {lat}, lng: {lng}). {hint}'
+            )
+            alert.save(update_fields=['level', 'message', 'updated_at'])
+
         notify_managers(
             title=f'Emergency location ping from {profile.full_name}',
             message=(
@@ -1153,7 +1174,7 @@ def location_tracker_ping(request):
             exclude_user=request.user,
         )
 
-    return JsonResponse({'status': 'ok', 'id': ping.pk})
+    return JsonResponse({'status': 'ok', 'id': ping.pk, 'alert_id': alert.pk if alert else None})
 
 
 def nearest_safe_places(lat, lng, limit=6, locations=None):
@@ -1299,6 +1320,14 @@ def ofw_emergency_sos(request):
     # Recent emergency location pings for this OFW
     recent_pings = LocationTracker.objects.filter(ofw=profile).order_by('-recorded_at')[:5]
 
+    # Latest open emergency alert for this OFW (so they see management has been alerted)
+    open_alert = (
+        EmergencyAlert.objects
+        .filter(ofw=profile, status=EmergencyAlert.Status.OPEN)
+        .order_by('-created_at')
+        .first()
+    )
+
     # Public hotlines
     from .hotlines import automatic_local_hotlines, philippine_national_hotlines
     from .models import EmergencyContact
@@ -1317,6 +1346,7 @@ def ofw_emergency_sos(request):
         'location_city': location_city,
         'safe_locations': safe_locations,
         'recent_pings': recent_pings,
+        'open_alert': open_alert,
         'local_hotlines': db_local,
         'national_hotlines': db_national,
         'page_title': 'Emergency SOS',
