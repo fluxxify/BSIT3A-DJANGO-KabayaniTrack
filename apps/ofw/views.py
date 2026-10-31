@@ -821,8 +821,8 @@ def inactive_ofws_page(request):
 
     return render(request, 'ofw/inactive_ofws.html', {
         'inactive_rows': inactive_rows,
-        'page_title': 'Inactive OFW Accounts',
-        'page_pretitle': 'Emergency Warning',
+        'page_title': 'Inactive OFWs',
+        'page_pretitle': 'OFW Activity Warning',
     })
 
 
@@ -854,7 +854,7 @@ def emergency_alerts_page(request):
     return render(request, 'ofw/emergency_alerts.html', {
         'alerts': alerts_qs.order_by('-created_at'),
         'status_filter': status_filter,
-        'page_title': 'Emergency Alerts',
+        'page_title': 'OFW Welfare Alerts',
         'page_pretitle': 'Inactive / At-Risk OFWs',
     })
 
@@ -954,7 +954,7 @@ def police_reports_page(request):
 
     return render(request, 'ofw/police_reports.html', {
         'reports': reports_qs.order_by('-reported_at'),
-        'page_title': 'Police Reports',
+        'page_title': 'OFW Escalations',
         'page_pretitle': 'Escalated Cases',
     })
 
@@ -1021,8 +1021,8 @@ def safe_locations_page(request):
         'countries': countries,
         'country_filter': country_filter,
         'near_me': near_me,
-        'page_title': 'Safe Places Near Me' if near_me else 'Safe Locations',
-        'page_pretitle': 'Emergency Safe Places',
+        'page_title': 'OFW Safe Places' if near_me else 'OFW Safe Places',
+        'page_pretitle': 'Safe Places for OFWs',
     })
 
 
@@ -1093,8 +1093,8 @@ def location_tracker_page(request):
     return render(request, 'ofw/location_tracker.html', {
         'pings': pings_qs[:50],
         'emergency_only': emergency_only,
-        'page_title': 'Location Tracker',
-        'page_pretitle': 'Emergency Location Monitoring',
+        'page_title': 'OFW Location Pings',
+        'page_pretitle': 'OFW Location Updates',
     })
 
 
