@@ -34,6 +34,12 @@
   {% else %}
   An emergency alert is open and management/your agency has been notified.
   {% endif %}
+  <form method="post" action="{% url 'ofw:portal_cancel_sos' %}" class="d-inline">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-secondary btn-sm ms-2" onclick="return confirm('Cancel this emergency alert? Mark it as a false alarm?');">
+      <i class="fas fa-times me-1"></i>Cancel SOS
+    </button>
+  </form>
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}

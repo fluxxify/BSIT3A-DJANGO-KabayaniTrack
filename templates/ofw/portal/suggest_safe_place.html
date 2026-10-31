@@ -1,0 +1,105 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">Suggest a Safe Place</h2>
+        <div class="text-muted small mt-1">Suggest a police station, hospital, embassy, or other safe place near your work location for admin approval.</div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  {% if not profile %}
+  <div class="alert alert-warning">
+    <i class="fas fa-triangle-exclamation me-2"></i>
+    You have not set up your profile yet.
+    <a href="{% url 'ofw:portal_profile' %}" class="alert-link">Complete your profile</a>
+    so we know your country of deployment.
+  </div>
+  {% else %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Name <span class="text-danger">*</span></label>
+            {{ form.name }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Type <span class="text-danger">*</span></label>
+            {{ form.location_type }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Country <span class="text-danger">*</span></label>
+            {{ form.country }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">City</label>
+            {{ form.city }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Address</label>
+            {{ form.address }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Phone</label>
+            {{ form.phone }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Latitude</label>
+            {{ form.latitude }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Longitude</label>
+            {{ form.longitude }}
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            {{ form.notes }}
+          </div>
+          <div class="col-12 d-grid mt-3">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-shield-alt me-2"></i>Submit Suggestion
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if my_suggestions %}
+  <div class="card">
+    <div class="card-header">
+      <h5 class="card-title mb-0">My Suggestions</h5>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Country</th><th>Status</th><th>Submitted</th></tr>
+        </thead>
+        <tbody>
+          {% for s in my_suggestions %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td>{{ s.get_location_type_display }}</td>
+            <td>{{ s.city|default:"-" }}, {{ s.country }}</td>
+            <td>
+              <span class="badge bg-{% if s.status == 'approved' %}success{% elif s.status == 'rejected' %}danger{% else %}warning{% endif %}-lt text-{% if s.status == 'approved' %}success{% elif s.status == 'rejected' %}danger{% else %}warning{% endif %}">
+                {{ s.get_status_display }}
+              </span>
+            </td>
+            <td class="text-muted">{{ s.created_at|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

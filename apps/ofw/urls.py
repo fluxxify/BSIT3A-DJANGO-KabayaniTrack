@@ -106,4 +106,6 @@ urlpatterns = [
 
     # OFW emergency SOS (portal)
     path('portal/emergency-sos/', views.ofw_emergency_sos, name='portal_emergency_sos'),
+    path('portal/emergency-sos/cancel/', views.cancel_sos, name='portal_cancel_sos'),
+    path('portal/suggest-safe-place/', portal_views.portal_suggest_safe_place, name='portal_suggest_safe_place'),
 ]

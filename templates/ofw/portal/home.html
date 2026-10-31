@@ -24,6 +24,22 @@
     so your information reaches the management team.
   </div>
   {% else %}
+  {% if is_inactive %}
+  <div class="alert alert-warning alert-dismissible fade show">
+    <i class="fas fa-clock text-warning me-2"></i>
+    <strong>Your account has been inactive for {{ inactive_days }} day{{ inactive_days|pluralize }}.</strong>
+    Management has been alerted. Log a check-in or update your profile to reactivate.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+  {% if latest_police_report %}
+  <div class="alert alert-danger alert-dismissible fade show">
+    <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+    <strong>A police report has been filed for your case:</strong> {{ latest_police_report.title }}
+    <br><span class="text-muted small">Status: {{ latest_police_report.get_status_display }}</span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
   <div class="row row-deck row-cards">
     <div class="col-md-6 col-lg-3">
       <div class="card">

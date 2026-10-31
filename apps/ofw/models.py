@@ -699,3 +699,57 @@ class MonitoringReport(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class SafeLocationSuggestion(models.Model):
+    """An OFW's suggestion for a new safe place, pending admin approval.
+
+    Approved suggestions are promoted into the SafeLocation directory so
+    every OFW can see them on Safe Places Near Me and Emergency SOS.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    class LocationType(models.TextChoices):
+        POLICE_STATION = 'police_station', 'Police Station'
+        HOSPITAL = 'hospital', 'Hospital / Medical'
+        EMBASSY = 'embassy', 'Embassy / Consulate'
+        POLO = 'polo', 'POLO / Labor Office'
+        OWWA = 'owwa', 'OWWA Office'
+        FIRE = 'fire', 'Fire / Rescue'
+        OTHER = 'other', 'Other Safe Place'
+
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='safe_location_suggestions',
+        on_delete=models.CASCADE,
+    )
+    name = models.CharField(max_length=200)
+    location_type = models.CharField(max_length=30, choices=LocationType.choices, default=LocationType.OTHER)
+    country = models.CharField(max_length=120)
+    city = models.CharField(max_length=120, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    phone = models.CharField(max_length=60, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='reviewed_safe_location_suggestions',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tblsafelocationsuggestion'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} — {self.get_status_display()}'

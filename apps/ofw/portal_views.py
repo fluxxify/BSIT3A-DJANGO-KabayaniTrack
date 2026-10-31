@@ -19,6 +19,7 @@ from .forms import (
     OFWPortalProfileForm,
     OFWSelfCheckInForm,
     OFWSelfConcernForm,
+    SafeLocationSuggestionForm,
 )
 from .hotlines import automatic_local_hotlines, philippine_national_hotlines
 from .locations import COUNTRY_CHOICES, canonical_country, cities_for_country
@@ -29,7 +30,10 @@ from .models import (
     EmergencyAlert,
     EmergencyContact,
     Notification,
+    OFWActivity,
     OFWProfile,
+    PoliceReport,
+    SafeLocationSuggestion,
     WelfareAssessment,
 )
 from .notifications import notify, notify_managers
@@ -131,6 +135,19 @@ def portal_home(request):
         .order_by('-assessment_date', '-id')[:5]
     )
 
+    # Inactive status: is the OFW's account flagged inactive (3+ days no login)?
+    activity = OFWActivity.objects.filter(user=request.user).first()
+    is_inactive = (
+        activity is not None
+        and not activity.is_account_active
+        and activity.days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
+    )
+    inactive_days = activity.days_inactive if activity else 0
+
+    # Police report status: any open/submitted police report for this OFW?
+    police_reports = PoliceReport.objects.filter(ofw=profile).order_by('-reported_at') if profile else []
+    latest_police_report = police_reports.first() if police_reports else None
+
     checkin_rows = [
         {'obj': c, 'badge': _condition_badge.get(c.condition, 'bg-secondary-lt text-secondary')}
         for c in my_checkins.select_related('ofw').order_by('-checkin_date')[:5]
@@ -159,6 +176,9 @@ def portal_home(request):
         'open_concerns': my_concerns.filter(
             status__in=['open', 'in_progress', 'escalated']
         ).count(),
+        'is_inactive': is_inactive,
+        'inactive_days': inactive_days,
+        'latest_police_report': latest_police_report,
     }
     return render(request, 'ofw/portal/home.html', context)
 
@@ -280,6 +300,22 @@ def portal_checkins(request):
                         f'via {checkin.get_method_display()}. {detail}'
                     )
                     alert.save(update_fields=['level', 'message', 'updated_at'])
+
+            # If the OFW reports SAFE and there is an open emergency alert,
+            # resolve it so management knows the OFW is okay.
+            if checkin.condition == CheckIn.Condition.SAFE:
+                open_alerts = EmergencyAlert.objects.filter(
+                    ofw=profile,
+                    status=EmergencyAlert.Status.OPEN,
+                )
+                for open_alert in open_alerts:
+                    open_alert.status = EmergencyAlert.Status.RESOLVED
+                    open_alert.message = (
+                        f'{open_alert.message}\n\nResolved: {profile.full_name} '
+                        f'checked in as SAFE via {checkin.get_method_display()}. '
+                        f'{detail}'
+                    )
+                    open_alert.save(update_fields=['status', 'message', 'updated_at'])
 
             notify_managers(
                 title=f'New check-in from {profile.full_name}',
@@ -547,6 +583,52 @@ def portal_contact_delete(request, pk):
             exclude_user=request.user,
             agency=profile.agency_org if profile else None,
         )
-        messages.success(request, f'"{name}" has been removed from your emergency contacts.')
+        return redirect('ofw:portal_contacts')
 
-    return redirect('ofw:portal_contacts')
+
+@login_required(login_url='login')
+def portal_suggest_safe_place(request):
+    """OFW suggests a new safe place for admin approval."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Please complete your profile before suggesting a safe place.')
+        return redirect('ofw:portal_profile')
+
+    if request.method == 'POST':
+        form = SafeLocationSuggestionForm(request.POST)
+        if form.is_valid():
+            suggestion = form.save(commit=False)
+            suggestion.submitted_by = request.user
+            suggestion.save()
+            notify_managers(
+                title=f'New safe place suggestion: {suggestion.name}',
+                message=(
+                    f'{profile.full_name} suggested a new safe place: {suggestion.name} '
+                    f'({suggestion.get_location_type_display()}) in {suggestion.city}, {suggestion.country}.'
+                ),
+                url=reverse('admin:kabayan_safelocationsuggestion_changelist'),
+                level=Notification.Level.INFO,
+                exclude_user=request.user,
+                agency=profile.agency_org,
+            )
+            messages.success(
+                request,
+                f'Your suggestion "{suggestion.name}" has been submitted for admin approval.'
+            )
+            return redirect('ofw:portal_suggest_safe_place')
+    else:
+        form = SafeLocationSuggestionForm(initial={'country': profile.country or ''})
+
+    my_suggestions = SafeLocationSuggestion.objects.filter(
+        submitted_by=request.user
+    ).order_by('-created_at')
+
+    return render(request, 'ofw/portal/suggest_safe_place.html', {
+        'form': form,
+        'profile': profile,
+        'my_suggestions': my_suggestions,
+    })

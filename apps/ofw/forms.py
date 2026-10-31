@@ -17,6 +17,7 @@ from .models import (
     EmergencyContact,
     MonitoringReport,
     OFWProfile,
+    SafeLocationSuggestion,
     WelfareAssessment,
 )
 
@@ -402,3 +403,14 @@ class OFWSelfConcernForm(StyledModelForm):
                     f'{ConcernProof.MAX_FILE_SIZE // (1024 * 1024)} MB.'
                 )
         return files
+
+
+class SafeLocationSuggestionForm(StyledModelForm):
+    """An OFW suggests a new safe place for admin approval."""
+
+    class Meta:
+        model = SafeLocationSuggestion
+        fields = [
+            'name', 'location_type', 'country', 'city', 'address',
+            'phone', 'latitude', 'longitude', 'notes',
+        ]

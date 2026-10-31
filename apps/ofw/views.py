@@ -1351,3 +1351,41 @@ def ofw_emergency_sos(request):
         'national_hotlines': db_national,
         'page_title': 'Emergency SOS',
     })
+
+
+@login_required(login_url='login')
+@require_POST
+def cancel_sos(request):
+    """OFW cancels / marks their own open emergency alert as a false alarm."""
+    from .roles import is_ofw
+    if not is_ofw(request.user):
+        return redirect('dashboard')
+
+    profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()
+    if profile is None:
+        return JsonResponse({'error': 'No OFW profile found.'}, status=400)
+
+    alert = (
+        EmergencyAlert.objects
+        .filter(ofw=profile, status=EmergencyAlert.Status.OPEN)
+        .order_by('-created_at')
+        .first()
+    )
+    if alert is None:
+        return JsonResponse({'error': 'No open emergency alert to cancel.'}, status=400)
+
+    alert.status = EmergencyAlert.Status.RESOLVED
+    alert.message = (
+        f'{alert.message}\n\nCancelled by OFW (false alarm) — {profile.full_name}.'
+    )
+    alert.save(update_fields=['status', 'message', 'updated_at'])
+
+    notify(
+        request.user,
+        'Emergency alert cancelled',
+        f'You cancelled the open emergency alert for {profile.full_name}. '
+        f'Management has been notified.',
+        url=reverse('ofw:portal_emergency_sos'),
+        level=Notification.Level.INFO,
+    )
+    return JsonResponse({'status': 'cancelled'})
