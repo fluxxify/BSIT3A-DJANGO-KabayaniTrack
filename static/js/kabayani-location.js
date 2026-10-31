@@ -202,9 +202,9 @@
     box.className = 'alert alert-warning';
     box.innerHTML =
       '<div class="fw-bold mb-1"><i class="fas fa-triangle-exclamation me-1"></i>' +
-      'Opening this page inside Messenger/Facebook blocks location</div>' +
-      '<div class="small">Open it in Chrome or Safari to share your live location ' +
-      'and see the nearest safe places.</div>';
+      'Open this page in Chrome or Safari</div>' +
+      '<div class="small">Messenger and Facebook block location access. ' +
+      'Use a real browser to share your live location.</div>';
 
     var actions = document.createElement('div');
     actions.className = 'd-flex flex-wrap gap-2 mt-2';
@@ -234,7 +234,7 @@
     if (!android) {
       var hint = document.createElement('div');
       hint.className = 'small mt-2';
-      hint.textContent = 'On iPhone: tap the ••• menu at the top, then "Open in Safari".';
+      hint.textContent = 'On iPhone: tap ••• at the top, then "Open in Safari".';
       box.appendChild(hint);
     }
 

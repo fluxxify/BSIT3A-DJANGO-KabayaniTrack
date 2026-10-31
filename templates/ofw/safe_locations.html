@@ -1,116 +1,124 @@
 {% extends "theme/base.html" %}
 {% load static %}
 {% block content %}
-<div class="container-xl">
-  <div class="page-header d-print-none" aria-label="Page header">
-    <div class="container-xl">
-      <div class="row align-items-center">
-        <div class="col">
-          <div class="page-pretitle">{{ page_pretitle }}</div>
-          <h2 class="page-title mb-0">{{ page_title }}</h2>
-        </div>
-        <div class="col-auto text-end">
-          {% if user.is_superuser or user.is_staff %}
-          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">
-            <i class="fas fa-plus me-2"></i> Add Safe Location
-          </button>
-          {% endif %}
-        </div>
-      </div>
+<div class="page-header d-print-none" aria-label="Page header">
+  <div class="row align-items-center g-2">
+    <div class="col">
+      <div class="page-pretitle">{{ page_pretitle }}</div>
+      <h2 class="page-title mb-0">{{ page_title }}</h2>
+      <div class="text-muted small mt-1">Police stations, hospitals, and embassies nearest to you.</div>
     </div>
-  </div>
-  <br>
-
-  {% if near_me %}
-  <div id="youAreHere" class="sp-here d-none mb-3" role="status"></div>
-  <div class="card sp-nearme mb-3" id="nearMeCard">
-    <div class="card-body d-flex flex-wrap align-items-center gap-3">
-      <button type="button" class="btn btn-primary" id="useMyLocationBtn">
-        <i class="fas fa-location-crosshairs me-2"></i>Use My Location
+    <div class="col-auto">
+      {% if user.is_superuser or user.is_staff %}
+      <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addLocationModal">
+        <i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">Add Safe Location</span><span class="d-sm-none">Add</span>
       </button>
-      <div id="nearMeStatus" class="text-muted small flex-grow-1">
-        Turn on your location to see the nearest safe places first.
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <form method="GET" class="d-flex align-items-center" style="max-width: 300px;">
-      <span class="input-group-text"><i class="ti ti-search"></i></span>
-      <input type="text" name="country" value="{{ country_filter }}" class="form-control form-control-sm" placeholder="Filter by country">
-      <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">Filter</button>
-      {% if country_filter %}
-      <a href="{% url 'ofw:safe_locations' %}" class="btn btn-sm btn-outline-secondary ms-2">Clear</a>
       {% endif %}
-    </form>
-  </div>
-
-  {% if locations %}
-  <!-- Map Section -->
-  <div class="card mb-3">
-    <div class="card-header">
-      <h5 class="card-title mb-0"><i class="fas fa-map-marked-alt me-2"></i>Safe Locations Map</h5>
-    </div>
-    <div class="card-body p-0">
-      <div id="safeLocationsMap" style="height: 420px; width: 100%;"></div>
     </div>
   </div>
+</div>
 
-  <div class="row row-deck row-cards" id="locationsList">
-    {% for loc in locations %}
-    <div class="col-sm-6 col-lg-4 loc-card"
-         data-id="{{ loc.pk }}"
-         data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
-         data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
-      <div class="card h-100 sp-card">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <h5 class="card-title mb-0">{{ loc.name }}</h5>
-            <span class="badge bg-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}-lt text-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}">
-              {{ loc.get_location_type_display }}
-            </span>
-          </div>
-          <div class="sp-distance d-none loc-distance mb-2"></div>
-          <p class="card-text text-muted small">
-            <i class="fas fa-map-marker-alt me-1"></i>
-            {{ loc.city }}, {{ loc.country }}
-            {% if loc.address %}<br><i class="fas fa-building me-1"></i> {{ loc.address }}{% endif %}
-            {% if loc.phone %}<br><i class="fas fa-phone me-1"></i> {{ loc.phone }}{% endif %}
-          </p>
-          {% if loc.has_coords %}
-          <p class="card-text text-muted small">
-            <i class="fas fa-location-crosshairs me-1"></i>
-            {{ loc.latitude }}, {{ loc.longitude }}
-          </p>
-          {% endif %}
+{% if near_me %}
+<div id="youAreHere" class="sp-here d-none mb-3" role="status"></div>
+<div class="card sp-nearme mb-3" id="nearMeCard">
+  <div class="card-body sp-nearme-body">
+    <button type="button" class="btn btn-primary" id="useMyLocationBtn">
+      <i class="fas fa-location-crosshairs me-2"></i>Use My Location
+    </button>
+    <div id="nearMeStatus" class="sp-status sp-status-muted">
+      Turn on location to see the nearest safe places first.
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<form method="GET" class="sp-filter mb-3">
+  <div class="input-group input-group-sm">
+    <span class="input-group-text"><i class="fas fa-search"></i></span>
+    <input type="text" name="country" value="{{ country_filter }}" class="form-control" placeholder="Filter by country">
+    <button type="submit" class="btn btn-outline-secondary">Filter</button>
+    {% if country_filter %}
+    <a href="{% url 'ofw:safe_locations' %}" class="btn btn-ghost-secondary">Clear</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if locations %}
+<!-- Map Section -->
+<div class="card mb-3">
+  <div class="card-header">
+    <h5 class="card-title mb-0"><i class="fas fa-map-marked-alt me-2"></i>Safe Locations Map</h5>
+  </div>
+  <div class="card-body p-0">
+    <div id="safeLocationsMap" class="sp-map"></div>
+  </div>
+</div>
+
+<div class="row row-deck row-cards" id="locationsList">
+  {% for loc in locations %}
+  <div class="col-sm-6 col-lg-4 loc-card"
+       data-id="{{ loc.pk }}"
+       data-lat="{% if loc.has_coords %}{{ loc.latitude }}{% endif %}"
+       data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
+    <div class="card h-100 sp-card">
+      <div class="card-body">
+        <div class="sp-card-top">
+          <h5 class="sp-card-title">{{ loc.name }}</h5>
+          <span class="badge bg-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}-lt text-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}">
+            {{ loc.get_location_type_display }}
+          </span>
         </div>
-        <div class="card-footer d-flex gap-2">
-          {% if user.is_superuser or user.is_staff %}
-          <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" data-bs-toggle="modal" data-bs-target="#editLocationModal{{ loc.pk }}">
-            <i class="fas fa-edit"></i>
-          </button>
-          <form method="post" action="{% url 'ofw:safe_location_delete' loc.pk %}" class="flex-grow-1" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Deactivate this safe location?')">
-              <i class="fas fa-trash"></i>
-            </button>
-          </form>
+        <div class="sp-distance d-none loc-distance mb-2"></div>
+        <div class="sp-meta">
+          <div class="sp-meta-row">
+            <i class="fas fa-location-dot"></i>
+            <span>{% if loc.city %}{{ loc.city }}, {% endif %}{{ loc.country }}</span>
+          </div>
+          {% if loc.address %}
+          <div class="sp-meta-row">
+            <i class="fas fa-building"></i><span>{{ loc.address }}</span>
+          </div>
           {% endif %}
           {% if loc.phone %}
-          <a href="tel:{{ loc.phone }}" class="btn btn-sm btn-success flex-grow-1">
-            <i class="fas fa-phone"></i> Call
-          </a>
-          {% endif %}
-          {% if loc.has_coords %}
-          <a href="https://www.google.com/maps/dir/?api=1&destination={{ loc.latitude }},{{ loc.longitude }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
-            <i class="fas fa-map-marker-alt"></i> Directions
-          </a>
+          <div class="sp-meta-row">
+            <i class="fas fa-phone"></i><span>{{ loc.phone }}</span>
+          </div>
           {% endif %}
         </div>
       </div>
+      {% if loc.phone or loc.has_coords or user.is_superuser or user.is_staff %}
+      <div class="card-footer sp-card-actions">
+        {% if user.is_superuser or user.is_staff %}
+        <button type="button" class="btn btn-sm btn-outline-primary sp-icon-btn" data-bs-toggle="modal" data-bs-target="#editLocationModal{{ loc.pk }}" title="Edit">
+          <i class="fas fa-edit"></i>
+        </button>
+        <form method="post" action="{% url 'ofw:safe_location_delete' loc.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger sp-icon-btn" onclick="return confirm('Deactivate this safe location?')" title="Deactivate">
+            <i class="fas fa-trash"></i>
+          </button>
+        </form>
+        {% endif %}
+        {% if loc.phone %}
+        <a href="tel:{{ loc.phone }}" class="btn btn-sm btn-success flex-grow-1">
+          <i class="fas fa-phone"></i> Call
+        </a>
+        {% endif %}
+        {% if loc.has_coords %}
+        <a href="https://www.google.com/maps/dir/?api=1&destination={{ loc.latitude }},{{ loc.longitude }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
+          <i class="fas fa-map-marker-alt"></i> Directions
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
-    {% endfor %}
+  </div>
+  {% endfor %}
+  </div>
+  <div class="text-center mt-3 d-none" id="locationsMoreWrap">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="locationsMoreBtn">
+      Show all safe places
+    </button>
   </div>
 
   {% else %}
@@ -271,14 +279,12 @@
   </div>
   {% endfor %}
   {% endif %}
-</div>
 {% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="{% static 'css/emergency.css' %}" />
 <style>
-  #safeLocationsMap { height: 420px; width: 100%; border-radius: 0.5rem; }
   #locationTrackerMap { height: 420px; width: 100%; border-radius: 0.5rem; }
 </style>
 {% endblock %}
@@ -403,6 +409,44 @@
       var nearestCard = cards[0].querySelector('.sp-card');
       if (nearestCard) nearestCard.classList.add('sp-nearest');
     }
+    applyLimit(cards);
+  }
+
+  var moreWrap = document.getElementById('locationsMoreWrap');
+  var moreBtn = document.getElementById('locationsMoreBtn');
+  var showAllCards = false;
+  var MAX_VISIBLE = 6;
+
+  function applyLimit(cards) {
+    if (!cards.length) return;
+    cards.forEach(function (card, index) {
+      if (!showAllCards && index >= MAX_VISIBLE) {
+        card.classList.add('d-none');
+      } else {
+        card.classList.remove('d-none');
+      }
+    });
+    if (moreWrap) {
+      moreWrap.classList.toggle('d-none', showAllCards || cards.length <= MAX_VISIBLE);
+      if (moreBtn && !showAllCards) {
+        moreBtn.textContent = 'Show all ' + cards.length + ' safe places';
+      }
+    }
+  }
+
+  if (moreBtn) {
+    moreBtn.addEventListener('click', function () {
+      showAllCards = true;
+      var list = document.getElementById('locationsList');
+      if (list) {
+        applyLimit(Array.prototype.slice.call(list.querySelectorAll('.loc-card')));
+      }
+    });
+  }
+
+  var initialCards = document.getElementById('locationsList');
+  if (initialCards) {
+    applyLimit(Array.prototype.slice.call(initialCards.querySelectorAll('.loc-card')));
   }
 
   function reorderFromServer(nearest) {
@@ -421,7 +465,7 @@
       if (!card) return;
       var badge = card.querySelector('.loc-distance');
       if (badge) {
-        badge.textContent = place.distance_text + ' away Â· â‰ˆ' +
+        badge.textContent = place.distance_text + ' away · ≈' +
           place.walking_minutes + ' min walk';
         badge.classList.remove('d-none');
       }
@@ -488,14 +532,17 @@
 
     sortCards(lat, lng);
     loadContext(lat, lng);
-    statusEl.className = 'text-success small flex-grow-1';
-    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Location on â€” nearest safe places are listed first.';
+    statusEl.className = 'sp-status sp-status-ok';
+    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Nearest safe places are shown first.';
     btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Update Location';
     btn.disabled = false;
   }
 
-  function showError(message) {
-    statusEl.className = 'text-warning small flex-grow-1';
+  function showError(err) {
+    var message = (err && err.code === 1)
+      ? 'Location is blocked. Allow location for this site, then tap Use My Location again.'
+      : KabayaniLocation.describeError(err);
+    statusEl.className = 'sp-status sp-status-warn';
     statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' + esc(message);
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Use My Location';
@@ -503,23 +550,23 @@
 
   function locate() {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Locating...';
-    statusEl.className = 'text-muted small flex-grow-1';
-    statusEl.textContent = 'Getting your GPS position...';
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Locating…';
+    statusEl.className = 'sp-status sp-status-muted';
+    statusEl.textContent = 'Getting your GPS position…';
 
     KabayaniLocation.getPosition({ fast: true })
       .then(function (loc) {
         showLocated(loc.lat, loc.lng, loc.accuracy);
         if (loc.source === 'ip') {
-          statusEl.className = 'text-warning small flex-grow-1';
+          statusEl.className = 'sp-status sp-status-warn';
           statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
-            'Using an approximate location from your internet connection. Turn on GPS for exact distance.';
+            'Approximate location from your internet connection. Turn on GPS for exact distance.';
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-location-crosshairs me-2"></i>Update Location';
         }
       })
       .catch(function (err) {
-        showError(KabayaniLocation.describeError(err));
+        showError(err);
       });
   }
 
@@ -531,8 +578,9 @@
       if (!btn.disabled) locate();
     }, 600);
   } else {
+    statusEl.className = 'sp-status sp-status-warn';
     statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
-      'Location needs HTTPS or localhost. Use the live site or <code>http://127.0.0.1:8000</code>.';
+      'Location needs HTTPS. Open the live site to use this feature.';
   }
 })();
 </script>

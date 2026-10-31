@@ -1,34 +1,27 @@
 {% extends "theme/base.html" %}
 {% load static %}
 {% block content %}
-<div class="container-xl">
-  <div class="page-header d-print-none" aria-label="Page header">
-    <div class="container-xl">
-      <div class="row align-items-center">
-        <div class="col">
-          <div class="page-pretitle">Emergency SOS</div>
-          <h2 class="page-title mb-0">Emergency Assistance</h2>
-        </div>
-        <div class="col-auto">
-          <a href="tel:911" class="btn btn-danger">
-            <i class="fas fa-phone me-2"></i>Call 911
-          </a>
-        </div>
-      </div>
+<div class="page-header d-print-none" aria-label="Page header">
+  <div class="row align-items-center g-2">
+    <div class="col">
+      <div class="page-pretitle">Emergency SOS</div>
+      <h2 class="page-title mb-0">Emergency Assistance</h2>
+      <div class="text-muted small mt-1">Send your location and get directions to the nearest safe place.</div>
+    </div>
+    <div class="col-auto">
+      <a href="tel:911" class="btn btn-danger btn-sm">
+        <i class="fas fa-phone me-1"></i>Call 911
+      </a>
     </div>
   </div>
-  <br>
+</div>
 
-  {% if profile %}
-  <div class="alert alert-danger alert-dismissible fade show py-2">
-    <i class="fas fa-exclamation-triangle me-2"></i>
-    <div>
-      If you are in immediate danger, call your local emergency number first,
-      then use the safe places below to find the nearest police station,
-      hospital, or embassy near your location.
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  </div>
+{% if profile %}
+<div class="alert alert-danger alert-dismissible fade show py-2 small">
+  <i class="fas fa-exclamation-triangle me-1"></i>
+  If you are in danger, call 911 first. Then use the nearest safe place below.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
 
   <!-- Your Location -->
   <div class="card mb-3">
@@ -36,21 +29,23 @@
       <h5 class="card-title mb-0"><i class="fas fa-user me-2"></i>Your Profile</h5>
     </div>
     <div class="card-body">
-      <div class="row">
-        <div class="col-md-6">
-          <p class="mb-1"><strong>Name:</strong> {{ profile.full_name }}</p>
-          <p class="mb-1"><strong>Country:</strong> {{ profile.country|default:"Not set" }}</p>
-          <p class="mb-1"><strong>City:</strong> {{ profile.city_abroad|default:"Not set" }}</p>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="fw-bold">{{ profile.full_name }}</span>
+        <span class="badge bg-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}-lt text-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}">
+          {{ profile.get_welfare_status_display }}
+        </span>
+      </div>
+      <div class="sp-meta mt-2">
+        <div class="sp-meta-row">
+          <i class="fas fa-location-dot"></i>
+          <span>{{ profile.city_abroad|default:"City not set" }}, {{ profile.country|default:"Country not set" }}</span>
         </div>
-        <div class="col-md-6">
-          <p class="mb-1"><strong>Employer:</strong> {{ profile.employer_name|default:"Not set" }}</p>
-          <p class="mb-1"><strong>Occupation:</strong> {{ profile.occupation|default:"Not set" }}</p>
-          <p class="mb-1"><strong>Welfare:</strong>
-            <span class="badge bg-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}-lt text-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}">
-              {{ profile.get_welfare_status_display }}
-            </span>
-          </p>
+        {% if profile.employer_name or profile.occupation %}
+        <div class="sp-meta-row">
+          <i class="fas fa-briefcase"></i>
+          <span>{{ profile.occupation|default:"Occupation not set" }}{% if profile.employer_name %} · {{ profile.employer_name }}{% endif %}</span>
         </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -61,10 +56,10 @@
       <h5 class="card-title mb-0"><i class="fas fa-location-crosshairs me-2"></i>Send Emergency Location</h5>
     </div>
     <div class="card-body">
-      <p class="text-muted small">We will detect where you are, send it to management, and show the nearest safe place with directions.</p>
+      <p class="text-muted small mb-3">We will send your location to management and show the nearest safe place.</p>
       <div class="d-grid gap-2">
         <button type="button" class="btn btn-danger btn-lg" id="sendLocationBtn">
-          <i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)
+          <i class="fas fa-broadcast-tower me-2"></i>Send My Location
         </button>
       </div>
       <div id="locationResult" class="mt-3"></div>
@@ -73,33 +68,38 @@
 
   <!-- Live emergency guidance (shown after the location is sent) -->
   <div class="card eg-card mb-3 d-none" id="emergencyGuide">
-    <div class="eg-header d-flex align-items-center gap-2">
-      <i class="fas fa-headset fa-lg"></i>
-      <div>
-        <div class="fw-bold">Emergency Guidance</div>
-        <div class="small opacity-75">Stay on this page — the distance updates as you move</div>
+    <div class="eg-header">
+      <div class="eg-header-title">
+        <i class="fas fa-headset"></i>Emergency Guidance
       </div>
+      <div class="eg-header-sub">Stay on this page — directions update as you move.</div>
     </div>
     <div class="eg-body">
-      <div id="guideYouAreHere" class="eg-pill d-none mb-3"></div>
+      <div id="guideYouAreHere" class="eg-here d-none mb-3"></div>
 
-      <div class="row g-3 align-items-center">
-        <div class="col-md-7">
-          <div class="text-muted small text-uppercase fw-bold mb-1">Nearest safe place</div>
-          <div id="guidePlaceName" class="eg-place">Locating…</div>
-          <div id="guidePlaceMeta" class="text-muted small mt-1"></div>
+      <div class="eg-target">
+        <div id="guideCompass" class="eg-arrow" aria-hidden="true">
+          <i class="fas fa-location-arrow"></i>
         </div>
-        <div class="col-md-5">
-          <div class="d-flex align-items-center justify-content-md-end gap-3">
-            <div id="guideCompass" class="eg-arrow" aria-hidden="true">
-              <i class="fas fa-location-arrow"></i>
-            </div>
-            <div class="text-md-end">
-              <div id="guideDistance" class="eg-dist">—</div>
-              <div id="guideDirection" class="text-muted small"></div>
-              <div id="guideEta" class="text-muted small"></div>
-            </div>
-          </div>
+        <div class="eg-target-body">
+          <div class="eg-label">Nearest safe place</div>
+          <div id="guidePlaceName" class="eg-place">Locating…</div>
+          <div id="guidePlaceMeta" class="eg-meta"></div>
+        </div>
+      </div>
+
+      <div class="eg-stats mt-3">
+        <div class="eg-stat">
+          <div class="eg-stat-label">Distance</div>
+          <div id="guideDistance" class="eg-stat-value eg-dist">—</div>
+        </div>
+        <div class="eg-stat">
+          <div class="eg-stat-label">Direction</div>
+          <div id="guideDirection" class="eg-stat-value">—</div>
+        </div>
+        <div class="eg-stat">
+          <div class="eg-stat-label">Walk</div>
+          <div id="guideEta" class="eg-stat-value">—</div>
         </div>
       </div>
 
@@ -122,24 +122,25 @@
 
       <div class="eg-note mt-3">
         <i class="fas fa-tower-broadcast me-1"></i>
-        <strong>Management has been notified</strong> with your live location and
-        the nearest safe place. Keep this page open. If you can talk safely,
-        call 911 or the safe place above.
+        <strong>Management has been notified</strong> and can see your live location.
       </div>
     </div>
   </div>
 
   <!-- Safe Places Near You -->
   <div class="card">
-    <div class="card-header d-flex flex-wrap align-items-center gap-2">
-      <h5 class="card-title mb-0 flex-grow-1"><i class="fas fa-shield-alt me-2"></i>Safe Places Near You</h5>
+    <div class="card-header sp-card-header">
+      <div class="sp-card-heading">
+        <i class="fas fa-shield-alt"></i>
+        <span>Safe Places Near You</span>
+      </div>
       <button type="button" class="btn btn-sm btn-outline-primary" id="nearbyLocateBtn">
-        <i class="fas fa-location-crosshairs me-1"></i>Detect My Location
+        <i class="fas fa-location-crosshairs me-1"></i>Detect
       </button>
     </div>
     <div class="card-body">
-      <div id="nearbyStatus" class="text-muted small mb-2">
-        Turn on your location to see the nearest police station, hospital, or embassy first.
+      <div id="nearbyStatus" class="sp-status mb-2">
+        Turn on location to see the nearest police station, hospital, or embassy first.
       </div>
       {% if safe_locations %}
       <div id="nearbyMapWrap" class="mb-3 d-none">
@@ -152,19 +153,31 @@
              data-lng="{% if loc.has_coords %}{{ loc.longitude }}{% endif %}">
           <div class="card h-100 sp-card">
             <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-2">
-                <h6 class="card-title mb-0">{{ loc.name }}</h6>
+              <div class="sp-card-top">
+                <h6 class="sp-card-title">{{ loc.name }}</h6>
                 <span class="badge bg-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}-lt text-{% if loc.location_type == 'police_station' %}danger{% elif loc.location_type == 'hospital' %}danger{% elif loc.location_type == 'embassy' %}info{% else %}secondary{% endif %}">
                   {{ loc.get_location_type_display }}
                 </span>
               </div>
               <div class="sp-distance d-none nearby-distance mb-2"></div>
-              <p class="card-text text-muted small">
-                {% if loc.city %}{{ loc.city }}, {% endif %}{{ loc.country }}
-                {% if loc.address %}<br>{{ loc.address }}{% endif %}
-                {% if loc.phone %}<br>{{ loc.phone }}{% endif %}
-              </p>
+              <div class="sp-meta">
+                <div class="sp-meta-row">
+                  <i class="fas fa-location-dot"></i>
+                  <span>{% if loc.city %}{{ loc.city }}, {% endif %}{{ loc.country }}</span>
+                </div>
+                {% if loc.address %}
+                <div class="sp-meta-row">
+                  <i class="fas fa-building"></i><span>{{ loc.address }}</span>
+                </div>
+                {% endif %}
+                {% if loc.phone %}
+                <div class="sp-meta-row">
+                  <i class="fas fa-phone"></i><span>{{ loc.phone }}</span>
+                </div>
+                {% endif %}
+              </div>
             </div>
+            {% if loc.phone or loc.has_coords %}
             <div class="card-footer d-flex gap-2">
               {% if loc.phone %}
               <a href="tel:{{ loc.phone }}" class="btn btn-sm btn-success flex-grow-1">
@@ -177,15 +190,21 @@
               </a>
               {% endif %}
             </div>
+            {% endif %}
           </div>
         </div>
         {% endfor %}
       </div>
+      <div class="text-center mt-3 d-none" id="nearbyMoreWrap">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="nearbyMoreBtn">
+          Show all safe places
+        </button>
+      </div>
       {% else %}
       <div class="text-muted text-center py-4">
         <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
-        <p>No safe locations registered yet.</p>
-        <p class="text-muted small">Ask your agency to add police stations, hospitals, or embassies near your work location.</p>
+        <p class="mb-1">No safe places registered yet.</p>
+        <p class="text-muted small mb-0">Ask your agency to add police stations, hospitals, or embassies near your work location.</p>
       </div>
       {% endif %}
     </div>
@@ -200,17 +219,22 @@
     <div class="table-responsive">
       <table class="table table-vcenter card-table table-sm">
         <thead>
-          <tr><th>Latitude</th><th>Longitude</th><th>Type</th><th class="text-end">Recorded</th></tr>
+          <tr>
+            <th>Type</th>
+            <th class="d-none d-md-table-cell">Latitude</th>
+            <th class="d-none d-md-table-cell">Longitude</th>
+            <th class="text-end">Recorded</th>
+          </tr>
         </thead>
         <tbody>
           {% for ping in recent_pings %}
           <tr>
-            <td>{{ ping.latitude }}</td>
-            <td>{{ ping.longitude }}</td>
             <td><span class="badge bg-{% if ping.is_emergency %}danger{% else %}secondary{% endif %}-lt text-{% if ping.is_emergency %}danger{% else %}secondary{% endif %}">
               {% if ping.is_emergency %}Emergency{% else %}Standard{% endif %}
             </span></td>
-            <td class="text-end text-muted">{{ ping.recorded_at|date:"M d, Y H:i" }}</td>
+            <td class="d-none d-md-table-cell text-muted">{{ ping.latitude }}</td>
+            <td class="d-none d-md-table-cell text-muted">{{ ping.longitude }}</td>
+            <td class="text-end text-muted small">{{ ping.recorded_at|date:"M d, H:i" }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -226,7 +250,6 @@
     <a href="{% url 'ofw:portal_profile' %}" class="btn btn-primary">Complete Profile</a>
   </div>
   {% endif %}
-</div>
 {% endblock %}
 
 {% block extra_css %}
@@ -245,7 +268,7 @@
 
   function restoreButton() {
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location (Emergency)';
+    btn.innerHTML = '<i class="fas fa-broadcast-tower me-2"></i>Send My Location';
   }
 
   function sendPing(loc) {
@@ -253,10 +276,12 @@
     var lng = loc.lng.toFixed(6);
     var accText = loc.accuracy ? Math.round(loc.accuracy) + ' m' : 'unknown';
     var note = loc.source === 'ip'
-      ? '<br><span class="small">Approximate location from your internet connection — turn on GPS for exact tracking.</span>'
+      ? '<br><span class="small">Approximate location — turn on GPS for exact tracking.</span>'
       : '';
-    result.innerHTML = '<div class="alert alert-success">Location captured: ' + lat + ', ' + lng +
-      ' (accuracy: ' + accText + '). Sending...' + note + '</div>';
+    result.innerHTML = '<div class="alert alert-success py-2">' +
+      '<i class="fas fa-location-crosshairs me-2"></i>Location captured' +
+      (loc.accuracy ? ' (accuracy ' + accText + ')' : '') +
+      '. Sending…' + note + '</div>';
 
     return fetch('{% url "ofw:location_tracker_ping" %}', {
       method: 'POST',
@@ -271,7 +296,7 @@
       .then(function (resp) { return resp.json(); })
       .then(function (data) {
         if (data.status === 'ok') {
-          result.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Emergency location sent to management. Follow the guidance below.</div>';
+          result.innerHTML = '<div class="alert alert-success py-2"><i class="fas fa-check-circle me-2"></i>Location sent to management. Follow the guidance below.</div>';
           btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
           btn.classList.replace('btn-danger', 'btn-success');
           if (window.KabayaniGuide) {
@@ -280,12 +305,12 @@
           var guide = document.getElementById('emergencyGuide');
           if (guide) guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
-          result.innerHTML = '<div class="alert alert-danger">Failed to send: ' + (data.error || 'unknown error') + '</div>';
+          result.innerHTML = '<div class="alert alert-danger py-2 small">Failed to send: ' + (data.error || 'unknown error') + '</div>';
           restoreButton();
         }
       })
       .catch(function (err) {
-        result.innerHTML = '<div class="alert alert-danger">Network error: ' + err.message + '</div>';
+        result.innerHTML = '<div class="alert alert-danger py-2 small">Network error: ' + err.message + '</div>';
         restoreButton();
       });
   }
@@ -293,12 +318,12 @@
   btn.addEventListener('click', function () {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting location...';
-    result.innerHTML = '<div class="alert alert-info py-2"><i class="fas fa-location-crosshairs me-2"></i>Getting your GPS position. This can take a few seconds…</div>';
+    result.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-location-crosshairs me-2"></i>Getting your location… This can take a few seconds.</div>';
 
     KabayaniLocation.getPosition()
       .then(sendPing)
       .catch(function (err) {
-        result.innerHTML = '<div class="alert alert-danger">' +
+        result.innerHTML = '<div class="alert alert-danger py-2 small">' +
           KabayaniLocation.describeError(err) + '</div>';
 
         if (err && err.code === 1) {
@@ -315,8 +340,8 @@
                 return sendPing(loc);
               })
               .catch(function () {
-                result.innerHTML = '<div class="alert alert-danger">' +
-                  'Unable to get an approximate location. Please check your internet connection, ' +
+                result.innerHTML = '<div class="alert alert-danger py-2 small">' +
+                  'Unable to get an approximate location. Check your internet connection, ' +
                   'then allow location access and try again.</div>';
                 restoreButton();
               });
@@ -371,8 +396,8 @@ window.KabayaniGuide = (function () {
   }
 
   function direction(bearing) {
-    var points = ['north', 'north-east', 'east', 'south-east',
-      'south', 'south-west', 'west', 'north-west'];
+    var points = ['North', 'North-east', 'East', 'South-east',
+      'South', 'South-west', 'West', 'North-west'];
     return points[Math.round(bearing / 45) % 8];
   }
 
@@ -387,8 +412,8 @@ window.KabayaniGuide = (function () {
     var km = distanceKm(lat, lng, target.latitude, target.longitude);
     var bearing = bearingDeg(lat, lng, target.latitude, target.longitude);
     distEl.textContent = (approximate ? '~' : '') + formatDistance(km);
-    dirEl.textContent = 'Head ' + direction(bearing);
-    etaEl.textContent = '≈ ' + Math.max(1, Math.round(km / 4.5 * 60)) + ' min walk';
+    dirEl.textContent = direction(bearing);
+    etaEl.textContent = Math.max(1, Math.round(km / 4.5 * 60)) + ' min';
     if (compassEl) {
       var arrow = compassEl.querySelector('i');
       if (arrow) arrow.style.transform = 'rotate(' + bearing + 'deg)';
@@ -399,10 +424,11 @@ window.KabayaniGuide = (function () {
     var nearest = data.nearest || [];
 
     if (data.you_are_here) {
-      hereEl.innerHTML = '<i class="fas fa-location-dot me-1"></i><strong>You are at:</strong> ' +
-        esc(data.you_are_here) +
+      hereEl.innerHTML =
+        '<div class="eg-label">Your location</div>' +
+        '<div class="eg-here-text">' + esc(data.you_are_here) + '</div>' +
         (approximate
-          ? ' <span class="badge bg-warning-lt text-warning ms-1">approximate ±3 km</span>'
+          ? '<span class="badge bg-warning-lt text-warning mt-1">approx. ±3 km</span>'
           : '');
       hereEl.classList.remove('d-none');
     }
@@ -411,11 +437,10 @@ window.KabayaniGuide = (function () {
       nameEl.textContent = 'No safe place registered near you';
       metaEl.textContent = 'Call 911 and stay on the line.';
       distEl.textContent = '—';
-      dirEl.textContent = '';
-      etaEl.textContent = '';
+      dirEl.textContent = '—';
+      etaEl.textContent = '—';
       stepsEl.innerHTML = '<li>Call <a href="tel:911">911</a> and stay on the line.</li>' +
-        '<li>Move to a crowded, well-lit place if it is safe to do so.</li>' +
-        '<li>Management has your location and will contact you.</li>';
+        '<li>Move to a crowded, well-lit place if it is safe to do so.</li>';
       return;
     }
 
@@ -425,7 +450,10 @@ window.KabayaniGuide = (function () {
     var meta = [target.type];
     if (target.city) meta.push(target.city);
     if (target.country) meta.push(target.country);
-    metaEl.textContent = meta.join(' · ') + (target.address ? ' · ' + target.address : '');
+    metaEl.innerHTML = esc(meta.join(' · ')) +
+      (target.address
+        ? '<div class="eg-meta-address">' + esc(target.address) + '</div>'
+        : '');
 
     if (target.phone) {
       callEl.href = 'tel:' + target.phone;
@@ -436,24 +464,16 @@ window.KabayaniGuide = (function () {
     mapsEl.href = target.maps_url || '#';
 
     var steps = [];
-    if (data.you_are_here) {
-      steps.push('You are at <strong>' + esc(data.you_are_here) + '</strong>.');
-    } else {
-      steps.push('Your live GPS position is shared with management.');
-    }
     steps.push('Walk <strong>' + esc(target.distance_text) + '</strong> ' +
-      esc(target.direction) + ' to <strong>' + esc(target.name) + '</strong>' +
-      (target.city ? ' (' + esc(target.city) + ')' : '') + '.');
+      esc(target.direction.toLowerCase()) + ' to <strong>' + esc(target.name) + '</strong>.');
     steps.push('If the way is not safe, call <a href="tel:911">911</a> and stay on the line.');
     if (nearest.length > 1) {
       var alt = nearest[1];
       steps.push('Other option: <strong>' + esc(alt.name) + '</strong> — ' +
-        esc(alt.distance_text) + ' ' + esc(alt.direction) + '.');
+        esc(alt.distance_text) + ' ' + esc(alt.direction.toLowerCase()) + '.');
     }
-    steps.push('Management has been notified and can see your location.');
     if (approximate) {
-      steps.push('Distances are approximate (±3 km). Turn on Location / GPS in your phone ' +
-        'settings and allow this site, then send again for exact directions.');
+      steps.push('Distances are approximate. Turn on location / GPS for exact directions.');
     }
     stepsEl.innerHTML = steps.map(function (text) { return '<li>' + text + '</li>'; }).join('');
 
@@ -585,6 +605,28 @@ window.KabayaniGuide = (function () {
     return map;
   }
 
+  var nearbyMoreWrap = document.getElementById('nearbyMoreWrap');
+  var nearbyMoreBtn = document.getElementById('nearbyMoreBtn');
+  var showAllPlaces = false;
+  var MAX_VISIBLE = 6;
+
+  function applyLimit(cards) {
+    if (!cards.length) return;
+    cards.forEach(function (card, index) {
+      if (!showAllPlaces && index >= MAX_VISIBLE) {
+        card.classList.add('d-none');
+      } else {
+        card.classList.remove('d-none');
+      }
+    });
+    if (nearbyMoreWrap) {
+      nearbyMoreWrap.classList.toggle('d-none', showAllPlaces || cards.length <= MAX_VISIBLE);
+      if (nearbyMoreBtn && !showAllPlaces) {
+        nearbyMoreBtn.textContent = 'Show all ' + cards.length + ' safe places';
+      }
+    }
+  }
+
   function sortCards(lat, lng) {
     var cards = Array.prototype.slice.call(list.querySelectorAll('.nearby-card'));
     cards.forEach(function (card) {
@@ -617,10 +659,19 @@ window.KabayaniGuide = (function () {
       var nearestCard = cards[0].querySelector('.sp-card');
       if (nearestCard) nearestCard.classList.add('sp-nearest');
     }
+    applyLimit(cards);
     return cards;
   }
 
   var cardsAll = Array.prototype.slice.call(list.querySelectorAll('.nearby-card'));
+  applyLimit(cardsAll);
+
+  if (nearbyMoreBtn) {
+    nearbyMoreBtn.addEventListener('click', function () {
+      showAllPlaces = true;
+      applyLimit(Array.prototype.slice.call(list.querySelectorAll('.nearby-card')));
+    });
+  }
 
   function showLocated(lat, lng, accuracy) {
     var mapObj = ensureMap();
@@ -653,19 +704,22 @@ window.KabayaniGuide = (function () {
     }
 
     sortCards(lat, lng);
-    statusEl.className = 'text-success small mb-2';
-    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Location on — the nearest safe places are shown first.';
+    statusEl.className = 'sp-status sp-status-ok mb-2';
+    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Nearest safe places are shown first.';
     if (locateBtn) {
-      locateBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Update Location';
+      locateBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Update';
       locateBtn.disabled = false;
     }
   }
 
-  function showError(message) {
-    statusEl.className = 'text-warning small mb-2';
+  function showError(err) {
+    var message = (err && err.code === 1)
+      ? 'Location is blocked. Open this page in Chrome, allow location, then tap Detect again.'
+      : KabayaniLocation.describeError(err);
+    statusEl.className = 'sp-status sp-status-warn mb-2';
     statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' + esc(message);
     if (locateBtn) {
-      locateBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Detect My Location';
+      locateBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Detect';
       locateBtn.disabled = false;
     }
   }
@@ -673,22 +727,22 @@ window.KabayaniGuide = (function () {
   function locate() {
     if (locateBtn) {
       locateBtn.disabled = true;
-      locateBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Locating...';
+      locateBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Locating…';
     }
-    statusEl.className = 'text-muted small mb-2';
-    statusEl.textContent = 'Getting your GPS position...';
+    statusEl.className = 'sp-status mb-2';
+    statusEl.textContent = 'Getting your GPS position…';
 
     KabayaniLocation.getPosition({ fast: true })
       .then(function (loc) {
         showLocated(loc.lat, loc.lng, loc.accuracy);
         if (loc.source === 'ip') {
-          statusEl.className = 'text-warning small mb-2';
+          statusEl.className = 'sp-status sp-status-warn mb-2';
           statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
-            'Using an approximate location from your internet connection. Turn on GPS for exact distance.';
+            'Approximate location from your internet connection. Turn on GPS for exact distance.';
         }
       })
       .catch(function (err) {
-        showError(KabayaniLocation.describeError(err));
+        showError(err);
       });
   }
 
@@ -696,8 +750,9 @@ window.KabayaniGuide = (function () {
   if (window.isSecureContext !== false) {
     window.setTimeout(function () { if (locateBtn && !locateBtn.disabled) locate(); }, 600);
   } else {
+    statusEl.className = 'sp-status sp-status-warn mb-2';
     statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
-      'Location needs HTTPS or localhost. Use the live site or <code>http://127.0.0.1:8000</code>.';
+      'Location needs HTTPS. Open the live site to use this feature.';
   }
 })();
 </script>

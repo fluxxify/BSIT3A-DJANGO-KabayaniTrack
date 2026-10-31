@@ -1,5 +1,7 @@
 /* Shared emergency UI styles (Safe Places Near Me + Emergency SOS). */
 
+/* ---------------------------------------------------------------- Guidance */
+
 .eg-card {
   border: 2px solid #d63939;
   border-radius: 0.85rem;
@@ -10,78 +12,159 @@
 .eg-header {
   background: #d63939;
   color: #fff;
-  padding: 0.9rem 1.1rem;
+  padding: 0.85rem 1.1rem;
 }
 
-.eg-body { padding: 1.1rem; }
-
-.eg-pill {
-  display: inline-flex;
+.eg-header-title {
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  background: #eaf1fb;
-  color: #1b4b91;
-  border-radius: 999px;
-  padding: 0.4rem 0.85rem;
-  font-size: 0.85rem;
-  line-height: 1.3;
-}
-
-.eg-place {
-  font-size: 1.4rem;
+  gap: 0.5rem;
+  font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.eg-dist {
-  font-size: 2.1rem;
-  font-weight: 800;
-  color: #d63939;
-  line-height: 1;
+.eg-header-sub {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+
+.eg-body { padding: 1.1rem; }
+
+.eg-label {
+  color: #6b7a90;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.eg-here {
+  background: #eaf1fb;
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.85rem;
+}
+
+.eg-here-text {
+  color: #1b4b91;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.eg-target {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.eg-target-body {
+  min-width: 0;
+}
+
+.eg-place {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.eg-meta {
+  margin-top: 0.15rem;
+  color: #6b7a90;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.eg-meta-address {
+  overflow-wrap: anywhere;
 }
 
 .eg-arrow {
-  width: 64px;
-  height: 64px;
-  flex: 0 0 64px;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
   border-radius: 50%;
   background: #fdecec;
   color: #d63939;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
 }
 
 .eg-arrow i { transition: transform 0.4s ease; }
+
+.eg-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid #e6ebf1;
+  border-radius: 0.7rem;
+  overflow: hidden;
+}
+
+.eg-stat {
+  padding: 0.6rem 0.7rem;
+  text-align: center;
+}
+
+.eg-stat + .eg-stat { border-left: 1px solid #e6ebf1; }
+
+.eg-stat-label {
+  color: #8a97a8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.eg-stat-value {
+  color: #1f2d3d;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 0.15rem;
+}
+
+.eg-stat-value.eg-dist {
+  color: #d63939;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
 
 .eg-steps {
   counter-reset: eg;
   list-style: none;
   padding-left: 0;
-  margin: 1.1rem 0 0;
+  margin: 1rem 0 0;
 }
 
 .eg-steps li {
   counter-increment: eg;
   position: relative;
-  padding-left: 2.3rem;
-  margin-bottom: 0.65rem;
-  font-size: 0.93rem;
-  line-height: 1.45;
+  padding-left: 2.1rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
+
+.eg-steps li:last-child { margin-bottom: 0; }
 
 .eg-steps li::before {
   content: counter(eg);
   position: absolute;
   left: 0;
-  top: 0;
-  width: 1.55rem;
-  height: 1.55rem;
+  top: 0.15rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 50%;
   background: #d63939;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -97,11 +180,11 @@
   background: #fff8e1;
   border-radius: 0.5rem;
   padding: 0.6rem 0.8rem;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   line-height: 1.4;
 }
 
-/* Safe places page */
+/* ------------------------------------------------------------- Safe places */
 
 .sp-here {
   background: #eaf1fb;
@@ -109,12 +192,54 @@
   border-radius: 0.6rem;
   padding: 0.6rem 0.9rem;
   font-size: 0.9rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .sp-nearme {
   background: linear-gradient(135deg, #f5f9ff, #eef4ff);
   border-color: #c9dcff;
 }
+
+.sp-nearme-body {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.sp-status {
+  color: #6b7a90;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.sp-status-ok { color: #2fb344; }
+.sp-status-warn { color: #b7791f; }
+
+.sp-filter { max-width: 380px; }
+
+.sp-map { height: 420px; width: 100%; }
+
+.sp-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.sp-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.sp-card-heading i { color: #6b7a90; }
 
 .sp-card {
   transition: box-shadow 0.15s ease, transform 0.15s ease;
@@ -129,6 +254,52 @@
   box-shadow: 0 0 0 1px rgba(214, 57, 57, 0.25);
 }
 
+.sp-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.sp-card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.sp-card-top .badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.68rem;
+}
+
+.sp-meta {
+  display: grid;
+  gap: 0.15rem;
+  color: #6b7a90;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.sp-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.sp-meta-row i {
+  flex: 0 0 1rem;
+  width: 1rem;
+  margin-top: 0.15rem;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.sp-meta-row span { overflow-wrap: anywhere; }
+
 .sp-distance {
   display: inline-flex;
   align-items: center;
@@ -137,14 +308,43 @@
   color: #1b4b91;
   border-radius: 999px;
   padding: 0.18rem 0.65rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.5;
 }
 
+.sp-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sp-card-actions form { display: flex; }
+
+.sp-icon-btn {
+  flex: 0 0 36px;
+  width: 36px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* ------------------------------------------------------------------ Mobile */
+
 @media (max-width: 575.98px) {
-  .eg-place { font-size: 1.15rem; }
-  .eg-dist { font-size: 1.8rem; }
-  .eg-arrow { width: 56px; height: 56px; flex-basis: 56px; font-size: 1.2rem; }
+  .eg-header { padding: 0.75rem 0.9rem; }
+  .eg-header-title { font-size: 1rem; }
   .eg-body { padding: 0.9rem; }
+  .eg-place { font-size: 1.06rem; }
+  .eg-arrow { width: 46px; height: 46px; flex-basis: 46px; font-size: 1.05rem; }
+  .eg-stat { padding: 0.5rem 0.35rem; }
+  .eg-stat-value { font-size: 0.92rem; }
+  .eg-stat-value.eg-dist { font-size: 1.15rem; }
+  .eg-steps li { font-size: 0.88rem; }
+  .eg-actions .btn { min-height: 44px; }
+
+  .sp-nearme-body { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .sp-nearme-body .btn { width: 100%; }
+  .sp-filter { max-width: none; }
+  .sp-map { height: 280px; }
+  .sp-card-actions .btn { font-size: 0.8rem; }
 }
