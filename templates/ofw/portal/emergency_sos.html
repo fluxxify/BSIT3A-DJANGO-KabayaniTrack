@@ -281,7 +281,7 @@
           btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
           btn.classList.replace('btn-danger', 'btn-success');
           if (window.KabayaniGuide) {
-            window.KabayaniGuide.start(loc.lat, loc.lng);
+            window.KabayaniGuide.start(loc.lat, loc.lng, loc.accuracy);
           }
           var guide = document.getElementById('emergencyGuide');
           if (guide) guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -342,6 +342,7 @@ window.KabayaniGuide = (function () {
 
   var watchId = null;
   var target = null;
+  var approximate = false;
   var lastFetchAt = 0;
   var lastFetchLat = null;
   var lastFetchLng = null;
@@ -386,7 +387,7 @@ window.KabayaniGuide = (function () {
     if (!target) return;
     var km = distanceKm(lat, lng, target.latitude, target.longitude);
     var bearing = bearingDeg(lat, lng, target.latitude, target.longitude);
-    distEl.textContent = formatDistance(km);
+    distEl.textContent = (approximate ? '~' : '') + formatDistance(km);
     dirEl.textContent = 'Head ' + direction(bearing);
     etaEl.textContent = '≈ ' + Math.max(1, Math.round(km / 4.5 * 60)) + ' min walk';
     if (compassEl) {
@@ -400,7 +401,10 @@ window.KabayaniGuide = (function () {
 
     if (data.you_are_here) {
       hereEl.innerHTML = '<i class="fas fa-location-dot me-1"></i><strong>You are at:</strong> ' +
-        esc(data.you_are_here);
+        esc(data.you_are_here) +
+        (approximate
+          ? ' <span class="badge bg-warning-lt text-warning ms-1">approximate ±3 km</span>'
+          : '');
       hereEl.classList.remove('d-none');
     }
 
@@ -448,6 +452,10 @@ window.KabayaniGuide = (function () {
         esc(alt.distance_text) + ' ' + esc(alt.direction) + '.');
     }
     steps.push('Management has been notified and can see your location.');
+    if (approximate) {
+      steps.push('Distances are approximate (±3 km). Turn on Location / GPS in your phone ' +
+        'settings and allow this site, then send again for exact directions.');
+    }
     stepsEl.innerHTML = steps.map(function (text) { return '<li>' + text + '</li>'; }).join('');
 
     updateLive(data.latitude, data.longitude);
@@ -497,7 +505,8 @@ window.KabayaniGuide = (function () {
     watchId = null;
   }
 
-  function start(lat, lng) {
+  function start(lat, lng, accuracy) {
+    approximate = (accuracy || 0) > 1000;
     guideEl.classList.remove('d-none');
     nameEl.textContent = 'Locating the nearest safe place…';
     metaEl.textContent = '';
