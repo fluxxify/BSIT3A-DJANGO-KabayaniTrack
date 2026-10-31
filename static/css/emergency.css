@@ -454,6 +454,121 @@
   }
 }
 
+/* ------------------------------------------------- Emergency SOS page shell */
+
+.sos-page { padding-bottom: 5.5rem; }
+
+.sos-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #d7dfe9;
+  border-radius: 0.7rem;
+  background: #f6f8fb;
+  color: #4b5b70;
+}
+
+.sos-status > i {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  font-size: 1rem;
+}
+
+.sos-status-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.sos-status-text {
+  margin-top: 0.1rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.sos-status-idle > i { color: #8a97a8; }
+
+.sos-status-busy {
+  background: #eef4fd;
+  border-color: #c7daf5;
+  color: #1b4f8f;
+}
+.sos-status-busy > i { color: #206bc4; }
+
+.sos-status-ok {
+  background: #edf8f0;
+  border-color: #b9e3c4;
+  color: #1d6b34;
+}
+.sos-status-ok > i { color: #2fb344; }
+
+.sos-status-warn {
+  background: #fff8e1;
+  border-color: #f0d998;
+  color: #7a5200;
+}
+.sos-status-warn > i { color: #b7791f; }
+
+.sos-collapse-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: none;
+  border: 0;
+  border-radius: 0.5rem;
+  color: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+
+.sos-collapse-head:focus-visible {
+  outline: 2px solid #206bc4;
+  outline-offset: -2px;
+}
+
+.sos-chevron {
+  flex: 0 0 auto;
+  color: #8a97a8;
+  transition: transform 0.2s ease;
+}
+
+.sos-collapse-head[aria-expanded="true"] .sos-chevron {
+  transform: rotate(180deg);
+}
+
+.sos-sticky {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1030;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem calc(0.6rem + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1px solid #e6e8eb;
+  box-shadow: 0 -4px 16px rgba(24, 36, 51, 0.12);
+}
+
+.sos-sticky .btn {
+  flex: 1 1 0;
+  min-height: 48px;
+  font-weight: 600;
+}
+
+@media (min-width: 992px) {
+  .sos-page { padding-bottom: 0; }
+}
+
+/* The theme picker floats over the sticky emergency bar on phones. */
+@media (max-width: 991.98px) {
+  body:has(.sos-page) .settings { display: none; }
+}
+
 /* ------------------------------------------------------------------ Mobile */
 
 @media (max-width: 575.98px) {

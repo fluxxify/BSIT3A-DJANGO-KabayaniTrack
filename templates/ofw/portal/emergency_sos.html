@@ -1,6 +1,7 @@
 {% extends "theme/base.html" %}
 {% load static %}
 {% block content %}
+<div class="sos-page">
 <div class="page-header d-print-none" aria-label="Page header">
   <div class="row align-items-center g-2">
     <div class="col">
@@ -23,37 +24,19 @@
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 
-  <!-- Your Location -->
-  <div class="card mb-3">
-    <div class="card-header">
-      <h5 class="card-title mb-0"><i class="fas fa-user me-2"></i>Your Profile</h5>
-    </div>
-    <div class="card-body">
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <span class="fw-bold">{{ profile.full_name }}</span>
-        <span class="badge bg-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}-lt text-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}">
-          {{ profile.get_welfare_status_display }}
-        </span>
-      </div>
-      <div class="sp-meta mt-2">
-        <div class="sp-meta-row">
-          <i class="fas fa-location-dot"></i>
-          <span>{{ profile.city_abroad|default:"City not set" }}, {{ profile.country|default:"Country not set" }}</span>
-        </div>
-        {% if profile.employer_name or profile.occupation %}
-        <div class="sp-meta-row">
-          <i class="fas fa-briefcase"></i>
-          <span>{{ profile.occupation|default:"Occupation not set" }}{% if profile.employer_name %} · {{ profile.employer_name }}{% endif %}</span>
-        </div>
-        {% endif %}
-      </div>
-    </div>
+<!-- Location status -->
+<div id="sosStatus" class="sos-status sos-status-idle mb-3" role="status">
+  <i class="fas fa-location-crosshairs"></i>
+  <div>
+    <div class="sos-status-title">Location not shared yet</div>
+    <div class="sos-status-text">Tap Send My Location so management can see where you are.</div>
   </div>
+</div>
 
   <!-- Send Emergency Location Ping -->
   <div class="card mb-3" id="sendLocationCard">
     <div class="card-header">
-      <h5 class="card-title mb-0"><i class="fas fa-location-crosshairs me-2"></i>Send Emergency Location</h5>
+      <h5 class="card-title mb-0"><i class="fas fa-location-crosshairs me-2"></i>Send My Location</h5>
     </div>
     <div class="card-body">
       <p class="text-muted small mb-3">We will send your location to management and show the nearest safe place.</p>
@@ -128,17 +111,22 @@
   </div>
 
   <!-- Safe Places Near You -->
-  <div class="card">
-    <div class="card-header sp-card-header">
-      <div class="sp-card-heading">
+  <div class="card mb-3">
+    <button type="button" class="sos-collapse-head" data-bs-toggle="collapse"
+            data-bs-target="#nearbyBody" aria-expanded="false" aria-controls="nearbyBody">
+      <span class="sp-card-heading">
         <i class="fas fa-shield-alt"></i>
         <span>Safe Places Near You</span>
-      </div>
-      <button type="button" class="btn btn-sm btn-outline-primary" id="nearbyLocateBtn">
-        <i class="fas fa-location-crosshairs me-1"></i>Detect
-      </button>
-    </div>
+      </span>
+      <i class="fas fa-chevron-down sos-chevron" aria-hidden="true"></i>
+    </button>
+    <div class="collapse" id="nearbyBody">
     <div class="card-body">
+      <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="nearbyLocateBtn">
+          <i class="fas fa-location-crosshairs me-1"></i>Detect
+        </button>
+      </div>
       <div id="nearbyStatus" class="sp-status mb-2">
         Turn on location to see the nearest police station, hospital, or embassy first.
       </div>
@@ -208,14 +196,55 @@
       </div>
       {% endif %}
     </div>
+    </div>
+  </div>
+
+  <!-- My details (collapsed) -->
+  <div class="card mb-3">
+    <button type="button" class="sos-collapse-head" data-bs-toggle="collapse"
+            data-bs-target="#sosDetails" aria-expanded="false" aria-controls="sosDetails">
+      <span class="sp-card-heading">
+        <i class="fas fa-user"></i>
+        <span>My details</span>
+      </span>
+      <i class="fas fa-chevron-down sos-chevron" aria-hidden="true"></i>
+    </button>
+    <div class="collapse" id="sosDetails">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="fw-bold">{{ profile.full_name }}</span>
+          <span class="badge bg-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}-lt text-{% if profile.welfare_status == 'distressed' %}danger{% elif profile.welfare_status == 'needs_support' %}warning{% else %}success{% endif %}">
+            {{ profile.get_welfare_status_display }}
+          </span>
+        </div>
+        <div class="sp-meta mt-2">
+          <div class="sp-meta-row">
+            <i class="fas fa-location-dot"></i>
+            <span>{{ profile.city_abroad|default:"City not set" }}, {{ profile.country|default:"Country not set" }}</span>
+          </div>
+          {% if profile.employer_name or profile.occupation %}
+          <div class="sp-meta-row">
+            <i class="fas fa-briefcase"></i>
+            <span>{{ profile.occupation|default:"Occupation not set" }}{% if profile.employer_name %} · {{ profile.employer_name }}{% endif %}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Recent Location Pings -->
   {% if recent_pings %}
-  <div class="card mt-3">
-    <div class="card-header">
-      <h5 class="card-title mb-0"><i class="fas fa-history me-2"></i>Recent Location Pings</h5>
-    </div>
+  <div class="card mb-3">
+    <button type="button" class="sos-collapse-head" data-bs-toggle="collapse"
+            data-bs-target="#sosPings" aria-expanded="false" aria-controls="sosPings">
+      <span class="sp-card-heading">
+        <i class="fas fa-history"></i>
+        <span>Recent location pings</span>
+      </span>
+      <i class="fas fa-chevron-down sos-chevron" aria-hidden="true"></i>
+    </button>
+    <div class="collapse" id="sosPings">
     <div class="table-responsive">
       <table class="table table-vcenter card-table table-sm">
         <thead>
@@ -240,8 +269,19 @@
         </tbody>
       </table>
     </div>
+    </div>
   </div>
   {% endif %}
+
+  <!-- Sticky emergency actions (phones only) -->
+  <div class="sos-sticky d-lg-none">
+    <a href="tel:911" class="btn btn-danger">
+      <i class="fas fa-phone me-1"></i>Call 911
+    </a>
+    <button type="button" class="btn btn-danger" id="sosStickySend">
+      <i class="fas fa-broadcast-tower me-1"></i>Send Location
+    </button>
+  </div>
 
   {% else %}
   <div class="text-muted text-center py-5">
@@ -250,6 +290,7 @@
     <a href="{% url 'ofw:portal_profile' %}" class="btn btn-primary">Complete Profile</a>
   </div>
   {% endif %}
+</div>
 {% endblock %}
 
 {% block extra_css %}
@@ -265,6 +306,33 @@
   var btn = document.getElementById('sendLocationBtn');
   var result = document.getElementById('locationResult');
   if (!btn) return;
+
+  var statusEl = document.getElementById('sosStatus');
+  var statusTitle = statusEl ? statusEl.querySelector('.sos-status-title') : null;
+  var statusText = statusEl ? statusEl.querySelector('.sos-status-text') : null;
+  var stickyBtn = document.getElementById('sosStickySend');
+  var nearbyBody = document.getElementById('nearbyBody');
+
+  function setStatus(state, title, text) {
+    if (!statusEl) return;
+    statusEl.className = 'sos-status sos-status-' + state + ' mb-3';
+    if (statusTitle) statusTitle.textContent = title;
+    if (statusText) statusText.textContent = text;
+  }
+
+  function expandNearby() {
+    if (!nearbyBody || nearbyBody.classList.contains('show')) return;
+    if (window.bootstrap && bootstrap.Collapse) {
+      bootstrap.Collapse.getOrCreateInstance(nearbyBody, { toggle: false }).show();
+    }
+  }
+
+  function markSent() {
+    if (stickyBtn) {
+      stickyBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Update Location';
+      stickyBtn.classList.replace('btn-danger', 'btn-success');
+    }
+  }
 
   function restoreButton() {
     btn.disabled = false;
@@ -296,9 +364,20 @@
       .then(function (resp) { return resp.json(); })
       .then(function (data) {
         if (data.status === 'ok') {
+          var when = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
           result.innerHTML = '<div class="alert alert-success py-2"><i class="fas fa-check-circle me-2"></i>Location sent to management. Follow the guidance below.</div>';
           btn.innerHTML = '<i class="fas fa-check me-2"></i>Location Sent';
           btn.classList.replace('btn-danger', 'btn-success');
+          setStatus(
+            'ok',
+            (loc.source === 'ip' ? 'Approximate location shared' : 'Location shared') + ' · ' + when,
+            'Management can see your location. Follow the guidance below.'
+          );
+          markSent();
+          expandNearby();
+          if (window.KabayaniNearby) {
+            window.KabayaniNearby.refresh(loc.lat, loc.lng);
+          }
           if (window.KabayaniGuide) {
             window.KabayaniGuide.start(loc.lat, loc.lng, loc.accuracy);
           }
@@ -306,11 +385,13 @@
           if (guide) guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
           result.innerHTML = '<div class="alert alert-danger py-2 small">Failed to send: ' + (data.error || 'unknown error') + '</div>';
+          setStatus('warn', 'Location not sent', 'Something went wrong. Try again.');
           restoreButton();
         }
       })
       .catch(function (err) {
         result.innerHTML = '<div class="alert alert-danger py-2 small">Network error: ' + err.message + '</div>';
+        setStatus('warn', 'Location not sent', 'Check your internet connection and try again.');
         restoreButton();
       });
   }
@@ -319,12 +400,14 @@
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting location...';
     result.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-location-crosshairs me-2"></i>Getting your location… This can take a few seconds.</div>';
+    setStatus('busy', 'Getting your location…', 'Allow location access if your browser asks.');
 
     KabayaniLocation.getPosition()
       .then(sendPing)
       .catch(function (err) {
         result.innerHTML = '<div class="alert alert-danger py-2 small">' +
           KabayaniLocation.describeError(err) + '</div>';
+        setStatus('warn', 'Location not sent', 'Check location permission and try again.');
 
         if (err && err.code === 1) {
           var approxBtn = document.createElement('button');
@@ -334,6 +417,7 @@
           approxBtn.addEventListener('click', function () {
             approxBtn.disabled = true;
             approxBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting approximate location...';
+            setStatus('busy', 'Getting approximate location…', 'Using your internet connection instead of GPS.');
             KabayaniLocation.getApproximate()
               .then(function (loc) {
                 result.innerHTML = '';
@@ -343,6 +427,7 @@
                 result.innerHTML = '<div class="alert alert-danger py-2 small">' +
                   'Unable to get an approximate location. Check your internet connection, ' +
                   'then allow location access and try again.</div>';
+                setStatus('warn', 'Location not sent', 'Unable to get an approximate location. Try again.');
                 restoreButton();
               });
           });
@@ -352,6 +437,14 @@
         restoreButton();
       });
   });
+
+  if (stickyBtn) {
+    stickyBtn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      btn.click();
+      btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
   var helpBox = KabayaniLocation.inAppHelpBox();
   var sendCard = document.getElementById('sendLocationCard');
   if (helpBox && sendCard && sendCard.parentNode) {
@@ -673,7 +766,19 @@ window.KabayaniGuide = (function () {
     });
   }
 
+  function applyLocation(lat, lng) {
+    sortCards(lat, lng);
+    statusEl.className = 'sp-status sp-status-ok mb-2';
+    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Nearest safe places are shown first.';
+    if (locateBtn) {
+      locateBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Update';
+      locateBtn.disabled = false;
+    }
+  }
+
   function showLocated(lat, lng, accuracy) {
+    applyLocation(lat, lng);
+
     var mapObj = ensureMap();
     if (mapObj) {
       if (userMarker) mapObj.removeLayer(userMarker);
@@ -701,14 +806,6 @@ window.KabayaniGuide = (function () {
       } else {
         mapObj.setView([lat, lng], 13);
       }
-    }
-
-    sortCards(lat, lng);
-    statusEl.className = 'sp-status sp-status-ok mb-2';
-    statusEl.innerHTML = '<i class="fas fa-check-circle me-1"></i>Nearest safe places are shown first.';
-    if (locateBtn) {
-      locateBtn.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Update';
-      locateBtn.disabled = false;
     }
   }
 
@@ -747,6 +844,7 @@ window.KabayaniGuide = (function () {
   }
 
   if (locateBtn) locateBtn.addEventListener('click', locate);
+  window.KabayaniNearby = { refresh: applyLocation };
   if (window.isSecureContext !== false) {
     window.setTimeout(function () { if (locateBtn && !locateBtn.disabled) locate(); }, 600);
   } else {
