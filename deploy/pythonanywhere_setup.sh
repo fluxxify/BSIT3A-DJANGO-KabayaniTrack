@@ -49,7 +49,7 @@ python manage.py collectstatic --noinput
 python manage.py check
 
 SECRET_KEY=""
-if [ -f deploy/pythonanywhere_wsgi.generated.py ]; then
+if [ "${ROTATE_SECRET_KEY:-0}" != "1" ] && [ -f deploy/pythonanywhere_wsgi.generated.py ]; then
     SECRET_KEY="$(python -c 'import pathlib,re; p=pathlib.Path("deploy/pythonanywhere_wsgi.generated.py").read_text(); m=re.search(r"DJANGO_SECRET_KEY\x27\] = \x27([^\x27]+)", p); print(m.group(1) if m else "")')"
 fi
 if [ -z "$SECRET_KEY" ]; then
@@ -80,6 +80,12 @@ from django.core.wsgi import get_wsgi_application  # noqa: E402
 application = get_wsgi_application()
 EOF
 
+DJANGO_DEBUG=0 \
+DJANGO_SECRET_KEY="$SECRET_KEY" \
+DJANGO_ALLOWED_HOSTS="$DOMAIN" \
+DJANGO_CSRF_TRUSTED_ORIGINS="https://$DOMAIN" \
+DJANGO_SECURE_SSL_REDIRECT=1 \
+DJANGO_SECURE_HSTS_SECONDS=3600 \
 python manage.py check --deploy
 
 cat <<EOF
