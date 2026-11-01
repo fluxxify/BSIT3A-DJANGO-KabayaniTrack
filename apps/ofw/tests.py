@@ -1425,6 +1425,17 @@ class SafeLocationNearbyTests(TestCase):
         self.assertContains(response, 'id="nearbyLocateBtn"')
         self.assertContains(response, 'id="nearbyMap"')
 
+    def test_emergency_sos_collapsibles_use_custom_toggles(self):
+        response = self.client.get(reverse('ofw:portal_emergency_sos'))
+        self.assertContains(response, 'id="nearbyToggle"')
+        self.assertContains(response, 'data-sos-collapse="#nearbyBody"')
+        self.assertContains(response, 'data-sos-collapse="#sosDetails"')
+        self.assertContains(response, 'class="sos-sticky d-lg-none"')
+        # Bootstrap is loaded twice on the page, so the data-api would toggle
+        # these panels twice and a second tap would reopen them.
+        self.assertNotContains(response, 'data-bs-target="#nearbyBody"')
+        self.assertNotContains(response, 'data-bs-target="#sosDetails"')
+
     def test_emergency_sos_prefers_profile_country(self):
         SafeLocation.objects.create(
             name='Riyadh Central Police Station',

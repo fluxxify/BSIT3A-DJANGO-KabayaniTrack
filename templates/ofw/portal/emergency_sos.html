@@ -132,8 +132,8 @@
 
   <!-- Safe Places Near You -->
   <div class="card mb-3">
-    <button type="button" class="sos-collapse-head" data-bs-toggle="collapse"
-            data-bs-target="#nearbyBody" aria-expanded="false" aria-controls="nearbyBody">
+    <button type="button" class="sos-collapse-head" id="nearbyToggle"
+            data-sos-collapse="#nearbyBody" aria-expanded="false" aria-controls="nearbyBody">
       <span class="sp-card-heading">
         <i class="fas fa-shield-alt"></i>
         <span>Safe Places Near You</span>
@@ -221,8 +221,8 @@
 
   <!-- My details (collapsed) -->
   <div class="card mb-3">
-    <button type="button" class="sos-collapse-head" data-bs-toggle="collapse"
-            data-bs-target="#sosDetails" aria-expanded="false" aria-controls="sosDetails">
+    <button type="button" class="sos-collapse-head" id="detailsToggle"
+            data-sos-collapse="#sosDetails" aria-expanded="false" aria-controls="sosDetails">
       <span class="sp-card-heading">
         <i class="fas fa-user"></i>
         <span>My details</span>
@@ -256,8 +256,8 @@
   <!-- Recent Location Pings -->
   {% if recent_pings %}
   <div class="card mb-3">
-    <button type="button" class="sos-collapse-head" data-bs-toggle="collapse"
-            data-bs-target="#sosPings" aria-expanded="false" aria-controls="sosPings">
+    <button type="button" class="sos-collapse-head" id="pingsToggle"
+            data-sos-collapse="#sosPings" aria-expanded="false" aria-controls="sosPings">
       <span class="sp-card-heading">
         <i class="fas fa-history"></i>
         <span>Recent location pings</span>
@@ -332,6 +332,24 @@
   var statusText = statusEl ? statusEl.querySelector('.sos-status-text') : null;
   var stickyBtn = document.getElementById('sosStickySend');
   var nearbyBody = document.getElementById('nearbyBody');
+  var nearbyToggle = document.getElementById('nearbyToggle');
+
+  // The page loads Bootstrap twice (CDN + Tabler), so its data-api toggles the
+  // same panel twice and a second tap reopens it. Drive the collapse ourselves.
+  Array.prototype.forEach.call(
+    document.querySelectorAll('.sos-collapse-head[data-sos-collapse]'),
+    function (head) {
+      head.addEventListener('click', function () {
+        var target = document.querySelector(head.getAttribute('data-sos-collapse'));
+        if (!target || !window.bootstrap || !bootstrap.Collapse) return;
+        var instance = bootstrap.Collapse.getOrCreateInstance(target, { toggle: false });
+        var willOpen = !target.classList.contains('show');
+        head.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        if (willOpen) instance.show();
+        else instance.hide();
+      });
+    }
+  );
 
   function setStatus(state, title, text) {
     if (!statusEl) return;
@@ -344,6 +362,7 @@
     if (!nearbyBody || nearbyBody.classList.contains('show')) return;
     if (window.bootstrap && bootstrap.Collapse) {
       bootstrap.Collapse.getOrCreateInstance(nearbyBody, { toggle: false }).show();
+      if (nearbyToggle) nearbyToggle.setAttribute('aria-expanded', 'true');
     }
   }
 

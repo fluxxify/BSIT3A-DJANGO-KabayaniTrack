@@ -585,6 +585,8 @@ def portal_contact_delete(request, pk):
         )
         return redirect('ofw:portal_contacts')
 
+    return redirect('ofw:portal_contacts')
+
 
 @login_required(login_url='login')
 def portal_suggest_safe_place(request):
