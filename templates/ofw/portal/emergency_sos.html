@@ -729,9 +729,9 @@ window.KabayaniGuide = (function () {
   function ensureMap() {
     if (map || !mapEl || typeof L === 'undefined') return map;
     map = L.map(mapEl, { scrollWheelZoom: false, zoomControl: true });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>'
     }).addTo(map);
     mapWrap.classList.remove('d-none');
     return map;
