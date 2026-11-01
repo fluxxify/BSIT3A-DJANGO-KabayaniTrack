@@ -1,0 +1,33 @@
+<a href="{% url 'ofw:emergency_guide' alert.ofw.pk %}" class="btn btn-sm btn-danger">
+  <i class="fas fa-headset me-1"></i> Guide
+</a>
+{% if alert.ofw.contact_number %}
+<a href="tel:{{ alert.ofw.contact_number }}" class="btn btn-sm btn-success">
+  <i class="fas fa-phone me-1"></i> Call
+</a>
+{% endif %}
+{% if alert.status == 'open' %}
+<form method="post" action="{% url 'ofw:acknowledge_alert' alert.pk %}" class="d-inline">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-sm btn-outline-primary" onclick="return confirm('Mark as called OFW?')">
+    <i class="fas fa-phone me-1"></i> Called
+  </button>
+</form>
+<form method="post" action="{% url 'ofw:escalate_to_police' alert.pk %}" class="d-inline">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Escalate to police? No response from OFW.')">
+    <i class="fas fa-exclamation-triangle me-1"></i> Police
+  </button>
+</form>
+{% elif alert.status == 'acknowledged' %}
+<form method="post" action="{% url 'ofw:escalate_to_police' alert.pk %}" class="d-inline">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Escalate to police?')">
+    <i class="fas fa-exclamation-triangle me-1"></i> Escalate
+  </button>
+</form>
+{% elif alert.police_report %}
+<a href="{% url 'ofw:police_reports' %}" class="btn btn-sm btn-outline-secondary">
+  <i class="fas fa-file-alt me-1"></i> Report
+</a>
+{% endif %}

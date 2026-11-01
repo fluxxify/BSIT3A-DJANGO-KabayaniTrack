@@ -84,11 +84,15 @@ urlpatterns = [
 
     # Inactive OFW accounts (admin/agency warning dashboard)
     path('inactive-ofws/', views.inactive_ofws_page, name='inactive_ofws'),
+    path('inactive-ofws/<int:pk>/request-location/', views.request_ofw_location, name='request_ofw_location'),
 
     # Emergency alerts
     path('emergency-alerts/', views.emergency_alerts_page, name='emergency_alerts'),
     path('emergency-alerts/<int:pk>/acknowledge/', views.acknowledge_alert, name='acknowledge_alert'),
     path('emergency-alerts/<int:pk>/escalate/', views.escalate_to_police, name='escalate_to_police'),
+
+    # Call guide with the nearest safe places
+    path('emergency-guide/<int:pk>/', views.emergency_guide, name='emergency_guide'),
 
     # Police reports
     path('police-reports/', views.police_reports_page, name='police_reports'),

@@ -1,0 +1,273 @@
+{% extends "theme/base.html" %}
+{% load static %}
+{% block content %}
+<div class="eg-guide">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center g-2">
+      <div class="col-12 col-md">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-1">{{ profile.full_name }}</h2>
+        <div class="text-muted small">
+          {{ profile.country|default:"Country not set" }}{% if profile.city_abroad %} · {{ profile.city_abroad }}{% endif %}
+          {% if profile.agency_org %} · {{ profile.agency_org.name }}{% endif %}
+        </div>
+      </div>
+      <div class="col-auto col-md-auto d-flex flex-wrap gap-2">
+        {% if profile.contact_number %}
+        <a href="tel:{{ profile.contact_number }}" class="btn btn-success">
+          <i class="fas fa-phone me-1"></i>Call OFW
+        </a>
+        {% endif %}
+        <a href="{% url 'ofw:location_tracker' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-map me-1"></i>Live map
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-danger d-flex gap-2 py-2">
+    <i class="fas fa-headset mt-1"></i>
+    <div>
+      <strong>Stay on the call.</strong> Read the script below and guide the OFW
+      to the nearest safe place. If there is no response, escalate to police.
+    </div>
+  </div>
+
+  <div class="row row-cards mb-3">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="eg-label">Contact number</div>
+          <div class="fw-bold">
+            {% if profile.contact_number %}{{ profile.contact_number }}{% else %}Not set{% endif %}
+          </div>
+          <div class="eg-label mt-3">Welfare status</div>
+          <div>{{ profile.get_welfare_status_display }}</div>
+          <div class="eg-label mt-3">Employer</div>
+          <div>{{ profile.employer_name|default:"Not set" }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="eg-label">Last known location</div>
+          {% if latest_ping %}
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-{% if freshness == 'live' %}success{% elif freshness == 'recent' %}info{% elif freshness == 'stale' %}warning{% else %}secondary{% endif %}-lt text-{% if freshness == 'live' %}success{% elif freshness == 'recent' %}info{% elif freshness == 'stale' %}warning{% else %}secondary{% endif %}">
+              {{ age_label }}
+            </span>
+            <span class="small text-muted">{{ latest_ping.recorded_at|timesince }} ago</span>
+          </div>
+          <div class="small text-muted mt-1">
+            {{ latest_ping.latitude }}, {{ latest_ping.longitude }}
+            {% if latest_ping.accuracy_meters %} · ±{{ latest_ping.accuracy_meters }} m{% endif %}
+          </div>
+          {% else %}
+          <div class="fw-bold text-warning">No location ping yet</div>
+          <div class="small text-muted">Use the script below and ask the OFW to send their location.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="eg-label">Open alert</div>
+          {% if alert %}
+          <div class="fw-bold">{{ alert.get_level_display }} · {{ alert.get_status_display }}</div>
+          <div class="small text-muted">{{ alert.created_at|date:"M d, Y H:i" }}</div>
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            {% if alert.status == 'open' %}
+            <form method="post" action="{% url 'ofw:acknowledge_alert' alert.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-phone me-1"></i>Mark as called
+              </button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'ofw:escalate_to_police' alert.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger"
+                      onclick="return confirm('Escalate to police?')">
+                <i class="fas fa-exclamation-triangle me-1"></i>Police
+              </button>
+            </form>
+          </div>
+          {% else %}
+          <div class="fw-bold text-success">No open alert</div>
+          <div class="small text-muted">Still call to check on the OFW.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if latest_ping %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-map-location-dot me-2"></i>Last known position</h5>
+    </div>
+    <div class="card-body p-0">
+      <div id="guideMap" style="height: 320px; width: 100%;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-shield-alt me-2"></i>Nearest safe places</h5>
+    </div>
+    <div class="card-body">
+      {% if nearest_places %}
+      <div class="row row-cards">
+        {% for place in nearest_places %}
+        <div class="col-md-6">
+          <div class="card h-100 sp-card">
+            <div class="card-body">
+              <div class="sp-card-top">
+                <h6 class="sp-card-title">{{ place.name }}</h6>
+                <span class="badge bg-info-lt text-info">{{ place.type }}</span>
+              </div>
+              <div class="sp-distance mb-2">
+                {{ place.distance_text }} away · {{ place.direction }} · ≈{{ place.walking_minutes }} min walk
+              </div>
+              <div class="sp-meta">
+                <div class="sp-meta-row">
+                  <i class="fas fa-location-dot"></i>
+                  <span>{% if place.city %}{{ place.city }}, {% endif %}{{ place.country }}</span>
+                </div>
+                {% if place.address %}
+                <div class="sp-meta-row"><i class="fas fa-building"></i><span>{{ place.address }}</span></div>
+                {% endif %}
+                {% if place.phone %}
+                <div class="sp-meta-row"><i class="fas fa-phone"></i><span>{{ place.phone }}</span></div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+              {% if place.phone %}
+              <a href="tel:{{ place.phone }}" class="btn btn-sm btn-success flex-grow-1">
+                <i class="fas fa-phone me-1"></i> Call
+              </a>
+              {% elif place.emergency_phone %}
+              <a href="tel:{{ place.emergency_phone }}" class="btn btn-sm btn-success flex-grow-1">
+                <i class="fas fa-phone me-1"></i> Call {{ place.emergency_phone }}
+              </a>
+              {% endif %}
+              <a href="{{ place.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
+                <i class="fas fa-map-marker-alt"></i> Directions
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% elif fallback_locations %}
+      <div class="alert alert-warning py-2">
+        No location ping yet, so distances are unavailable. These are registered
+        safe places in the OFW's country:
+      </div>
+      <ul class="list-unstyled mb-0">
+        {% for place in fallback_locations %}
+        <li class="py-1 border-bottom">
+          <strong>{{ place.name }}</strong>
+          <span class="text-muted small">· {{ place.get_location_type_display }}{% if place.city %}, {{ place.city }}{% endif %}</span>
+          {% if place.phone %}<a href="tel:{{ place.phone }}" class="ms-2 small">Call</a>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="text-muted">
+        No safe place is registered for this OFW's location yet. Ask the OFW to
+        call the local emergency number and stay on the line.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-comments me-2"></i>Call script</h5>
+    </div>
+    <div class="card-body">
+      <ol class="eg-steps mb-0">
+        <li>Confirm you are speaking to <strong>{{ profile.full_name }}</strong>.</li>
+        <li>Ask: <em>"Are you safe right now? Are you injured?"</em></li>
+        {% if nearest_places %}
+        <li>
+          Say: <em>"The nearest safe place is <strong>{{ nearest_places.0.name }}</strong>,
+          about {{ nearest_places.0.distance_text }} {{ nearest_places.0.direction|lower }} of you.
+          Can you walk there?"</em>
+        </li>
+        <li>If they cannot move, tell them to call the local emergency number and stay on the line.</li>
+        {% else %}
+        <li>Ask the OFW to open <strong>Emergency SOS</strong> and tap <strong>Send My Location</strong>.</li>
+        <li>If they cannot move, tell them to call the local emergency number and stay on the line.</li>
+        {% endif %}
+        <li>Stay on the call until they reach the safe place or help arrives.</li>
+        <li>If there is no answer after several attempts, escalate to police.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h5 class="card-title mb-0"><i class="fas fa-phone-volume me-2"></i>Emergency hotlines</h5>
+    </div>
+    <div class="card-body">
+      {% if local_hotlines %}
+      <div class="eg-label">Local to {{ profile.country }}</div>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        {% for hotline in local_hotlines %}
+        <a href="tel:{{ hotline.dial_number }}" class="btn btn-sm btn-outline-danger">
+          <i class="fas fa-phone me-1"></i>{{ hotline.name }} · {{ hotline.phone }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="eg-label">Philippine hotlines</div>
+      <div class="d-flex flex-wrap gap-2">
+        {% for hotline in national_hotlines %}
+        <a href="tel:{{ hotline.dial_number }}" class="btn btn-sm btn-outline-secondary">
+          <i class="fas fa-phone me-1"></i>{{ hotline.name }} · {{ hotline.phone }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="{% static 'css/emergency.css' %}?v=20261101b" />
+{% endblock %}
+
+{% block extra_js %}
+{% if latest_ping %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  var map = L.map('guideMap', { scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  var bounds = [[{{ latest_ping.latitude }}, {{ latest_ping.longitude }}]];
+  L.marker([{{ latest_ping.latitude }}, {{ latest_ping.longitude }}], { zIndexOffset: 1000 })
+    .addTo(map)
+    .bindPopup('<b>{{ profile.full_name|escapejs }}</b><br>Last seen {{ latest_ping.recorded_at|date:"M d, H:i"|escapejs }}');
+
+  {% for place in nearest_places %}
+  L.marker([{{ place.latitude }}, {{ place.longitude }}])
+    .addTo(map)
+    .bindPopup('<b>{{ place.name|escapejs }}</b><br>{{ place.distance_text|escapejs }} {{ place.direction|escapejs }}');
+  bounds.push([{{ place.latitude }}, {{ place.longitude }}]);
+  {% endfor %}
+
+  map.fitBounds(L.latLngBounds(bounds).pad(0.2), { maxZoom: 15 });
+})();
+</script>
+{% endif %}
+{% endblock %}

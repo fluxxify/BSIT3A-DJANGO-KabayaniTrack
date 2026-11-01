@@ -821,9 +821,32 @@ def inactive_ofws_page(request):
 
     return render(request, 'ofw/inactive_ofws.html', {
         'inactive_rows': inactive_rows,
-        'page_title': 'OFW Activity Warning',
-        'page_pretitle': 'OFWs Offline 3-5 Days',
+        'page_title': 'Inactive OFWs',
+        'page_pretitle': 'No check-in for 3 or more days',
     })
+
+
+@login_required(login_url='login')
+@require_POST
+def request_ofw_location(request, pk):
+    """Ask an inactive OFW to share their location (consent-based)."""
+    profile = get_object_or_404(_management_scope(request.user), pk=pk)
+    if profile.user is None:
+        messages.error(request, 'This OFW has no linked login account.')
+        return redirect('ofw:inactive_ofws')
+
+    notify(
+        profile.user,
+        'Your agency is checking on you',
+        'Please open Emergency SOS and tap Send My Location so we know you are safe.',
+        url=reverse('ofw:portal_emergency_sos'),
+        level=Notification.Level.WARNING,
+    )
+    messages.success(
+        request,
+        f'Location request sent to {profile.full_name}. They must allow it on their phone.',
+    )
+    return redirect('ofw:inactive_ofws')
 
 
 @login_required(login_url='login')
@@ -1071,13 +1094,19 @@ def safe_location_delete(request, pk):
 
 @login_required(login_url='login')
 def location_tracker_page(request):
-    """View recent location pings for OFWs (emergency tracking)."""
+    """Live map of the latest known location for each OFW.
+
+    Each OFW appears once (their newest ping), so management can see who is
+    currently sharing a location instead of scrolling through duplicate rows.
+    """
     if not (request.user.is_superuser or request.user.is_staff):
         return redirect('dashboard')
 
     from apps.users.agencies import agency_for_user
 
-    pings_qs = LocationTracker.objects.select_related('ofw__user').order_by('-recorded_at')
+    pings_qs = LocationTracker.objects.select_related(
+        'ofw__user', 'ofw__agency_org'
+    ).order_by('-recorded_at')
 
     if not request.user.is_superuser:
         agency = agency_for_user(request.user)
@@ -1090,11 +1119,39 @@ def location_tracker_page(request):
     if emergency_only:
         pings_qs = pings_qs.filter(is_emergency=True)
 
+    history = list(pings_qs[:200])
+
+    latest_pings = []
+    seen_ofws = set()
+    now = timezone.now()
+    for ping in history:
+        if ping.ofw_id in seen_ofws:
+            continue
+        seen_ofws.add(ping.ofw_id)
+        age_seconds = max(0, int((now - ping.recorded_at).total_seconds()))
+        ping.age_seconds = age_seconds
+        ping.age_minutes = age_seconds // 60
+        if age_seconds <= 600:
+            ping.freshness = 'live'
+            ping.freshness_label = 'Live now'
+        elif age_seconds <= 3600:
+            ping.freshness = 'recent'
+            ping.freshness_label = f'{age_seconds // 60} min ago'
+        elif age_seconds <= 86400:
+            ping.freshness = 'stale'
+            ping.freshness_label = f'{age_seconds // 3600} hr ago'
+        else:
+            ping.freshness = 'old'
+            ping.freshness_label = f'{age_seconds // 86400} day(s) ago'
+        latest_pings.append(ping)
+
     return render(request, 'ofw/location_tracker.html', {
-        'pings': pings_qs[:50],
+        'pings': history[:50],
+        'latest_pings': latest_pings,
         'emergency_only': emergency_only,
-        'page_title': 'Live GPS Map',
-        'page_pretitle': 'Track OFW Location in Real-Time',
+        'live_count': sum(1 for p in latest_pings if p.freshness == 'live'),
+        'page_title': 'Live Location Map',
+        'page_pretitle': 'Latest location per OFW',
     })
 
 
@@ -1177,6 +1234,17 @@ def location_tracker_ping(request):
     return JsonResponse({'status': 'ok', 'id': ping.pk, 'alert_id': alert.pk if alert else None})
 
 
+_EMERGENCY_NUMBERS = {
+    'Philippines': '911',
+    'Hong Kong': '999',
+    'Saudi Arabia': '999',
+    'Kuwait': '112',
+    'Qatar': '999',
+    'United Arab Emirates': '999',
+    'Switzerland': '112',
+}
+
+
 def nearest_safe_places(lat, lng, limit=6, locations=None):
     """Return active safe places sorted by distance from a coordinate.
 
@@ -1217,6 +1285,9 @@ def nearest_safe_places(lat, lng, limit=6, locations=None):
             'country': place.country,
             'address': place.address,
             'phone': place.phone,
+            'emergency_phone': _EMERGENCY_NUMBERS.get(
+                canonical_country(place.country), ''
+            ),
             'latitude': place_lat,
             'longitude': place_lng,
             'distance_km': round(km, 3),
@@ -1271,6 +1342,77 @@ def location_context(request):
         'latitude': lat_value,
         'longitude': lng_value,
         'nearest': nearest,
+    })
+
+
+@login_required(login_url='login')
+def emergency_guide(request, pk):
+    """Call guide: where the OFW was last seen and the safest places nearby."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    profile = get_object_or_404(_management_scope(request.user), pk=pk)
+    latest = profile.location_pings.order_by('-recorded_at').first()
+
+    nearest = []
+    if latest is not None:
+        nearest = nearest_safe_places(
+            latest.latitude, latest.longitude, limit=6
+        )
+
+    fallback_locations = []
+    if not nearest:
+        country = canonical_country(profile.country) if profile.country else ''
+        fallback_qs = SafeLocation.objects.filter(is_active=True)
+        if country:
+            fallback_qs = fallback_qs.filter(country__iexact=country)
+        fallback_locations = list(fallback_qs.order_by('city', 'name')[:6])
+
+    alert = profile.emergency_alerts.filter(
+        status__in=[EmergencyAlert.Status.OPEN, EmergencyAlert.Status.ACKNOWLEDGED]
+    ).order_by('-created_at').first()
+
+    age_seconds = None
+    age_label = ''
+    age_minutes = None
+    freshness = 'old'
+    is_live = False
+    if latest is not None:
+        age_seconds = max(0, int((timezone.now() - latest.recorded_at).total_seconds()))
+        age_minutes = age_seconds // 60
+        is_live = age_seconds <= 600
+        if is_live:
+            freshness = 'live'
+            age_label = 'Live now'
+        elif age_seconds <= 3600:
+            freshness = 'recent'
+            age_label = f'{age_minutes} min ago'
+        elif age_seconds <= 86400:
+            freshness = 'stale'
+            age_label = f'{age_seconds // 3600} hr ago'
+        else:
+            freshness = 'old'
+            age_label = f'{age_seconds // 86400} day(s) ago'
+
+    from .hotlines import automatic_local_hotlines, philippine_national_hotlines
+    local_hotlines = automatic_local_hotlines(profile.country)
+    national_hotlines = philippine_national_hotlines()
+
+    return render(request, 'ofw/emergency_guide.html', {
+        'profile': profile,
+        'latest_ping': latest,
+        'nearest_places': nearest,
+        'fallback_locations': fallback_locations,
+        'alert': alert,
+        'age_seconds': age_seconds,
+        'age_label': age_label,
+        'age_minutes': age_minutes,
+        'freshness': freshness,
+        'is_live': is_live,
+        'local_hotlines': local_hotlines,
+        'national_hotlines': national_hotlines,
+        'page_title': f'Emergency Guide - {profile.full_name}',
+        'page_pretitle': 'Call the OFW and guide them to the nearest safe place',
     })
 
 

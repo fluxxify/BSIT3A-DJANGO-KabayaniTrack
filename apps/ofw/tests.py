@@ -1471,6 +1471,100 @@ class SeedSafeLocationsCommandTests(TestCase):
         ).count()
         self.assertEqual(first_count, second_count)
 
+    def test_masulog_has_a_safe_place_inside_the_barangay(self):
+        """Standing in Masulog must find a place in Masulog, not a far city."""
+        from django.core.management import call_command
+
+        from apps.ofw.views import nearest_safe_places
+
+        call_command('seed_safe_locations', verbosity=0)
+        rows = nearest_safe_places(10.3593, 123.1703, limit=1)
+        self.assertEqual(rows[0]['name'], 'Masulog Barangay Health Center')
+        self.assertLess(rows[0]['distance_km'], 1)
+
+    def test_command_seeds_every_ofw_deployment_country(self):
+        from django.core.management import call_command
+
+        call_command('seed_safe_locations', verbosity=0)
+        for country in (
+            'Hong Kong', 'Saudi Arabia', 'Kuwait', 'Qatar',
+            'United Arab Emirates', 'Switzerland',
+        ):
+            self.assertTrue(
+                SafeLocation.objects.filter(country=country, is_active=True).exists(),
+                f'No safe place seeded for {country}',
+            )
+
+    def test_nearest_safe_place_in_hong_kong_is_local(self):
+        from django.core.management import call_command
+
+        from apps.ofw.views import nearest_safe_places
+
+        call_command('seed_safe_locations', verbosity=0)
+        rows = nearest_safe_places(22.2819, 114.1582, limit=1)
+        self.assertEqual(rows[0]['country'], 'Hong Kong')
+        self.assertLess(rows[0]['distance_km'], 3)
+
+
+class EmergencyGuideViewTests(TestCase):
+    """The admin call guide must show where the OFW is and what is nearby."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='guideadmin', password='Passw0rd!23', is_staff=True
+        )
+        self.ofw = User.objects.create_user(
+            username='guideofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw, first_name='Liza', last_name='Mendoza',
+            country='Hong Kong', city_abroad='Central',
+            contact_number='+852 9123 4567',
+        )
+        LocationTracker.objects.create(
+            ofw=self.profile, latitude='22.281900', longitude='114.158200',
+            is_emergency=True,
+        )
+        SafeLocation.objects.create(
+            name='Central Police Station',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='Hong Kong', city='Hong Kong', phone='999',
+            latitude='22.279700', longitude='114.159800',
+        )
+        self.client.force_login(self.staff)
+
+    def test_guide_shows_nearest_place_and_call_buttons(self):
+        response = self.client.get(
+            reverse('ofw:emergency_guide', args=[self.profile.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Central Police Station')
+        self.assertContains(response, 'Call OFW')
+        self.assertContains(response, 'tel:+852 9123 4567')
+        self.assertContains(response, 'Nearest safe places')
+
+    def test_guide_handles_ofw_without_any_ping(self):
+        self.profile.location_pings.all().delete()
+        response = self.client.get(
+            reverse('ofw:emergency_guide', args=[self.profile.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No location ping yet')
+
+    def test_request_location_notifies_the_ofw(self):
+        response = self.client.post(
+            reverse('ofw:request_ofw_location', args=[self.profile.pk]),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.ofw,
+                title='Your agency is checking on you',
+            ).exists()
+        )
+
 class LocationContextApiTests(TestCase):
     """The live guide asks the server where the OFW is and what is nearby."""
 

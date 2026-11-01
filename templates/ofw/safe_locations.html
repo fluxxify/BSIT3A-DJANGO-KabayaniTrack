@@ -32,6 +32,8 @@
 </div>
 {% endif %}
 
+<div class="card sp-summary d-none mb-3" id="nearestSummary" role="status" aria-live="polite"></div>
+
 <div class="sp-tools mb-3">
   <div class="sp-search">
     <i class="fas fa-search" aria-hidden="true"></i>
@@ -309,7 +311,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="{% static 'css/emergency.css' %}?v=20261031a" />
+<link rel="stylesheet" href="{% static 'css/emergency.css' %}?v=20261101b" />
 <style>
   #locationTrackerMap { height: 420px; width: 100%; border-radius: 0.5rem; }
 </style>
@@ -317,7 +319,7 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="{% static 'js/kabayani-location.js' %}?v=20261031a"></script>
+<script src="{% static 'js/kabayani-location.js' %}?v=20261101b"></script>
 <script>
 (function () {
   if (window.KabayaniLocation) {
@@ -539,7 +541,9 @@
       if (inner) inner.classList.remove('sp-nearest');
     });
 
-    nearest.forEach(function (place) {
+    // Put the server's nearest places at the top (already sorted by distance).
+    // Iterating in reverse keeps the nearest one first after each insertBefore.
+    nearest.slice().reverse().forEach(function (place) {
       var card = byId[String(place.id)];
       if (!card) return;
       var badge = card.querySelector('.loc-distance');
@@ -548,7 +552,7 @@
           place.walking_minutes + ' min walk';
         badge.classList.remove('d-none');
       }
-      list.appendChild(card);
+      list.insertBefore(card, list.firstElementChild);
     });
 
     if (nearest.length && byId[String(nearest[0].id)]) {
@@ -556,6 +560,39 @@
       if (firstCard) firstCard.classList.add('sp-nearest');
     }
     refreshFilters(false);
+  }
+
+  function renderNearestSummary(place) {
+    var box = document.getElementById('nearestSummary');
+    if (!box || !place) return;
+    var city = place.city ? esc(place.city) + ', ' : '';
+    var callTo = place.phone || place.emergency_phone || '';
+    var callLabel = place.phone ? 'Call' : (place.emergency_phone ? 'Call ' + esc(place.emergency_phone) : '');
+    var html = '' +
+      '<div class="card-body sp-summary-body">' +
+        '<div class="sp-summary-icon"><i class="fas fa-shield-alt"></i></div>' +
+        '<div class="sp-summary-main">' +
+          '<div class="eg-label">Nearest safe place right now</div>' +
+          '<div class="sp-summary-name">' + esc(place.name) + '</div>' +
+          '<div class="sp-summary-meta">' +
+            '<span class="badge bg-danger-lt text-danger">' + esc(place.type) + '</span>' +
+            '<span><i class="fas fa-location-arrow me-1"></i>' +
+              esc(place.distance_text) + ' ' + esc(place.direction) +
+              ' · ≈' + esc(place.walking_minutes) + ' min walk</span>' +
+            '<span class="text-muted">' + city + esc(place.country || '') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sp-summary-actions">' +
+          (callTo
+            ? '<a href="tel:' + esc(callTo) + '" class="btn btn-sm btn-success">' +
+              '<i class="fas fa-phone me-1"></i>' + callLabel + '</a>'
+            : '') +
+          '<a href="' + esc(place.maps_url) + '" target="_blank" rel="noopener" ' +
+            'class="btn btn-sm btn-primary"><i class="fas fa-map-marker-alt me-1"></i>Directions</a>' +
+        '</div>' +
+      '</div>';
+    box.innerHTML = html;
+    box.classList.remove('d-none');
   }
 
   function loadContext(lat, lng) {
@@ -574,6 +611,7 @@
         }
         if (data.nearest && data.nearest.length) {
           reorderFromServer(data.nearest);
+          renderNearestSummary(data.nearest[0]);
         }
       })
       .catch(function () {
