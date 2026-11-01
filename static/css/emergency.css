@@ -433,7 +433,10 @@
   gap: 0.4rem;
 }
 
-.sp-card-actions form { display: flex; }
+.sp-card-actions form { display: flex; margin: 0; }
+
+.action-buttons { align-items: center; }
+.action-buttons form { display: flex; margin: 0; }
 
 .sp-icon-btn {
   flex: 0 0 36px;

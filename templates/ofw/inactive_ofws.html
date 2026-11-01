@@ -66,7 +66,7 @@
             <td class="text-end"><span class="badge bg-danger">{{ row.activity.days_inactive }} days</span></td>
             <td class="text-end text-muted">{{ row.activity.last_login_at|date:"M d, Y H:i"|default:"never" }}</td>
             <td class="text-end">
-              <div class="d-flex flex-wrap gap-1 justify-content-end">
+              <div class="d-flex flex-wrap gap-1 justify-content-end action-buttons">
                 {% include "ofw/_inactive_actions.html" with row=row %}
               </div>
             </td>
@@ -101,7 +101,7 @@
         <div class="text-muted small mt-1">
           Last login: {{ row.activity.last_login_at|date:"M d, Y H:i"|default:"never" }}
         </div>
-        <div class="d-flex flex-wrap gap-1 mt-2">
+        <div class="d-flex flex-wrap gap-1 mt-2 action-buttons">
           {% include "ofw/_inactive_actions.html" with row=row %}
         </div>
       </div>
