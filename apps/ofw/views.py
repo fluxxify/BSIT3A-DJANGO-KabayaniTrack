@@ -844,11 +844,24 @@ def inactive_ofws_page(request):
 @login_required(login_url='login')
 @require_POST
 def request_ofw_location(request, pk):
-    """Ask an inactive OFW to share their location (consent-based)."""
+    """Ask an OFW to share their location (consent-based)."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+
     profile = get_object_or_404(_management_scope(request.user), pk=pk)
+    next_url = request.POST.get('next', '').strip()
+    if not (
+        next_url
+        and url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        )
+    ):
+        next_url = ''
+
     if profile.user is None:
         messages.error(request, 'This OFW has no linked login account.')
-        return redirect('ofw:inactive_ofws')
+        return redirect(next_url or 'ofw:inactive_ofws')
 
     notify(
         profile.user,
@@ -861,7 +874,7 @@ def request_ofw_location(request, pk):
         request,
         f'Location request sent to {profile.full_name}. They must allow it on their phone.',
     )
-    return redirect('ofw:inactive_ofws')
+    return redirect(next_url or 'ofw:inactive_ofws')
 
 
 @login_required(login_url='login')
@@ -1147,15 +1160,20 @@ def safe_location_delete(request, pk):
 
 @login_required(login_url='login')
 def location_tracker_page(request):
-    """Live map of the latest known location for each OFW.
+    """Live map and list of every OFW and their latest known location.
 
-    Each OFW appears once (their newest ping), so management can see who is
-    currently sharing a location instead of scrolling through duplicate rows.
+    Every OFW in the management scope appears once. OFWs who have never shared
+    a location are still listed with a "No location" status, so management can
+    call them or request a location instead of wondering whether they exist.
     """
     if not (request.user.is_superuser or request.user.is_staff):
         return redirect('dashboard')
 
     from apps.users.agencies import agency_for_user
+
+    profiles = list(
+        _management_scope(request.user).select_related('user', 'agency_org')
+    )
 
     pings_qs = LocationTracker.objects.select_related(
         'ofw__user', 'ofw__agency_org'
@@ -1165,22 +1183,18 @@ def location_tracker_page(request):
         agency = agency_for_user(request.user)
         if agency is not None:
             pings_qs = pings_qs.filter(ofw__agency_org=agency)
-        else:
-            pings_qs = pings_qs.none()
 
     emergency_only = request.GET.get('emergency') == '1'
     if emergency_only:
         pings_qs = pings_qs.filter(is_emergency=True)
 
-    history = list(pings_qs[:200])
+    history = list(pings_qs[:400])
 
-    latest_pings = []
-    seen_ofws = set()
+    latest_by_ofw = {}
     now = timezone.now()
     for ping in history:
-        if ping.ofw_id in seen_ofws:
+        if ping.ofw_id in latest_by_ofw:
             continue
-        seen_ofws.add(ping.ofw_id)
         age_seconds = max(0, int((now - ping.recorded_at).total_seconds()))
         ping.age_seconds = age_seconds
         ping.age_minutes = age_seconds // 60
@@ -1196,15 +1210,39 @@ def location_tracker_page(request):
         else:
             ping.freshness = 'old'
             ping.freshness_label = f'{age_seconds // 86400} day(s) ago'
-        latest_pings.append(ping)
+        latest_by_ofw[ping.ofw_id] = ping
+
+    rows = []
+    for profile in profiles:
+        ping = latest_by_ofw.get(profile.pk)
+        if emergency_only and ping is None:
+            continue
+        rows.append({
+            'profile': profile,
+            'ping': ping,
+            'is_emergency': bool(ping and ping.is_emergency),
+            'freshness': ping.freshness if ping else 'none',
+            'freshness_label': ping.freshness_label if ping else 'No location',
+        })
+
+    # OFWs with a location first (newest first), then the rest alphabetically.
+    rows.sort(key=lambda row: (
+        row['ping'] is None,
+        -(row['ping'].recorded_at.timestamp() if row['ping'] else 0),
+        (row['profile'].full_name or '').lower(),
+    ))
+
+    located_rows = [row for row in rows if row['ping'] is not None]
 
     return render(request, 'ofw/location_tracker.html', {
+        'rows': rows,
         'pings': history[:50],
-        'latest_pings': latest_pings,
+        'located_rows': located_rows,
         'emergency_only': emergency_only,
-        'live_count': sum(1 for p in latest_pings if p.freshness == 'live'),
+        'live_count': sum(1 for row in rows if row['freshness'] == 'live'),
+        'no_location_count': sum(1 for row in rows if row['ping'] is None),
         'page_title': 'Live Location Map',
-        'page_pretitle': 'Latest location per OFW',
+        'page_pretitle': 'Every OFW at a glance',
     })
 
 

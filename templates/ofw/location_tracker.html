@@ -12,6 +12,11 @@
           <span class="badge bg-success-lt text-success align-self-center">
             {{ live_count }} live now
           </span>
+          {% if no_location_count %}
+          <span class="badge bg-secondary-lt text-secondary align-self-center">
+            {{ no_location_count }} no location
+          </span>
+          {% endif %}
           <a href="?refresh=1{% if emergency_only %}&amp;emergency=1{% endif %}" class="btn btn-sm btn-outline-secondary">
             <i class="fas fa-rotate me-1"></i>Refresh
           </a>
@@ -27,13 +32,16 @@
   <div class="alert alert-info d-flex gap-2 py-2">
     <i class="fas fa-location-crosshairs mt-1"></i>
     <div>
-      One row per OFW, showing their newest ping. <strong>Live now</strong> means
-      the ping is under 10 minutes old. Older pings are labelled so nobody
-      mistakes them for a current position. The page refreshes every 30 seconds.
+      <strong>Lahat ng OFW</strong> ay nakalista dito, may location man o wala.
+      <strong>Live now</strong> means the ping is under 10 minutes old. Older pings
+      are labelled so nobody mistakes them for a current position.
+      <strong>No location</strong> means the OFW has not shared one yet — call or
+      request their location from this page. The page refreshes every 30 seconds.
     </div>
   </div>
 
-  {% if latest_pings %}
+  {% if rows %}
+  {% if located_rows %}
   <div class="card mb-3">
     <div class="card-header">
       <h5 class="card-title mb-0"><i class="fas fa-map-location-dot me-2"></i>Latest OFW Locations</h5>
@@ -42,8 +50,61 @@
       <div id="locationTrackerMap" style="height: 420px; width: 100%;"></div>
     </div>
   </div>
+  {% endif %}
 
-  <div class="card mb-3">
+  <!-- Phones: card layout so names and actions are not squeezed -->
+  <div class="card mb-3 d-md-none">
+    {% for row in rows %}
+    <div class="card-body py-3 {% if not forloop.last %}border-bottom{% endif %}{% if row.is_emergency %} bg-danger-lt{% endif %}">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div class="min-w-0">
+          <a href="{% url 'ofw:profile_detail' row.profile.pk %}" class="text-decoration-none fw-medium d-block text-truncate">
+            {{ row.profile.full_name }}
+          </a>
+          <div class="text-muted small">
+            {% if row.profile.country %}{{ row.profile.country }}{% else %}Country not set{% endif %}
+            {% if row.profile.agency_org %} · {{ row.profile.agency_org.name }}{% endif %}
+          </div>
+          {% if row.profile.contact_number %}
+          <div class="text-muted small">{{ row.profile.contact_number }}</div>
+          {% endif %}
+        </div>
+        {% if row.is_emergency %}
+        <span class="badge bg-danger text-white flex-shrink-0">SOS</span>
+        {% endif %}
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-1 mt-2">
+        <span class="badge bg-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}-lt text-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}">
+          {{ row.freshness_label }}
+        </span>
+        <span class="text-muted small">
+          {% if row.ping %}Last seen {{ row.ping.recorded_at|date:"M d, H:i" }}{% else %}Has not shared a location yet{% endif %}
+        </span>
+      </div>
+      <div class="d-flex flex-wrap gap-1 mt-2 action-buttons">
+        {% if row.profile.contact_number %}
+        <a href="tel:{{ row.profile.contact_number }}" class="btn btn-sm btn-outline-success">
+          <i class="fas fa-phone me-1"></i>Call
+        </a>
+        {% endif %}
+        <form method="post" action="{% url 'ofw:request_ofw_location' row.profile.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn btn-sm btn-outline-primary"
+                  title="Ask the OFW to share their location">
+            <i class="fas fa-location-crosshairs me-1"></i>Request
+          </button>
+        </form>
+        <a href="{% url 'ofw:emergency_guide' row.profile.pk %}" class="btn btn-sm btn-outline-danger">
+          <i class="fas fa-headset me-1"></i>Guide
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Tablet / desktop: table -->
+  <div class="card mb-3 d-none d-md-block">
     <div class="table-responsive">
       <table class="table table-vcenter card-table table-sm">
         <thead>
@@ -51,46 +112,61 @@
             <th>OFW</th>
             <th class="w-1">Status</th>
             <th class="text-end w-1">Last seen</th>
-            <th class="d-none d-md-table-cell">Location</th>
+            <th>Location</th>
             <th class="w-1">Action</th>
           </tr>
         </thead>
         <tbody>
-          {% for ping in latest_pings %}
-          <tr {% if ping.is_emergency %}class="table-danger"{% endif %}>
+          {% for row in rows %}
+          <tr {% if row.is_emergency %}class="table-danger"{% endif %}>
             <td>
-              <a href="{% url 'ofw:profile_detail' ping.ofw.pk %}" class="text-decoration-none fw-medium">
-                {{ ping.ofw.full_name }}
+              <a href="{% url 'ofw:profile_detail' row.profile.pk %}" class="text-decoration-none fw-medium">
+                {{ row.profile.full_name }}
               </a>
               <div class="text-muted small">
-                {% if ping.ofw.country %}{{ ping.ofw.country }}{% else %}Country not set{% endif %}
-                {% if ping.ofw.agency_org %} · {{ ping.ofw.agency_org.name }}{% endif %}
+                {% if row.profile.country %}{{ row.profile.country }}{% else %}Country not set{% endif %}
+                {% if row.profile.agency_org %} · {{ row.profile.agency_org.name }}{% endif %}
               </div>
+              {% if row.profile.contact_number %}
+              <div class="text-muted small">{{ row.profile.contact_number }}</div>
+              {% endif %}
             </td>
             <td>
-              {% if ping.is_emergency %}
+              {% if row.is_emergency %}
               <span class="badge bg-danger-lt text-danger">SOS</span>
               {% endif %}
-              <span class="badge bg-{% if ping.freshness == 'live' %}success{% elif ping.freshness == 'recent' %}info{% elif ping.freshness == 'stale' %}warning{% else %}secondary{% endif %}-lt text-{% if ping.freshness == 'live' %}success{% elif ping.freshness == 'recent' %}info{% elif ping.freshness == 'stale' %}warning{% else %}secondary{% endif %}">
-                {{ ping.freshness_label }}
+              <span class="badge bg-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}-lt text-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}">
+                {{ row.freshness_label }}
               </span>
             </td>
             <td class="text-end text-muted small">
-              {{ ping.recorded_at|date:"M d, H:i" }}
+              {% if row.ping %}{{ row.ping.recorded_at|date:"M d, H:i" }}{% else %}—{% endif %}
             </td>
-            <td class="d-none d-md-table-cell text-muted small">
-              {{ ping.latitude }}, {{ ping.longitude }}
-              {% if ping.accuracy_meters %}<span class="text-muted">(±{{ ping.accuracy_meters }} m)</span>{% endif %}
+            <td class="text-muted small">
+              {% if row.ping %}
+              {{ row.ping.latitude }}, {{ row.ping.longitude }}
+              {% if row.ping.accuracy_meters %}<span class="text-muted">(±{{ row.ping.accuracy_meters }} m)</span>{% endif %}
+              {% else %}
+              <span class="text-muted">Not shared yet</span>
+              {% endif %}
             </td>
             <td>
-              <div class="d-flex gap-1 justify-content-end">
-                {% if ping.ofw.contact_number %}
-                <a href="tel:{{ ping.ofw.contact_number }}" class="btn btn-sm btn-outline-success">
-                  <i class="fas fa-phone"></i><span class="d-none d-sm-inline ms-1">Call</span>
+              <div class="d-flex gap-1 justify-content-end action-buttons">
+                {% if row.profile.contact_number %}
+                <a href="tel:{{ row.profile.contact_number }}" class="btn btn-sm btn-outline-success">
+                  <i class="fas fa-phone"></i><span class="d-none d-lg-inline ms-1">Call</span>
                 </a>
                 {% endif %}
-                <a href="{% url 'ofw:emergency_guide' ping.ofw.pk %}" class="btn btn-sm btn-outline-danger">
-                  <i class="fas fa-headset"></i><span class="d-none d-sm-inline ms-1">Guide</span>
+                <form method="post" action="{% url 'ofw:request_ofw_location' row.profile.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="btn btn-sm btn-outline-primary"
+                          title="Ask the OFW to share their location">
+                    <i class="fas fa-location-crosshairs"></i><span class="d-none d-lg-inline ms-1">Request</span>
+                  </button>
+                </form>
+                <a href="{% url 'ofw:emergency_guide' row.profile.pk %}" class="btn btn-sm btn-outline-danger">
+                  <i class="fas fa-headset"></i><span class="d-none d-lg-inline ms-1">Guide</span>
                 </a>
               </div>
             </td>
@@ -101,6 +177,7 @@
     </div>
   </div>
 
+  {% if pings %}
   <details class="card">
     <summary class="card-header" style="cursor:pointer;">
       <span class="card-title mb-0"><i class="fas fa-history me-1"></i>Recent ping history</span>
@@ -132,12 +209,18 @@
         </table>
     </div>
   </details>
+  {% endif %}
 
   {% else %}
   <div class="text-muted text-center py-5">
-    <i class="fas fa-location-crosshairs fa-3x mb-3 text-muted"></i>
-    <p class="mb-1">No location pings recorded yet.</p>
-    <p class="small mb-0">An OFW shares a location by tapping Send My Location on the Emergency SOS page.</p>
+    <i class="fas fa-users fa-3x mb-3 text-muted"></i>
+    {% if emergency_only %}
+    <p class="mb-1">No emergency locations right now.</p>
+    <p class="small mb-0"><a href="{% url 'ofw:location_tracker' %}">Show all OFWs</a></p>
+    {% else %}
+    <p class="mb-1">No OFWs are assigned to your account yet.</p>
+    <p class="small mb-0">Add OFW profiles and they will appear here automatically.</p>
+    {% endif %}
   </div>
   {% endif %}
 </div>
@@ -148,6 +231,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if located_rows %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
@@ -163,40 +247,39 @@
 
   var markers = [];
   var first = true;
-  var centerLat = 15, centerLng = 105;
 
-  {% for ping in latest_pings %}
-  var marker{{ forloop.counter }} = L.marker([{{ ping.latitude }}, {{ ping.longitude }}]).addTo(map);
+  {% for row in rows %}
+  {% if row.ping %}
+  var marker{{ forloop.counter }} = L.marker([{{ row.ping.latitude }}, {{ row.ping.longitude }}]).addTo(map);
   marker{{ forloop.counter }}.bindPopup(
-    '<b>{{ ping.ofw.full_name|escapejs }}</b><br>' +
-    '{{ ping.ofw.country|escapejs }}<br>' +
-    '{% if ping.is_emergency %}<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>{% endif %}' +
-    '{{ ping.freshness_label|escapejs }}<br>' +
-    '{{ ping.recorded_at|date:"M d, Y H:i"|escapejs }}' +
-    '<br><a href="{% url 'ofw:emergency_guide' ping.ofw.pk %}">Open call guide</a>'
+    '<b>{{ row.profile.full_name|escapejs }}</b><br>' +
+    '{{ row.profile.country|escapejs }}<br>' +
+    '{% if row.is_emergency %}<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>{% endif %}' +
+    '{{ row.freshness_label|escapejs }}<br>' +
+    '{{ row.ping.recorded_at|date:"M d, Y H:i"|escapejs }}' +
+    '<br><a href="{% url 'ofw:emergency_guide' row.profile.pk %}">Open call guide</a>'
   );
-  {% if ping.is_emergency or ping.freshness == 'live' %}
+  {% if row.is_emergency or row.freshness == 'live' %}
   marker{{ forloop.counter }}.setIcon(L.divIcon({
     className: '',
-    html: '<span style="display:block;width:16px;height:16px;border-radius:50%;background:{% if ping.is_emergency %}#d63939{% else %}#2fb344{% endif %};border:2px solid #fff;box-shadow:0 0 0 2px {% if ping.is_emergency %}#d63939{% else %}#2fb344{% endif %};"></span>',
+    html: '<span style="display:block;width:16px;height:16px;border-radius:50%;background:{% if row.is_emergency %}#d63939{% else %}#2fb344{% endif %};border:2px solid #fff;box-shadow:0 0 0 2px {% if row.is_emergency %}#d63939{% else %}#2fb344{% endif %};"></span>',
     iconSize: [16, 16],
     iconAnchor: [8, 8],
     popupAnchor: [0, -8]
   }));
   {% endif %}
   markers.push(marker{{ forloop.counter }});
-  if (first) {
-    centerLat = {{ ping.latitude }};
-    centerLng = {{ ping.longitude }};
-    first = false;
-  }
+  {% if first %}
+  first = false;
+  {% endif %}
+  {% endif %}
   {% endfor %}
 
   if (markers.length) {
     var group = L.featureGroup(markers);
     map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
   } else {
-    map.setView([centerLat, centerLng], 3);
+    map.setView([15, 105], 3);
   }
 
   // Keep the live view fresh without reloading while the tab is hidden.
@@ -206,4 +289,5 @@
   }, REFRESH_MS);
 })();
 </script>
+{% endif %}
 {% endblock %}

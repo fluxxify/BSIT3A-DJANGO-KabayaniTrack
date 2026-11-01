@@ -941,3 +941,178 @@ html {
     width: auto;
   }
 }
+
+/* ============================================================
+   Mobile-first usability improvements (KabayaniTrack)
+   Applied only with existing Tabler + custom CSS, no new deps.
+   ============================================================ */
+
+/* Safe-area insets for iPhones with notch / home indicator */
+html {
+  padding-top: max(env(safe-area-inset-top), 0.5rem);
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  padding-left: max(env(safe-area-inset-left), 0.5rem);
+  padding-right: max(env(safe-area-inset-right), 0.5rem);
+}
+
+@media (max-width: 767.98px) {
+  .page {
+    padding-top: max(env(safe-area-inset-top), 0.5rem);
+  }
+}
+
+/* Larger touch targets on phones (min 44px per WCAG) */
+@media (max-width: 767.98px) {
+  .btn {
+    min-height: 44px;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+    font-size: 0.9rem;
+  }
+
+  .btn-sm {
+    min-height: 40px;
+    font-size: 0.85rem;
+  }
+
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .form-control,
+  .form-select {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table th,
+  .table td {
+    white-space: nowrap;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+
+  .modal-content {
+    border-radius: var(--tblr-border-radius-lg);
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 0.85rem 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  /* Cards stack full-width on phones already via col-12; tighten gaps */
+  .card {
+    margin-bottom: 1rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+
+  /* Page header on phones */
+  .page-header {
+    margin-bottom: 1rem;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .page-pretitle {
+    font-size: 0.7rem;
+  }
+
+  /* Topbar user name hides on very small screens */
+  .dh-topbar-user {
+    display: none;
+  }
+
+  /* SOS sticky bar: full-width buttons */
+  .sos-sticky .btn {
+    min-height: 48px;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.4rem;
+  }
+
+  /* Emergency guide cards: full width */
+  .eg-guide .card {
+    margin-bottom: 1rem;
+  }
+
+  /* Location tracker: phone card view already d-md-none; tighten */
+  .location-tracker .card-body,
+  .location-tracker .card {
+    padding: 0.75rem;
+  }
+
+  /* Stat cards on phones */
+  .stat-card .stat-value {
+    font-size: 1.6rem;
+  }
+
+  /* Flash messages full width on phones */
+  .dh-flash-stack {
+    left: 0.5rem;
+    right: 0.5rem;
+    width: auto;
+  }
+
+  .dh-flash {
+    width: 100%;
+  }
+}
+
+/* Tablet: keep touch targets comfortable but allow side-by-side */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .btn {
+    min-height: 42px;
+  }
+
+  .form-control,
+  .form-select {
+    min-height: 42px;
+  }
+
+  .modal-dialog {
+    max-width: 90vw;
+  }
+}
+
+/* Desktop: ensure hover states don't break touch devices */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    transform: none;
+  }
+}
