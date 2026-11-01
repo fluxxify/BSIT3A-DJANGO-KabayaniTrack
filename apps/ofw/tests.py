@@ -1642,3 +1642,43 @@ class LocationContextApiTests(TestCase):
         self.assertIsNotNone(notification)
         self.assertIn('Near Police Station', notification.message)
         self.assertIn('Nearest safe place', notification.message)
+
+    def test_location_ping_rejects_out_of_range_coordinates(self):
+        response = self.client.post(reverse('ofw:location_tracker_ping'), {
+            'latitude': '91', 'longitude': '120', 'is_emergency': '1',
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(LocationTracker.objects.filter(ofw__user=self.user).exists())
+
+    def test_location_ping_rejects_non_finite_coordinates(self):
+        response = self.client.post(reverse('ofw:location_tracker_ping'), {
+            'latitude': 'NaN', 'longitude': '120', 'is_emergency': '1',
+        })
+        self.assertEqual(response.status_code, 400)
+
+
+class LocationRetentionCommandTests(TestCase):
+    def test_command_previews_then_deletes_only_when_requested(self):
+        from datetime import timedelta
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        user = User.objects.create_user(username='retention_ofw')
+        profile = OFWProfile.objects.create(
+            user=user, first_name='Ret', last_name='Test', country='Qatar'
+        )
+        ping = LocationTracker.objects.create(
+            ofw=profile, latitude='25.0', longitude='51.0'
+        )
+        LocationTracker.objects.filter(pk=ping.pk).update(
+            recorded_at=timezone.now() - timedelta(days=100)
+        )
+
+        output = StringIO()
+        call_command('prune_location_history', stdout=output)
+        self.assertTrue(LocationTracker.objects.filter(pk=ping.pk).exists())
+        self.assertIn('Preview only', output.getvalue())
+
+        call_command('prune_location_history', execute=True, stdout=StringIO())
+        self.assertFalse(LocationTracker.objects.filter(pk=ping.pk).exists())

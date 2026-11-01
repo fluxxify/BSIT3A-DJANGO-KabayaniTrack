@@ -190,9 +190,16 @@ MEDIA_ROOT = Path(os.environ.get('DJANGO_MEDIA_ROOT', BASE_DIR / 'media'))
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
-# Keep this opt-in: forcing HTTPS without the proxy header causes redirect
-# loops on some hosts.
-SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
+# Production defaults to HTTPS redirects. The proxy header above lets Django
+# recognize HTTPS terminated by PythonAnywhere or another trusted proxy.
+SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
+SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
+    'DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', False
+)
+SECURE_HSTS_PRELOAD = _env_bool('DJANGO_SECURE_HSTS_PRELOAD', False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Concern proof uploads (photos/videos from the OFW portal)
 # DATA_UPLOAD_MAX_MEMORY_SIZE caps the whole request body; without raising it

@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from datetime import timedelta
 
 from django.contrib import messages
@@ -13,47 +14,50 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from .models import LoginAttempt
+
 User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
 MAX_FAILED_ATTEMPTS = 5
-LOCK_DURATION = timedelta(minutes=1)
+LOCK_DURATION = timedelta(minutes=15)
 INVALID_LOGIN_MESSAGE = 'Invalid username or password.'
-LOCKED_MESSAGE = 'Too many failed attempts. Locked for 1 minute.'
+LOCKED_MESSAGE = 'Too many failed attempts. Locked for 15 minutes.'
 
 
-def _reset_lock_state(request):
-    request.session['failed_attempts'] = 0
-    request.session['lock_time'] = None
+def _lock_key(request, username):
+    client_ip = request.META.get('REMOTE_ADDR', '')
+    raw = f'{username.strip().casefold()}|{client_ip}'.encode('utf-8')
+    return hashlib.sha256(raw).hexdigest()
 
 
-def _get_lock_state(request):
-    failed_attempts = request.session.get('failed_attempts', 0)
-    lock_time = request.session.get('lock_time')
-
-    if not lock_time:
-        return failed_attempts, None
-
-    try:
-        unlock_time = timezone.datetime.fromisoformat(lock_time)
-    except (TypeError, ValueError):
-        _reset_lock_state(request)
+def _get_lock_state(request, username):
+    attempt = LoginAttempt.objects.filter(key=_lock_key(request, username)).first()
+    if not attempt:
         return 0, None
+    if attempt.locked_until and timezone.now() < attempt.locked_until:
+        return attempt.failed_attempts, max(
+            1, int((attempt.locked_until - timezone.now()).total_seconds())
+        )
+    if attempt.locked_until:
+        attempt.delete()
+        return 0, None
+    return attempt.failed_attempts, None
 
-    if timezone.now() < unlock_time:
-        remaining = int((unlock_time - timezone.now()).total_seconds())
-        return failed_attempts, remaining
 
-    _reset_lock_state(request)
-    return 0, None
-
-
-def _set_lock_state(request):
-    lock_until = timezone.now() + LOCK_DURATION
-    request.session['failed_attempts'] = MAX_FAILED_ATTEMPTS
-    request.session['lock_time'] = lock_until.isoformat()
-    return int(LOCK_DURATION.total_seconds())
+def _record_failed_attempt(request, username):
+    key = _lock_key(request, username)
+    with transaction.atomic():
+        attempt, _ = LoginAttempt.objects.select_for_update().get_or_create(key=key)
+        attempt.failed_attempts += 1
+        if attempt.failed_attempts >= MAX_FAILED_ATTEMPTS:
+            attempt.locked_until = timezone.now() + LOCK_DURATION
+        attempt.save(update_fields=['failed_attempts', 'locked_until', 'updated_at'])
+    if attempt.locked_until:
+        remaining = max(1, int((attempt.locked_until - timezone.now()).total_seconds()))
+        return attempt.failed_attempts, remaining
+    return attempt.failed_attempts, None
 
 
 def _home_url_name(user):
@@ -151,7 +155,8 @@ def login_view(request, agency_slug=None):
         return redirect(_home_url_name(request.user))
 
     context = _auth_context(agency)
-    failed_attempts, remaining = _get_lock_state(request)
+    username = request.POST.get('username', '').strip() if request.method == 'POST' else ''
+    failed_attempts, remaining = _get_lock_state(request, username)
     if remaining is not None:
         messages.error(
             request,
@@ -166,13 +171,12 @@ def login_view(request, agency_slug=None):
     if request.method == 'GET':
         return render(request, 'auth/login.html', context)
 
-    username = request.POST.get('username', '').strip()
     password = request.POST.get('password', '')
 
     user = authenticate(request, username=username, password=password)
 
     if user is not None:
-        _reset_lock_state(request)
+        LoginAttempt.objects.filter(key=_lock_key(request, username)).delete()
         login(request, user)
         messages.success(
             request,
@@ -181,10 +185,8 @@ def login_view(request, agency_slug=None):
         )
         return redirect(_home_url_name(user))
 
-    failed_attempts += 1
-    request.session['failed_attempts'] = failed_attempts
+    failed_attempts, remaining = _record_failed_attempt(request, username)
     if failed_attempts >= MAX_FAILED_ATTEMPTS:
-        remaining = _set_lock_state(request)
         messages.error(request, LOCKED_MESSAGE, extra_tags='lock')
         return render(
             request, 'auth/login.html',

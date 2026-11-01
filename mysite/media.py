@@ -14,6 +14,7 @@ import os
 import re
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, StreamingHttpResponse
 from django.utils.http import http_date
 
@@ -54,8 +55,28 @@ def _file_stream(fileobj, length):
         fileobj.close()
 
 
+def _user_can_access_media(user, path):
+    """Check ownership/agency scope before serving private user uploads."""
+    from apps.ofw.crud import _scoped
+    from apps.ofw.models import Concern, MonitoringReport, OFWProfile
+
+    if user.is_superuser:
+        return True
+
+    if _scoped(user, OFWProfile).filter(profile_picture=path).exists():
+        return True
+    if _scoped(user, Concern).filter(proofs__file=path).exists():
+        return True
+    if _scoped(user, MonitoringReport).filter(attachment=path).exists():
+        return True
+    return False
+
+
+@login_required(login_url='login')
 def serve_media(request, path):
-    """Serve a file from ``MEDIA_ROOT`` with HTTP range support."""
+    """Serve private uploads only to an authorized signed-in user."""
+    if not _user_can_access_media(request.user, path):
+        raise Http404('Media file not found')
     fullpath = _safe_media_path(path)
     stat = os.stat(fullpath)
     file_size = stat.st_size

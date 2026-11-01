@@ -96,6 +96,29 @@ You can also log in at `/admin/` to create users and OFW profiles.
 
 ## Updating the site later
 
+Before updating a site with real OFW records, make a private backup of both
+SQLite and uploaded files. Example from the project directory:
+
+```bash
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+backup="$HOME/KabayaniTrack-backups/$stamp"
+install -d -m 700 "$backup"
+python - "$HOME/KabayaniTrack/db.sqlite3" "$backup/db.sqlite3" <<'PY'
+import sqlite3, sys
+source = sqlite3.connect(sys.argv[1])
+target = sqlite3.connect(sys.argv[2])
+source.backup(target)
+target.close()
+source.close()
+PY
+tar -czf "$backup/media.tar.gz" media/
+chmod 600 "$backup/db.sqlite3" "$backup/media.tar.gz"
+```
+
+Keep backups private because they contain personal and potentially sensitive
+information. The setup script preserves the generated Django secret key when
+it is re-run on the same project checkout.
+
 ```bash
 cd ~/KabayaniTrack
 git pull
@@ -111,7 +134,11 @@ Then click **Reload** on the Web tab.
 
 - `DEBUG=False` is set by the generated WSGI file.
 - `SECRET_KEY` is generated locally; never commit it.
+- HTTPS redirects and a one-hour HSTS policy are enabled by the generated WSGI
+  file. Keep the proxy HTTPS header configured in Django settings; only raise
+  `DJANGO_SECURE_HSTS_SECONDS` after confirming the domain is HTTPS-only.
 - Static files are served by WhiteNoise. Media is served by the project's
-  range-aware media view, so uploaded videos can play on mobile.
+  range-aware media view, so uploaded videos can play on mobile. Uploaded files
+  require sign-in and are limited to their owner, agency, or an administrator.
 - For a custom domain, HTTPS certificate, and no free-account limits, use a
   paid PythonAnywhere plan or a PaaS such as Render/Railway with PostgreSQL.

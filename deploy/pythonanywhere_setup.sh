@@ -48,7 +48,13 @@ python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py check
 
-SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
+SECRET_KEY=""
+if [ -f deploy/pythonanywhere_wsgi.generated.py ]; then
+    SECRET_KEY="$(python -c 'import pathlib,re; p=pathlib.Path("deploy/pythonanywhere_wsgi.generated.py").read_text(); m=re.search(r"DJANGO_SECRET_KEY\x27\] = \x27([^\x27]+)", p); print(m.group(1) if m else "")')"
+fi
+if [ -z "$SECRET_KEY" ]; then
+    SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
+fi
 
 mkdir -p deploy
 cat > deploy/pythonanywhere_wsgi.generated.py <<EOF
@@ -66,13 +72,15 @@ os.environ['DJANGO_DEBUG'] = '0'
 os.environ['DJANGO_SECRET_KEY'] = '$SECRET_KEY'
 os.environ['DJANGO_ALLOWED_HOSTS'] = '$DOMAIN'
 os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'] = 'https://$DOMAIN'
+os.environ['DJANGO_SECURE_SSL_REDIRECT'] = '1'
+os.environ.setdefault('DJANGO_SECURE_HSTS_SECONDS', '3600')
 
 from django.core.wsgi import get_wsgi_application  # noqa: E402
 
 application = get_wsgi_application()
 EOF
 
-python manage.py check --deploy || true
+python manage.py check --deploy
 
 cat <<EOF
 

@@ -199,3 +199,53 @@ class AgencyWorkspaceTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['stats']['kpi']['ofw_total'], 2)
+
+    def test_agency_staff_cannot_acknowledge_or_escalate_other_agency_alert(self):
+        from apps.ofw.models import EmergencyAlert
+
+        alert = EmergencyAlert.objects.create(
+            ofw=self.ofw_b, title='Private agency alert'
+        )
+        self.client.force_login(self.staff_a)
+
+        acknowledge = self.client.post(
+            reverse('ofw:acknowledge_alert', args=[alert.pk])
+        )
+        escalate = self.client.post(
+            reverse('ofw:escalate_to_police', args=[alert.pk])
+        )
+
+        self.assertEqual(acknowledge.status_code, 404)
+        self.assertEqual(escalate.status_code, 404)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.OPEN)
+
+    def test_agency_staff_cannot_submit_other_agency_police_report(self):
+        from apps.ofw.models import PoliceReport
+
+        report = PoliceReport.objects.create(
+            ofw=self.ofw_b, title='Private report', reported_by=self.staff_a,
+        )
+        self.client.force_login(self.staff_a)
+        response = self.client.post(
+            reverse('ofw:police_report_submit', args=[report.pk]),
+            {'police_station': 'Station', 'police_contact': '123'},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        report.refresh_from_db()
+        self.assertEqual(report.status, PoliceReport.Status.DRAFT)
+
+    def test_ofw_cannot_disable_safe_location(self):
+        from apps.ofw.models import SafeLocation
+
+        location = SafeLocation.objects.create(name='Test location', country='Qatar')
+        ofw_user = User.objects.create_user(username='ordinary_ofw')
+        self.client.force_login(ofw_user)
+        response = self.client.post(
+            reverse('ofw:safe_location_delete', args=[location.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        location.refresh_from_db()
+        self.assertTrue(location.is_active)

@@ -17,8 +17,8 @@
     <i class="fas fa-file-alt me-2"></i>
     <div>
       Police reports are created when an unresponsive OFW cannot be reached after
-      an inactivity warning. Submit the report to the local police station near
-      the OFW's location.
+      an inactivity warning. Contact the local police station directly, then
+      record that contact here. KabayaniTrack does not send reports to police.
     </div>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
@@ -55,10 +55,10 @@
             <td class="text-end">
               {% if report.status == 'draft' %}
               <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#submitModal{{ report.pk }}">
-                <i class="fas fa-paper-plane"></i> Submit
+                <i class="fas fa-phone"></i> Record contact
               </button>
               {% else %}
-              <span class="badge bg-secondary-lt text-secondary">Submitted</span>
+              <span class="badge bg-secondary-lt text-secondary">{{ report.get_status_display }}</span>
               {% endif %}
             </td>
           </tr>
@@ -67,7 +67,7 @@
             <div class="modal-dialog modal-dialog-centered">
               <div class="modal-content">
                 <div class="modal-header">
-                  <h5 class="modal-title">Submit Police Report</h5>
+                  <h5 class="modal-title">Record police contact</h5>
                   <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -82,12 +82,12 @@
                       <input type="text" name="police_contact" class="form-control" placeholder="+966 11 000 0000">
                     </div>
                     <div class="mb-3 text-muted small">
-                      Submitting will mark this report as sent to local police. The OFW's
-                      emergency contacts will be notified.
+                      This records the contact in KabayaniTrack. It does not send
+                      the report to police or notify the OFW's emergency contacts.
                     </div>
                     <div class="modal-footer">
                       <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button type="submit" class="btn btn-primary">Submit to Police</button>
+                      <button type="submit" class="btn btn-primary">Record contact</button>
                     </div>
                   </form>
                 </div>

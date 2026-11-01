@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
-from apps.ofw.models import Notification, OFWProfile
+from apps.ofw.models import Concern, ConcernProof, Notification, OFWProfile
 
 
 TEMP_MEDIA_DIR = tempfile.mkdtemp(prefix='kabayani_core_media_')
@@ -28,6 +28,23 @@ class MediaServingTests(TestCase):
         self.video_path = os.path.join(TEMP_MEDIA_DIR, 'proof.mp4')
         with open(self.video_path, 'wb') as handle:
             handle.write(b'0123456789')
+        self.user = get_user_model().objects.create_user(
+            username='media_owner', password='Passw0rd!23'
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user, first_name='Ana', last_name='Reyes', country='Qatar'
+        )
+        concern = Concern.objects.create(
+            ofw=self.profile, user=self.user, title='Test concern',
+            reported_date='2026-01-01',
+        )
+        ConcernProof.objects.create(concern=concern, file='proof.mp4')
+        self.client.force_login(self.user)
+
+    def test_anonymous_user_cannot_access_upload(self):
+        self.client.logout()
+        response = self.client.get(reverse('media', args=['proof.mp4']))
+        self.assertEqual(response.status_code, 302)
 
     @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
     def test_full_request_returns_whole_file(self):
@@ -84,6 +101,26 @@ class MediaServingTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+    def test_user_cannot_read_another_users_upload(self):
+        other_file = os.path.join(TEMP_MEDIA_DIR, 'other-proof.mp4')
+        with open(other_file, 'wb') as handle:
+            handle.write(b'private')
+        other = get_user_model().objects.create_user(
+            username='media_other', password='Passw0rd!23'
+        )
+        other_profile = OFWProfile.objects.create(
+            user=other, first_name='Ben', last_name='Cruz', country='Qatar'
+        )
+        other_concern = Concern.objects.create(
+            ofw=other_profile, user=other, title='Private concern',
+            reported_date='2026-01-01',
+        )
+        ConcernProof.objects.create(concern=other_concern, file='other-proof.mp4')
+
+        response = self.client.get(reverse('media', args=['other-proof.mp4']))
+        self.assertEqual(response.status_code, 404)
+
 
 class HomeViewTests(TestCase):
     def test_home_renders_for_authenticated_user(self):
@@ -101,6 +138,41 @@ class HomeViewTests(TestCase):
         response = self.client.get(reverse('dashboard'))
 
         self.assertEqual(response.status_code, 302)
+
+
+class LoginThrottleTests(TestCase):
+    def test_failed_attempts_lock_username_and_ip_across_sessions(self):
+        user = get_user_model().objects.create_user(
+            username='throttle_user', password='Passw0rd!23'
+        )
+        for _ in range(5):
+            self.client.post(reverse('login'), {
+                'username': 'throttle_user', 'password': 'wrong-password',
+            })
+
+        self.client.cookies.clear()
+        response = self.client.post(reverse('login'), {
+            'username': user.username, 'password': 'Passw0rd!23',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+
+    def test_successful_login_clears_failed_attempt_counter(self):
+        from apps.core.models import LoginAttempt
+        from apps.core.views import _lock_key
+
+        user = get_user_model().objects.create_user(
+            username='throttle_success', password='Passw0rd!23'
+        )
+        key = _lock_key(self.client.post(reverse('login'), {
+            'username': user.username, 'password': 'wrong-password',
+        }).wsgi_request, user.username)
+        self.client.post(reverse('login'), {
+            'username': user.username, 'password': 'Passw0rd!23',
+        })
+
+        self.assertFalse(LoginAttempt.objects.filter(key=key).exists())
 
 
 class OFWRegistrationTests(TestCase):

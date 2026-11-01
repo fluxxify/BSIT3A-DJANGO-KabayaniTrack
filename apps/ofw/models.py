@@ -551,7 +551,7 @@ class PoliceReport(models.Model):
 
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Draft'
-        SUBMITTED = 'submitted', 'Submitted to Police'
+        SUBMITTED = 'submitted', 'Police contact recorded'
         RESPONDED = 'responded', 'Police Responded'
         CLOSED = 'closed', 'Closed'
 

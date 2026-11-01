@@ -2,12 +2,13 @@
 
 import json
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -792,6 +793,20 @@ def _management_scope(user):
     return OFWProfile.objects.none()
 
 
+def _management_alert_scope(user):
+    """Return emergency alerts visible to this management account."""
+    if not (user.is_superuser or user.is_staff):
+        return EmergencyAlert.objects.none()
+    return EmergencyAlert.objects.filter(ofw__in=_management_scope(user))
+
+
+def _management_police_report_scope(user):
+    """Return police reports visible to this management account."""
+    if not (user.is_superuser or user.is_staff):
+        return PoliceReport.objects.none()
+    return PoliceReport.objects.filter(ofw__in=_management_scope(user))
+
+
 @login_required(login_url='login')
 def inactive_ofws_page(request):
     """List OFWs whose accounts have been inactive for 3+ days.
@@ -886,7 +901,12 @@ def emergency_alerts_page(request):
 @require_POST
 def acknowledge_alert(request, pk):
     """Mark an alert as acknowledged (management called the OFW)."""
-    alert = get_object_or_404(EmergencyAlert, pk=pk)
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
+    alert = get_object_or_404(_management_alert_scope(request.user), pk=pk)
+    if alert.status != EmergencyAlert.Status.OPEN:
+        messages.info(request, 'This emergency alert is no longer awaiting acknowledgment.')
+        return redirect('ofw:emergency_alerts')
     alert.status = EmergencyAlert.Status.ACKNOWLEDGED
     alert.acknowledged_by = request.user
     alert.acknowledged_at = timezone.now()
@@ -907,13 +927,13 @@ def acknowledge_alert(request, pk):
 @require_POST
 def escalate_to_police(request, pk):
     """Escalate an alert to a police report when the OFW does not respond."""
-    alert = get_object_or_404(EmergencyAlert, pk=pk)
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
+    alert = get_object_or_404(_management_alert_scope(request.user), pk=pk)
 
-    from apps.users.agencies import agency_for_user
-    if not request.user.is_superuser:
-        agency = agency_for_user(request.user)
-        if agency is None or alert.ofw.agency_org_id != agency.id:
-            return redirect('ofw:emergency_alerts')
+    if alert.status in (EmergencyAlert.Status.ESCALATED, EmergencyAlert.Status.RESOLVED):
+        messages.info(request, 'This emergency alert has already been closed or escalated.')
+        return redirect('ofw:emergency_alerts')
 
     # Create the police report
     report = PoliceReport.objects.create(
@@ -921,7 +941,7 @@ def escalate_to_police(request, pk):
         title=f'Missing / Unresponsive OFW — {alert.ofw.full_name}',
         description=(
             f'OFW {alert.ofw.full_name} has been inactive for '
-            f'{alert.ofw.ofw_activity.days_inactive} days. '
+            f'{getattr(getattr(alert.ofw, "ofw_activity", None), "days_inactive", 0)} days. '
             f'Management called but received no response. '
             f'Last known country: {alert.ofw.country or "not set"}, '
             f'city: {alert.ofw.city_abroad or "not set"}. '
@@ -986,16 +1006,25 @@ def police_reports_page(request):
 @require_POST
 def police_report_submit(request, pk):
     """Submit a drafted police report to local police."""
-    report = get_object_or_404(PoliceReport, pk=pk)
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
+    report = get_object_or_404(_management_police_report_scope(request.user), pk=pk)
+    if report.status != PoliceReport.Status.DRAFT:
+        messages.info(request, 'Only draft police reports can be submitted.')
+        return redirect('ofw:police_reports')
     report.status = PoliceReport.Status.SUBMITTED
     report.police_station = request.POST.get('police_station', '').strip()
+    if not report.police_station:
+        messages.error(request, 'Enter the police station before recording contact.')
+        return redirect('ofw:police_reports')
     report.police_contact = request.POST.get('police_contact', '').strip()
     report.save(update_fields=['status', 'police_station', 'police_contact', 'updated_at'])
 
     notify(
         request.user,
-        'Police report submitted',
-        f'Report for {report.ofw.full_name} has been submitted to {report.police_station or "local police"}.',
+        'Police contact recorded',
+        f'Contact with {report.police_station} was recorded in KabayaniTrack. '
+        'This app does not transmit the report to the police.',
         url=reverse('ofw:police_reports'),
         level=Notification.Level.SUCCESS,
     )
@@ -1065,13 +1094,35 @@ def safe_location_save(request):
     location.name = request.POST.get('name', '').strip()
     location.location_type = request.POST.get('location_type', 'other')
     location.country = request.POST.get('country', '').strip()
+    if location.location_type not in dict(SafeLocation.LocationType.choices):
+        messages.error(request, 'Choose a valid safe-place type.')
+        return redirect('ofw:safe_locations')
+    if not location.name or not location.country:
+        messages.error(request, 'A safe-place name and country are required.')
+        return redirect('ofw:safe_locations')
     location.city = request.POST.get('city', '').strip()
     location.address = request.POST.get('address', '').strip()
     location.phone = request.POST.get('phone', '').strip()
     lat = request.POST.get('latitude', '').strip()
     lng = request.POST.get('longitude', '').strip()
-    location.latitude = lat if lat else None
-    location.longitude = lng if lng else None
+    if bool(lat) != bool(lng):
+        messages.error(request, 'Enter both coordinates, or leave both blank.')
+        return redirect('ofw:safe_locations')
+    if lat and lng:
+        try:
+            latitude, longitude = Decimal(lat), Decimal(lng)
+        except InvalidOperation:
+            messages.error(request, 'Enter valid latitude and longitude values.')
+            return redirect('ofw:safe_locations')
+        if not latitude.is_finite() or not longitude.is_finite():
+            messages.error(request, 'Enter finite latitude and longitude values.')
+            return redirect('ofw:safe_locations')
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            messages.error(request, 'Coordinates are outside valid ranges.')
+            return redirect('ofw:safe_locations')
+        location.latitude, location.longitude = latitude, longitude
+    else:
+        location.latitude = location.longitude = None
     location.is_active = request.POST.get('is_active') == 'on'
     location.save()
 
@@ -1081,6 +1132,8 @@ def safe_location_save(request):
 @login_required(login_url='login')
 @require_POST
 def safe_location_delete(request, pk):
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
     location = get_object_or_404(SafeLocation, pk=pk)
     location.is_active = False
     location.save(update_fields=['is_active', 'updated_at'])
@@ -1172,16 +1225,26 @@ def location_tracker_ping(request):
         return JsonResponse({'error': 'Latitude and longitude are required.'}, status=400)
 
     try:
+        latitude_value = Decimal(lat)
+        longitude_value = Decimal(lng)
+    except InvalidOperation:
+        return JsonResponse({'error': 'Latitude and longitude must be valid numbers.'}, status=400)
+    if not latitude_value.is_finite() or not longitude_value.is_finite():
+        return JsonResponse({'error': 'Latitude and longitude must be finite numbers.'}, status=400)
+    if not (-90 <= latitude_value <= 90 and -180 <= longitude_value <= 180):
+        return JsonResponse({'error': 'Latitude or longitude is out of range.'}, status=400)
+
+    try:
         accuracy_value = int(float(accuracy)) if accuracy else None
-    except (TypeError, ValueError):
-        accuracy_value = None
+    except (TypeError, ValueError, OverflowError):
+        return JsonResponse({'error': 'Accuracy must be a valid number.'}, status=400)
     if accuracy_value is not None and accuracy_value < 0:
-        accuracy_value = None
+        return JsonResponse({'error': 'Accuracy cannot be negative.'}, status=400)
 
     ping = LocationTracker.objects.create(
         ofw=profile,
-        latitude=lat,
-        longitude=lng,
+        latitude=latitude_value,
+        longitude=longitude_value,
         accuracy_meters=accuracy_value,
         is_emergency=is_emergency,
     )
