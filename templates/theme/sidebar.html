@@ -68,6 +68,14 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'inactive_ofws' or request.resolver_match.url_name == 'ofw_activity' %}active{% endif %}" href="{% url 'ofw:inactive_ofws' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-clock text-warning"></i>
+            </span>
+            <span class="nav-link-title">Login Warnings</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'assessment_list' %}active{% endif %}" href="{% url 'ofw:assessment_list' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-heart-pulse"></i>
