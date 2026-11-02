@@ -90,6 +90,7 @@ urlpatterns = [
 
     # Inactive OFW accounts (admin/agency warning dashboard)
     path('inactive-ofws/', views.inactive_ofws_page, name='inactive_ofws'),
+    path('inactive-ofws/police-contact/', views.inactive_police_contacts_page, name='inactive_police_contacts'),
     path('inactive-ofws/<int:pk>/request-location/', views.request_ofw_location, name='request_ofw_location'),
 
     # Emergency alerts

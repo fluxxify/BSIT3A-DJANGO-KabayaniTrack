@@ -879,6 +879,110 @@ def inactive_ofws_page(request):
 
 
 @login_required(login_url='login')
+def inactive_police_contacts_page(request):
+    """Show the closest registered police station for inactive agency OFWs."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    profiles_qs = _management_scope(request.user).select_related(
+        'user', 'agency_org'
+    )
+    refresh_activities_for_profiles(profiles_qs)
+    profiles = list(profiles_qs)
+    activities = OFWActivity.objects.filter(
+        user__ofw_profiles__in=profiles
+    ).distinct()
+    activity_by_user = {activity.user_id: activity for activity in activities}
+
+    all_stations = list(SafeLocation.objects.filter(
+        is_active=True,
+        location_type=SafeLocation.LocationType.POLICE_STATION,
+    ).order_by('country', 'city', 'name'))
+    now = timezone.now()
+    rows = []
+
+    for profile in profiles:
+        activity = activity_by_user.get(profile.user_id)
+        if (
+            activity is None
+            or activity.is_account_active
+            or activity.days_inactive < OFWActivity.INACTIVE_THRESHOLD_DAYS
+        ):
+            continue
+
+        country = canonical_country(profile.country)
+        country_stations = [
+            station for station in all_stations
+            if canonical_country(station.country).casefold() == country.casefold()
+        ] if country else []
+        city = (profile.city_abroad or '').strip()
+        city_stations = [
+            station for station in country_stations
+            if city and station.city.strip().casefold() == city.casefold()
+        ]
+        latest_ping = profile.location_pings.order_by('-recorded_at').first()
+        station_options = []
+        station_note = ''
+
+        if latest_ping is not None:
+            nearest = nearest_safe_places(
+                latest_ping.latitude,
+                latest_ping.longitude,
+                limit=3,
+                locations=[station for station in country_stations if station.has_coords],
+            )
+            if nearest:
+                for station in nearest:
+                    phone = (station.get('phone') or '').strip()
+                    station['tel'] = ''.join(
+                        char for char in phone if char.isdigit() or char == '+'
+                    )
+                station_options = nearest
+                station_note = 'Sorted by distance from the OFW\'s last recorded location.'
+
+        if not station_options and city_stations:
+            for station in city_stations[:3]:
+                phone = (station.phone or '').strip()
+                station_options.append({
+                    'name': station.name,
+                    'city': station.city,
+                    'country': station.country,
+                    'address': station.address,
+                    'phone': phone,
+                    'tel': ''.join(char for char in phone if char.isdigit() or char == '+'),
+                    'distance_text': '',
+                    'maps_url': '',
+                })
+            station_note = 'Matched by the OFW\'s saved city; exact distance is unavailable.'
+
+        if not station_options:
+            station_note = (
+                'No registered police station matches this OFW\'s last known location. '
+                'Add a police station in Safe Places with its phone and coordinates.'
+            )
+
+        ping_age_days = (
+            max(0, (now - latest_ping.recorded_at).days)
+            if latest_ping is not None else 0
+        )
+        rows.append({
+            'profile': profile,
+            'activity': activity,
+            'latest_ping': latest_ping,
+            'ping_age_days': ping_age_days,
+            'station_options': station_options,
+            'station_note': station_note,
+        })
+
+    rows.sort(key=lambda row: (-row['activity'].days_inactive, row['profile'].full_name.casefold()))
+    return render(request, 'ofw/inactive_police_contacts.html', {
+        'rows': rows,
+        'page_title': 'Police Contact',
+        'page_pretitle': 'Registered police stations near inactive OFWs',
+    })
+
+
+@login_required(login_url='login')
 @require_POST
 def request_ofw_location(request, pk):
     """Ask an OFW to share their location (consent-based)."""

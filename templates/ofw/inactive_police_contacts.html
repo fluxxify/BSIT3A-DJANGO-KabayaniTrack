@@ -1,0 +1,106 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+      </div>
+      <div class="col-auto">
+        <a href="{% url 'ofw:inactive_ofws' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i> Login Warnings
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="alert alert-info py-2">
+    <i class="fas fa-circle-info me-2"></i>
+    The call button opens your device's dialer. KabayaniTrack does not call police
+    automatically. Confirm the OFW's location first, especially if the last ping is old.
+  </div>
+
+  {% for row in rows %}
+  <div class="card mb-3">
+    <div class="card-header d-flex flex-wrap align-items-center gap-2">
+      <div class="me-auto">
+        <a href="{% url 'ofw:profile_detail' row.profile.pk %}" class="card-title text-decoration-none">
+          {{ row.profile.full_name }}
+        </a>
+        <div class="text-muted small">
+          {{ row.profile.country|default:"Country not set" }}{% if row.profile.city_abroad %}, {{ row.profile.city_abroad }}{% endif %}
+          {% if row.profile.agency_org %} · {{ row.profile.agency_org.name }}{% endif %}
+        </div>
+      </div>
+      <span class="badge {% if row.activity.days_inactive <= 5 %}bg-warning-lt text-warning{% else %}bg-danger-lt text-danger{% endif %}">
+        No login for {{ row.activity.days_inactive }} days
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-5">
+          <div class="subheader">Last successful login</div>
+          {% if row.activity.last_login_at %}
+          <div>{{ row.activity.last_login_at|date:"F j, Y, g:i A" }}</div>
+          {% else %}
+          <div>Never logged in</div>
+          {% endif %}
+          <div class="subheader mt-3">Last known location</div>
+          {% if row.latest_ping %}
+          <div>
+            {{ row.latest_ping.latitude }}, {{ row.latest_ping.longitude }}
+            <span class="text-muted small">(recorded {{ row.latest_ping.recorded_at|date:"F j, Y, g:i A" }})</span>
+          </div>
+          {% if row.ping_age_days > 0 %}
+          <div class="text-warning small">Location ping is {{ row.ping_age_days }} day{{ row.ping_age_days|pluralize }} old.</div>
+          {% endif %}
+          {% else %}
+          <div class="text-muted">No location ping on record.</div>
+          {% endif %}
+        </div>
+        <div class="col-md-7">
+          <div class="subheader">Nearest registered police station</div>
+          <div class="text-muted small mb-2">{{ row.station_note }}</div>
+          {% if row.station_options %}
+          <div class="d-flex flex-column gap-2">
+            {% for station in row.station_options %}
+            <div class="border rounded p-2 d-flex flex-wrap align-items-center gap-2">
+              <div class="me-auto">
+                <div class="fw-medium">{{ station.name }}</div>
+                <div class="text-muted small">
+                  {{ station.city|default:station.country }}{% if station.address %} · {{ station.address }}{% endif %}
+                  {% if station.distance_text %} · {{ station.distance_text }} away{% endif %}
+                </div>
+              </div>
+              {% if station.phone and station.tel %}
+              <a href="tel:{{ station.tel }}" class="btn btn-sm btn-danger">
+                <i class="fas fa-phone me-1"></i> Call {{ station.phone }}
+              </a>
+              {% else %}
+              <span class="badge bg-secondary-lt text-secondary">No phone on record</span>
+              {% endif %}
+              {% if station.maps_url %}
+              <a href="{{ station.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Open directions">
+                <i class="fas fa-map-location-dot"></i>
+              </a>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">No matching station is registered yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="text-center text-muted py-5">
+    <i class="fas fa-circle-check fa-3x mb-3 text-success"></i>
+    <p>No OFWs in your scope have missed login for 3 or more days.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

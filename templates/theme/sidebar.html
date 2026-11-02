@@ -76,6 +76,14 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'inactive_police_contacts' %}active{% endif %}" href="{% url 'ofw:inactive_police_contacts' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-building-shield text-danger"></i>
+            </span>
+            <span class="nav-link-title">Police Contact</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'assessment_list' %}active{% endif %}" href="{% url 'ofw:assessment_list' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-heart-pulse"></i>
