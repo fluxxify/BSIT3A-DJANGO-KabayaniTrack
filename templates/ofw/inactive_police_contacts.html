@@ -47,6 +47,12 @@
           {% else %}
           <div>Never logged in</div>
           {% endif %}
+          <div class="subheader mt-3">Last known location</div>
+          <div>{{ row.last_location_label }}</div>
+          <div class="text-muted small">{{ row.last_location_note }}</div>
+          {% if row.latest_ping %}
+          <div class="text-muted small">Recorded {{ row.latest_ping.recorded_at|date:"F j, Y, g:i A" }}</div>
+          {% endif %}
         </div>
         <div class="col-md-7">
           <div class="subheader">Nearest registered police station</div>

@@ -24,6 +24,7 @@ from .forms import (
     OFWProfileForm,
     WelfareAssessmentForm,
 )
+from .geo import reverse_geocode
 from .locations import COUNTRY_GEO, canonical_country
 from .models import (
     CheckIn,
@@ -921,6 +922,19 @@ def inactive_police_contacts_page(request):
             if city and station.city.strip().casefold() == city.casefold()
         ]
         latest_ping = profile.location_pings.order_by('-recorded_at').first()
+        saved_area = ', '.join(
+            part for part in (city, (profile.country or '').strip()) if part
+        ) or 'Location not set in profile'
+        if latest_ping is not None:
+            geocoded = reverse_geocode(latest_ping.latitude, latest_ping.longitude)
+            last_location_label = geocoded.get('label') or saved_area
+            last_location_note = (
+                'Area from the last GPS ping.' if geocoded.get('label')
+                else 'GPS place name unavailable; showing the saved profile area.'
+            )
+        else:
+            last_location_label = saved_area
+            last_location_note = 'No GPS ping is on record; showing the saved profile area.'
         station_options = []
         station_note = ''
 
@@ -970,6 +984,8 @@ def inactive_police_contacts_page(request):
             'activity': activity,
             'latest_ping': latest_ping,
             'ping_age_days': ping_age_days,
+            'last_location_label': last_location_label,
+            'last_location_note': last_location_note,
             'station_options': station_options,
             'station_note': station_note,
         })
