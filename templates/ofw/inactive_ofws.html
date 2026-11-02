@@ -42,7 +42,6 @@
             <th>Country / City</th>
             <th class="w-1">Status</th>
             <th class="w-1">Last Successful Login</th>
-            <th class="w-1">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -72,11 +71,6 @@
               Never logged in
               <div class="small">Account created {{ row.user.date_joined|date:"F j, Y, g:i A" }}</div>
               {% endif %}
-            </td>
-            <td class="text-end">
-              <div class="d-flex flex-wrap gap-1 justify-content-end action-buttons">
-                {% include "ofw/_inactive_actions.html" with row=row %}
-              </div>
             </td>
           </tr>
           {% endfor %}
@@ -114,9 +108,6 @@
           Never (account created {{ row.user.date_joined|date:"F j, Y, g:i A" }})
           {% endif %}
           {% if row.activity.days_inactive > 5 %}<span class="text-danger"> · Follow up promptly</span>{% else %}<span class="text-warning"> · Welfare check due</span>{% endif %}
-        </div>
-        <div class="d-flex flex-wrap gap-1 mt-2 action-buttons">
-          {% include "ofw/_inactive_actions.html" with row=row %}
         </div>
       </div>
     </div>
