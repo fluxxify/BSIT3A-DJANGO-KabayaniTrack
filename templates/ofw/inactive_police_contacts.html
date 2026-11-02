@@ -19,7 +19,7 @@
   <div class="alert alert-info py-2">
     <i class="fas fa-circle-info me-2"></i>
     The call button opens your device's dialer. KabayaniTrack does not call police
-    automatically. Confirm the OFW's location first, especially if the last ping is old.
+    automatically. Confirm the OFW's location before calling the listed police station.
   </div>
 
   {% for row in rows %}
@@ -47,18 +47,6 @@
           {% else %}
           <div>Never logged in</div>
           {% endif %}
-          <div class="subheader mt-3">Last known location</div>
-          {% if row.latest_ping %}
-          <div>
-            {{ row.latest_ping.latitude }}, {{ row.latest_ping.longitude }}
-            <span class="text-muted small">(recorded {{ row.latest_ping.recorded_at|date:"F j, Y, g:i A" }})</span>
-          </div>
-          {% if row.ping_age_days > 0 %}
-          <div class="text-warning small">Location ping is {{ row.ping_age_days }} day{{ row.ping_age_days|pluralize }} old.</div>
-          {% endif %}
-          {% else %}
-          <div class="text-muted">No location ping on record.</div>
-          {% endif %}
         </div>
         <div class="col-md-7">
           <div class="subheader">Nearest registered police station</div>
@@ -80,11 +68,6 @@
               </a>
               {% else %}
               <span class="badge bg-secondary-lt text-secondary">No phone on record</span>
-              {% endif %}
-              {% if station.maps_url %}
-              <a href="{{ station.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Open directions">
-                <i class="fas fa-map-location-dot"></i>
-              </a>
               {% endif %}
             </div>
             {% endfor %}
