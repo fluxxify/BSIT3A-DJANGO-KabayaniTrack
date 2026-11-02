@@ -467,6 +467,8 @@ class OFWActivity(models.Model):
     days_inactive = models.PositiveIntegerField(default=0)
     warning_sent_at = models.DateTimeField(null=True, blank=True,
         help_text='When the inactivity warning was last sent to management.')
+    followup_sent_at = models.DateTimeField(null=True, blank=True,
+        help_text='When the 6-day inactivity follow-up was sent to management.')
     escalated_to_police_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -493,7 +495,7 @@ class OFWActivity(models.Model):
             return False
         if self.escalated_to_police_at is not None:
             return False
-        return self.warning_sent_at is not None and self.days_inactive >= self.INACTIVE_THRESHOLD_DAYS
+        return self.warning_sent_at is not None and self.days_inactive > 5
 
 
 class EmergencyAlert(models.Model):

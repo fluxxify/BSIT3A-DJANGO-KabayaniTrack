@@ -1,8 +1,11 @@
 """Helpers for deriving OFW inactivity from successful login timestamps."""
 
 from django.utils import timezone
+from django.db import transaction
+from django.urls import reverse
 
-from .models import OFWActivity
+from .models import OFWActivity, Notification
+from .notifications import notify_inactivity_managers
 
 
 def refresh_activity_status(activity, now=None):
@@ -39,12 +42,14 @@ def refresh_activity_status(activity, now=None):
 
 
 def refresh_activities_for_profiles(profiles, now=None):
-    """Ensure and refresh activity rows for every linked OFW account."""
+    """Refresh linked OFW accounts and notify management at 3 and 6 days."""
     now = now or timezone.now()
     users = {}
-    for profile in profiles.select_related('user'):
+    profile_by_user = {}
+    for profile in profiles.select_related('user', 'agency_org'):
         if profile.user_id:
             users[profile.user_id] = profile.user
+            profile_by_user[profile.user_id] = profile
     if not users:
         return []
 
@@ -54,11 +59,60 @@ def refresh_activities_for_profiles(profiles, now=None):
     }
     refreshed = []
     for user_id, user in users.items():
-        activity = activities.get(user_id)
-        if activity is None:
-            activity, _ = OFWActivity.objects.get_or_create(user=user)
-        refreshed.append(refresh_activity_status(activity, now=now))
+        with transaction.atomic():
+            activity = activities.get(user_id)
+            if activity is None:
+                activity, _ = OFWActivity.objects.get_or_create(user=user)
+            activity = OFWActivity.objects.select_for_update().select_related(
+                'user'
+            ).get(pk=activity.pk)
+            profile = profile_by_user[user_id]
+            activity = refresh_activity_status(activity, now=now)
+            _send_due_inactivity_notification(activity, profile, now)
+            refreshed.append(activity)
     return refreshed
+
+
+def _send_due_inactivity_notification(activity, profile, now):
+    """Send one warning per inactivity cycle and one follow-up at day six."""
+    days = activity.days_inactive
+    if activity.is_account_active or days < OFWActivity.INACTIVE_THRESHOLD_DAYS:
+        return
+
+    full_name = (profile.full_name or activity.user.username)[:120]
+    last_login = (
+        timezone.localtime(activity.last_login_at).strftime('%B %d, %Y, %I:%M %p')
+        if activity.last_login_at else 'Never logged in'
+    )
+    url = reverse('ofw:inactive_ofws')
+
+    if days > 5 and activity.followup_sent_at is None:
+        created = notify_inactivity_managers(
+            profile,
+            f'Follow-up overdue: {full_name}',
+            f'{full_name} has not successfully logged in for {days} days. '
+            f'Last login: {last_login}. Please follow up promptly.',
+            url,
+            Notification.Level.DANGER,
+        )
+        if created:
+            activity.warning_sent_at = activity.warning_sent_at or now
+            activity.followup_sent_at = now
+            activity.save(update_fields=[
+                'warning_sent_at', 'followup_sent_at', 'updated_at',
+            ])
+    elif activity.warning_sent_at is None:
+        created = notify_inactivity_managers(
+            profile,
+            f'OFW login warning: {full_name}',
+            f'{full_name} has not successfully logged in for {days} days. '
+            f'Last login: {last_login}. Contact them for a welfare check.',
+            url,
+            Notification.Level.WARNING,
+        )
+        if created:
+            activity.warning_sent_at = now
+            activity.save(update_fields=['warning_sent_at', 'updated_at'])
 
 
 def refresh_activity_for_user(user, now=None):

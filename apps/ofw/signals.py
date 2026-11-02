@@ -161,9 +161,10 @@ def update_activity_on_login(sender, request, user, **kwargs):
         activity.is_account_active = True
         activity.days_inactive = 0
         activity.warning_sent_at = None
+        activity.followup_sent_at = None
         activity.escalated_to_police_at = None
         activity.save(update_fields=[
             'last_login_at', 'last_activity_at',
             'is_account_active', 'days_inactive', 'updated_at',
-            'warning_sent_at', 'escalated_to_police_at',
+            'warning_sent_at', 'followup_sent_at', 'escalated_to_police_at',
         ])

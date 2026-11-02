@@ -57,6 +57,32 @@ def notify_managers(title, message='', url='', level=Notification.Level.INFO,
     ])
 
 
+def notify_inactivity_managers(profile, title, message, url, level):
+    """Notify global admins and the agency assigned to an inactive OFW."""
+    if profile.agency_org_id:
+        recipients = User.objects.filter(is_active=True).filter(
+            Q(is_superuser=True) |
+            Q(is_staff=True, agency_staff__agency_id=profile.agency_org_id) |
+            Q(is_staff=True, agency_staff__isnull=True)
+        ).distinct()
+    else:
+        recipients = User.objects.filter(
+            Q(is_staff=True) | Q(is_superuser=True), is_active=True,
+        ).distinct()
+
+    notifications = Notification.objects.bulk_create([
+        Notification(
+            recipient=user,
+            title=title,
+            message=message,
+            url=url,
+            level=level,
+        )
+        for user in recipients
+    ])
+    return len(notifications)
+
+
 def mark_concern_read_by_management(concern, user):
     """Mark a concern as seen by management and tell the OFW exactly once.
 

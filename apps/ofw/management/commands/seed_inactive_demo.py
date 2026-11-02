@@ -72,6 +72,7 @@ class Command(BaseCommand):
                 'days_inactive': 4,
                 'is_account_active': False,
                 'warning_sent_at': None,
+                'followup_sent_at': None,
                 'escalated_to_police_at': None,
             },
         )
