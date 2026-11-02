@@ -10,6 +10,11 @@
       <div class="text-muted small mt-1">Send your location and get directions to the nearest safe place.</div>
     </div>
     <div class="col-auto">
+      {% if agency_phone %}
+      <a href="tel:{{ agency_phone }}" class="btn btn-success btn-sm">
+        <i class="fas fa-headset me-1"></i>Call Agency
+      </a>
+      {% endif %}
       <a href="tel:911" class="btn btn-danger btn-sm">
         <i class="fas fa-phone me-1"></i>Call 911
       </a>
@@ -506,8 +511,13 @@ window.KabayaniGuide = (function () {
   var callEl, mapsEl, stopEl;
 
   var watchId = null;
+  var refreshTimer = null;
   var target = null;
   var approximate = false;
+  var lastSharedAt = Date.now();
+  var lastSharedLat = null;
+  var lastSharedLng = null;
+  var sharingRequest = false;
   var lastFetchAt = 0;
   var lastFetchLat = null;
   var lastFetchLng = null;
@@ -650,12 +660,52 @@ window.KabayaniGuide = (function () {
     if (watchId !== null || !navigator.geolocation) return;
     watchId = navigator.geolocation.watchPosition(
       function (pos) {
-        updateLive(pos.coords.latitude, pos.coords.longitude);
-        maybeRefresh(pos.coords.latitude, pos.coords.longitude);
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        updateLive(lat, lng);
+        maybeRefresh(lat, lng);
+        shareUpdatedLocation(lat, lng, pos.coords.accuracy);
       },
       function () { /* keep the last known distance */ },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
     );
+    refreshTimer = window.setInterval(function () {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var lat = pos.coords.latitude;
+        var lng = pos.coords.longitude;
+        updateLive(lat, lng);
+        maybeRefresh(lat, lng);
+        shareUpdatedLocation(lat, lng, pos.coords.accuracy);
+      }, function () {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    }, 15000);
+  }
+
+  function shareUpdatedLocation(lat, lng, accuracy) {
+    var moved = lastSharedLat === null || distanceKm(lat, lng, lastSharedLat, lastSharedLng) >= 0.05;
+    var elapsed = Date.now() - lastSharedAt >= 15000;
+    if (sharingRequest || (!moved && !elapsed)) return;
+    sharingRequest = true;
+    fetch('{% url "ofw:location_tracker_ping" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'latitude=' + encodeURIComponent(lat.toFixed(6)) +
+        '&longitude=' + encodeURIComponent(lng.toFixed(6)) +
+        '&accuracy=' + encodeURIComponent(Math.round(accuracy || 0)) +
+        '&is_emergency=1'
+    }).then(function (response) {
+      if (response.ok) {
+        lastSharedAt = Date.now();
+        lastSharedLat = lat;
+        lastSharedLng = lng;
+      }
+    }).catch(function () {
+      // Keep the guide running and retry on the next GPS update.
+    }).finally(function () {
+      sharingRequest = false;
+    });
   }
 
   function stopWatch() {
@@ -663,10 +713,15 @@ window.KabayaniGuide = (function () {
       navigator.geolocation.clearWatch(watchId);
     }
     watchId = null;
+    if (refreshTimer !== null) window.clearInterval(refreshTimer);
+    refreshTimer = null;
   }
 
   function start(lat, lng, accuracy) {
     approximate = (accuracy || 0) > 1000;
+    lastSharedAt = Date.now();
+    lastSharedLat = lat;
+    lastSharedLng = lng;
     guideEl.classList.remove('d-none');
     nameEl.textContent = 'Locating the nearest safe place…';
     metaEl.textContent = '';

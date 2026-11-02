@@ -1455,39 +1455,38 @@ def location_tracker_ping(request):
                 f'({place["distance_text"]} {place["direction"]}) in '
                 f'{place["city"] or place["country"]}. '
             )
-        alert, created = EmergencyAlert.objects.get_or_create(
-            ofw=profile,
-            status=EmergencyAlert.Status.OPEN,
-            defaults={
-                'title': f'Emergency SOS from {profile.full_name}',
-                'message': (
-                    f'{profile.full_name} sent an emergency location ping '
-                    f'(lat: {lat}, lng: {lng}). {hint}'
-                ),
-                'level': EmergencyAlert.Level.CRITICAL,
-            },
+        alert = profile.emergency_alerts.filter(
+            status__in=[EmergencyAlert.Status.OPEN, EmergencyAlert.Status.ACKNOWLEDGED]
+        ).order_by('-created_at').first()
+        created = alert is None
+        message = (
+            f'{profile.full_name} sent an emergency location ping '
+            f'(lat: {lat}, lng: {lng}). {hint}'
         )
-        if not created:
-            alert.level = EmergencyAlert.Level.CRITICAL
-            alert.message = (
-                f'{profile.full_name} sent another emergency location ping '
-                f'(lat: {lat}, lng: {lng}). {hint}'
+        if created:
+            alert = EmergencyAlert.objects.create(
+                ofw=profile,
+                title=f'Emergency SOS from {profile.full_name}',
+                message=message,
+                level=EmergencyAlert.Level.CRITICAL,
             )
+        else:
+            alert.level = EmergencyAlert.Level.CRITICAL
+            alert.message = message
             alert.save(update_fields=['level', 'message', 'updated_at'])
 
-        notify_managers(
-            title=f'Emergency location ping from {profile.full_name}',
-            message=(
-                f'{profile.full_name} sent an emergency location ping. '
-                f'Latitude: {lat}, Longitude: {lng}. '
-                f'{hint}'
-                f'Guide them to the nearest safe place.'
-            ),
-            url=reverse('ofw:location_tracker'),
-            level=Notification.Level.DANGER,
-            agency=profile.agency_org,
-            exclude_user=request.user,
-        )
+        if created:
+            notify_managers(
+                title=f'Emergency SOS from {profile.full_name}',
+                message=(
+                    f'{profile.full_name} shared an emergency location. '
+                    f'Nearest safe place: {hint or "not found; open the guide for options."}'
+                ),
+                url=reverse('ofw:emergency_guide', args=[profile.pk]),
+                level=Notification.Level.DANGER,
+                agency=profile.agency_org,
+                exclude_user=request.user,
+            )
 
     return JsonResponse({'status': 'ok', 'id': ping.pk, 'alert_id': alert.pk if alert else None})
 
@@ -1747,6 +1746,10 @@ def ofw_emergency_sos(request):
         'safe_locations': safe_locations,
         'recent_pings': recent_pings,
         'open_alert': open_alert,
+        'agency_phone': (
+            profile.agency_org.phone
+            if profile and profile.agency_org_id and profile.agency_org.phone else ''
+        ),
         'local_hotlines': db_local,
         'national_hotlines': db_national,
         'page_title': 'Emergency SOS',

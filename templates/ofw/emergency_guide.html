@@ -106,7 +106,10 @@
   {% if latest_ping %}
   <div class="card mb-3">
     <div class="card-header">
-      <h5 class="card-title mb-0"><i class="fas fa-map-location-dot me-2"></i>Last known position</h5>
+      <div>
+        <h5 class="card-title mb-0"><i class="fas fa-map-location-dot me-2"></i>OFW location and nearby safe places</h5>
+        <div class="text-muted small">Map refreshes every 15 seconds while this page is open. Location sharing requires the OFW's Emergency SOS page and GPS permission.</div>
+      </div>
     </div>
     <div class="card-body p-0">
       <div id="guideMap" style="height: 320px; width: 100%;"></div>
@@ -268,6 +271,10 @@
   {% endfor %}
 
   map.fitBounds(L.latLngBounds(bounds).pad(0.2), { maxZoom: 15 });
+
+  window.setInterval(function () {
+    if (!document.hidden) window.location.reload();
+  }, 15000);
 })();
 </script>
 {% endif %}
