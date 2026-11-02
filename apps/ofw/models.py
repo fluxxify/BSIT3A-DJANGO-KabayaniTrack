@@ -446,8 +446,9 @@ class Notification(models.Model):
 class OFWActivity(models.Model):
     """Tracks OFW account activity for auto-inactive detection.
 
-    An OFW account is considered inactive when the user has not logged in
-    or updated their profile for the INACTIVE_THRESHOLD days (3-5 days).
+    An OFW account is considered inactive after three full days without a
+    successful login. The dashboard shows a welfare-check stage at 3-5 days
+    and a prompt-follow-up stage after five days.
     Management and agency staff see warning notifications so they can call
     the OFW and, if there is no response, escalate to the police.
     """
@@ -461,7 +462,7 @@ class OFWActivity(models.Model):
     )
     last_login_at = models.DateTimeField(null=True, blank=True)
     last_activity_at = models.DateTimeField(null=True, blank=True,
-        help_text='Last profile update, check-in, or any portal action.')
+        help_text='Most recent recorded login or profile update.')
     is_account_active = models.BooleanField(default=True)
     days_inactive = models.PositiveIntegerField(default=0)
     warning_sent_at = models.DateTimeField(null=True, blank=True,

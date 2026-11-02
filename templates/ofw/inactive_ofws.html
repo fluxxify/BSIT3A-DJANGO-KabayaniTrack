@@ -22,8 +22,9 @@
   <div class="alert alert-warning alert-dismissible fade show py-2">
     <i class="fas fa-triangle-exclamation me-2"></i>
     <div>
-      <strong>These OFW accounts have been inactive for 3 or more days.</strong>
-      Call them directly. If there is no response, escalate to police from the
+    <strong>These OFWs have not successfully logged in for 3 or more days.</strong>
+    Review the last login time and contact them for a welfare check. For accounts
+    past 5 days, follow up promptly. Any police escalation remains a manual decision in the
       <a href="{% url 'ofw:emergency_alerts' %}" class="alert-link">Emergency Alerts</a> page.
     </div>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -39,8 +40,8 @@
             <th>Username</th>
             <th>Agency</th>
             <th>Country / City</th>
-            <th class="text-end w-1">Days Inactive</th>
-            <th class="text-end w-1">Last Login</th>
+            <th class="w-1">Status</th>
+            <th class="w-1">Last Successful Login</th>
             <th class="w-1">Action</th>
           </tr>
         </thead>
@@ -63,8 +64,15 @@
               {{ row.profile.country|default:"Not set" }}
               {% if row.profile.city_abroad %}, {{ row.profile.city_abroad }}{% endif %}
             </td>
-            <td class="text-end"><span class="badge bg-danger">{{ row.activity.days_inactive }} days</span></td>
-            <td class="text-end text-muted">{{ row.activity.last_login_at|date:"M d, Y H:i"|default:"never" }}</td>
+            <td><span class="badge {% if row.activity.days_inactive <= 5 %}bg-warning-lt text-warning{% else %}bg-danger-lt text-danger{% endif %}">{{ row.activity.days_inactive }} days · {{ row.age_band }}</span></td>
+            <td class="text-muted">
+              {% if row.activity.last_login_at %}
+              {{ row.activity.last_login_at|date:"F j, Y, g:i A" }}
+              {% else %}
+              Never logged in
+              <div class="small">Account created {{ row.user.date_joined|date:"F j, Y, g:i A" }}</div>
+              {% endif %}
+            </td>
             <td class="text-end">
               <div class="d-flex flex-wrap gap-1 justify-content-end action-buttons">
                 {% include "ofw/_inactive_actions.html" with row=row %}
@@ -96,10 +104,16 @@
             <div class="text-muted small">{{ row.profile.agency_org.name }}</div>
             {% endif %}
           </div>
-          <span class="badge bg-danger flex-shrink-0">{{ row.activity.days_inactive }} days</span>
+          <span class="badge {% if row.activity.days_inactive <= 5 %}bg-warning-lt text-warning{% else %}bg-danger-lt text-danger{% endif %} flex-shrink-0">{{ row.activity.days_inactive }} days</span>
         </div>
         <div class="text-muted small mt-1">
-          Last login: {{ row.activity.last_login_at|date:"M d, Y H:i"|default:"never" }}
+          Last successful login:
+          {% if row.activity.last_login_at %}
+          {{ row.activity.last_login_at|date:"F j, Y, g:i A" }}
+          {% else %}
+          Never (account created {{ row.user.date_joined|date:"F j, Y, g:i A" }})
+          {% endif %}
+          {% if row.activity.days_inactive > 5 %}<span class="text-danger"> · Follow up promptly</span>{% else %}<span class="text-warning"> · Welfare check due</span>{% endif %}
         </div>
         <div class="d-flex flex-wrap gap-1 mt-2 action-buttons">
           {% include "ofw/_inactive_actions.html" with row=row %}

@@ -16,6 +16,26 @@
   </div>
   <br>
 
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <div class="subheader">Account Activity</div>
+        <div class="fw-medium">Last successful login</div>
+        <div class="text-muted">
+          {% if has_ever_logged_in %}
+          {{ last_login_at|date:"F j, Y, g:i A" }}
+          {% else %}
+          Never logged in (account created {{ user.date_joined|date:"F j, Y, g:i A" }})
+          {% endif %}
+        </div>
+      </div>
+      <span class="badge {% if is_inactive %}bg-warning-lt text-warning{% else %}bg-success-lt text-success{% endif %}">
+        {% if is_inactive %}No login for {{ inactive_days }} days{% else %}Active{% endif %}
+      </span>
+      <div class="text-muted small w-100">Inactivity is based on successful sign-ins, not live online presence.</div>
+    </div>
+  </div>
+
   {% if not profile %}
   <div class="alert alert-warning">
     <i class="fas fa-triangle-exclamation me-2"></i>
@@ -28,7 +48,7 @@
   <div class="alert alert-warning alert-dismissible fade show">
     <i class="fas fa-clock text-warning me-2"></i>
     <strong>Your account has been inactive for {{ inactive_days }} day{{ inactive_days|pluralize }}.</strong>
-    Management has been alerted. Log a check-in or update your profile to reactivate.
+    Please log a check-in so management knows you are safe.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
   {% endif %}

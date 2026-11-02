@@ -30,7 +30,7 @@
             <th>Username</th>
             <th>Agency</th>
             <th class="w-1">Status</th>
-            <th class="text-end w-1">Last Login</th>
+            <th class="text-end w-1">Last Successful Login</th>
             <th class="text-end w-1">Last Activity</th>
             <th class="text-end w-1">Days Inactive</th>
             <th class="w-1">Action</th>
@@ -58,11 +58,18 @@
                 {% if activity.is_account_active %}Active{% else %}Inactive{% endif %}
               </span>
             </td>
-            <td class="text-end text-muted">{{ activity.last_login_at|date:"M d, Y H:i"|default:"—" }}</td>
+            <td class="text-end text-muted">
+              {% if activity.last_login_at %}
+              {{ activity.last_login_at|date:"F j, Y, g:i A" }}
+              {% else %}
+              Never logged in
+              <div class="small">Account created {{ activity.user.date_joined|date:"F j, Y, g:i A" }}</div>
+              {% endif %}
+            </td>
             <td class="text-end text-muted">{{ activity.last_activity_at|date:"M d, Y H:i"|default:"—" }}</td>
             <td class="text-end">
               <span class="fw-medium {% if activity.days_inactive >= 3 %}text-danger{% else %}text-muted{% endif %}">
-                {{ activity.days_inactive }}
+                {{ activity.days_inactive }} days
               </span>
             </td>
             <td class="text-end">

@@ -143,13 +143,11 @@ def ensure_ofw_activity(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=OFWProfile)
 def update_activity_on_profile_change(sender, instance, **kwargs):
-    """Bump last_activity_at whenever an OFW profile is updated."""
+    """Record profile edits without treating them as a successful login."""
     if instance.user_id:
         activity, _ = OFWActivity.objects.get_or_create(user_id=instance.user_id)
         activity.last_activity_at = timezone.now()
-        activity.is_account_active = True
-        activity.days_inactive = 0
-        activity.save(update_fields=['last_activity_at', 'is_account_active', 'days_inactive', 'updated_at'])
+        activity.save(update_fields=['last_activity_at', 'updated_at'])
 
 
 @receiver(user_logged_in)
@@ -162,7 +160,10 @@ def update_activity_on_login(sender, request, user, **kwargs):
         activity.last_activity_at = now
         activity.is_account_active = True
         activity.days_inactive = 0
+        activity.warning_sent_at = None
+        activity.escalated_to_police_at = None
         activity.save(update_fields=[
             'last_login_at', 'last_activity_at',
             'is_account_active', 'days_inactive', 'updated_at',
+            'warning_sent_at', 'escalated_to_police_at',
         ])

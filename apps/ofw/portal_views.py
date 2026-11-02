@@ -14,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from .activity import refresh_activity_for_user
 from .forms import (
     FamilyContactForm,
     OFWPortalProfileForm,
@@ -135,14 +136,10 @@ def portal_home(request):
         .order_by('-assessment_date', '-id')[:5]
     )
 
-    # Inactive status: is the OFW's account flagged inactive (3+ days no login)?
-    activity = OFWActivity.objects.filter(user=request.user).first()
-    is_inactive = (
-        activity is not None
-        and not activity.is_account_active
-        and activity.days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
-    )
-    inactive_days = activity.days_inactive if activity else 0
+    # Keep the OFW's own portal status in sync with the successful login time.
+    activity = refresh_activity_for_user(request.user)
+    is_inactive = activity.days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
+    inactive_days = activity.days_inactive
 
     # Police report status: any open/submitted police report for this OFW?
     police_reports = PoliceReport.objects.filter(ofw=profile).order_by('-reported_at') if profile else []
@@ -178,6 +175,8 @@ def portal_home(request):
         ).count(),
         'is_inactive': is_inactive,
         'inactive_days': inactive_days,
+        'last_login_at': activity.last_login_at,
+        'has_ever_logged_in': activity.last_login_at is not None,
         'latest_police_report': latest_police_report,
     }
     return render(request, 'ofw/portal/home.html', context)

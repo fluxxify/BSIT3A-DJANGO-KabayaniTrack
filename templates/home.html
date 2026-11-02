@@ -82,16 +82,21 @@
       <div class="card">
         <div class="card-body">
           <div class="d-flex align-items-center">
-            <div class="subheader">Inactive OFWs (3+ days)</div>
+            <div class="subheader">No Login for 3+ Days</div>
           </div>
           <div class="d-flex align-items-baseline">
             <div class="h1 mb-0 me-2 text-warning">{{ stats.kpi.inactive_ofws }}</div>
             <i class="fas fa-clock text-muted"></i>
           </div>
+          <div class="small text-muted mt-2">
+            3–5 days: {{ stats.kpi.inactive_3_5_days }}
+            <span class="mx-1">·</span>
+            6+ days: {{ stats.kpi.inactive_6_plus_days }}
+          </div>
         </div>
         <div class="card-footer">
           <a href="{{ stats.links.inactive_ofws }}" class="text-decoration-none">
-            View inactive <i class="ti ti-arrow-right ms-1"></i>
+            View login warnings <i class="ti ti-arrow-right ms-1"></i>
           </a>
         </div>
       </div>

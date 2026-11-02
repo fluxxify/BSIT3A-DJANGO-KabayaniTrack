@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import crud
+from .activity import refresh_activities_for_profiles
 from .forms import (
     CheckInForm,
     ConcernForm,
@@ -624,6 +625,7 @@ def report_export_ajax(request):
 def dashboard_stats(user):
     """Aggregate monitoring metrics shown on the dashboard."""
     profiles = crud._scoped(user, OFWProfile)
+    refresh_activities_for_profiles(profiles)
     checkins = crud._scoped(user, CheckIn)
     concerns = crud._scoped(user, Concern)
     contacts = crud._scoped(user, EmergencyContact)
@@ -638,21 +640,15 @@ def dashboard_stats(user):
     new_ofws_month = profiles.filter(created_at__gte=month_start).count()
     incomplete_profiles = profiles.filter(country='').count()
 
-    # Inactive OFW accounts (no login/activity for 3+ days)
+    # Inactive OFW accounts (no successful login for 3+ days)
     inactive_activities = OFWActivity.objects.filter(
+        user__ofw_profiles__in=profiles,
         is_account_active=False,
         days_inactive__gte=OFWActivity.INACTIVE_THRESHOLD_DAYS,
-    )
-    if not user.is_superuser:
-        from apps.users.agencies import agency_for_user
-        agency = agency_for_user(user)
-        if agency is not None:
-            inactive_activities = inactive_activities.filter(
-                user__ofw_profiles__agency_org=agency
-            ).distinct()
-        else:
-            inactive_activities = inactive_activities.none()
+    ).distinct()
     inactive_ofw_count = inactive_activities.count()
+    inactive_3_5_count = inactive_activities.filter(days_inactive__lte=5).count()
+    inactive_6_plus_count = inactive_activities.filter(days_inactive__gt=5).count()
 
     # Open emergency alerts
     open_alerts = EmergencyAlert.objects.filter(status=EmergencyAlert.Status.OPEN)
@@ -768,6 +764,8 @@ def dashboard_stats(user):
             'contacts_total': contacts.count(),
             'reports_total': reports.count(),
             'inactive_ofws': inactive_ofw_count,
+            'inactive_3_5_days': inactive_3_5_count,
+            'inactive_6_plus_days': inactive_6_plus_count,
             'open_emergency_alerts': open_alerts_count,
         },
         'links': {
@@ -848,11 +846,14 @@ def inactive_ofws_page(request):
 
     Admin sees all; agency staff see only their agency's OFWs.
     """
-    if not (request.user.is_superuser or request.user.is_staff or request.user.is_authenticated):
+    if not (request.user.is_superuser or request.user.is_staff):
         return redirect('dashboard')
 
     profiles = _management_scope(request.user).select_related('user', 'agency_org')
-    activities = OFWActivity.objects.select_related('user').all()
+    refresh_activities_for_profiles(profiles)
+    activities = OFWActivity.objects.select_related('user').filter(
+        user__ofw_profiles__in=profiles
+    ).distinct()
     activity_map = {a.user_id: a for a in activities}
 
     inactive_rows = []
@@ -865,6 +866,7 @@ def inactive_ofws_page(request):
                 'profile': profile,
                 'activity': activity,
                 'user': profile.user,
+                'age_band': '3–5 days' if activity.days_inactive <= 5 else '6+ days',
             })
 
     inactive_rows.sort(key=lambda r: r['activity'].days_inactive, reverse=True)
@@ -872,7 +874,7 @@ def inactive_ofws_page(request):
     return render(request, 'ofw/inactive_ofws.html', {
         'inactive_rows': inactive_rows,
         'page_title': 'Inactive OFWs',
-        'page_pretitle': 'No check-in for 3 or more days',
+        'page_pretitle': 'No successful login for 3 or more days',
     })
 
 
@@ -1839,18 +1841,11 @@ def ofw_activity_page(request):
     if not (request.user.is_superuser or request.user.is_staff):
         return redirect('dashboard')
 
-    from apps.users.agencies import agency_for_user
-
-    activities = OFWActivity.objects.select_related('user').order_by('-updated_at')
-
-    if not request.user.is_superuser:
-        agency = agency_for_user(request.user)
-        if agency is not None:
-            activities = activities.filter(
-                user__ofw_profiles__agency_org=agency
-            ).distinct()
-        else:
-            activities = activities.none()
+    profiles = _management_scope(request.user).select_related('user')
+    refresh_activities_for_profiles(profiles)
+    activities = OFWActivity.objects.select_related('user').filter(
+        user__ofw_profiles__in=profiles
+    ).distinct().order_by('-last_login_at', '-updated_at')
 
     active_only = request.GET.get('active') == '1'
     inactive_only = request.GET.get('inactive') == '1'
