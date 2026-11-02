@@ -7,7 +7,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 
-from apps.users.agencies import agency_for_user
+from apps.users.agencies import agency_for_user, has_agency_assignment, is_global_staff
 from apps.users.models import Agency
 
 from .models import (
@@ -52,22 +52,26 @@ class StyledModelForm(forms.ModelForm):
         agency = agency_for_user(user) if user is not None else None
 
         if user is not None and 'ofw' in self.fields:
-            if user.is_superuser or (user.is_staff and agency is None):
+            if is_global_staff(user):
                 self.fields['ofw'].queryset = OFWProfile.objects.all()
             elif agency is not None:
                 self.fields['ofw'].queryset = OFWProfile.objects.filter(
                     agency_org=agency,
                 )
+            elif has_agency_assignment(user):
+                self.fields['ofw'].queryset = OFWProfile.objects.none()
             else:
                 self.fields['ofw'].queryset = OFWProfile.objects.filter(user=user)
 
         if user is not None and 'concern' in self.fields:
-            if user.is_superuser or (user.is_staff and agency is None):
+            if is_global_staff(user):
                 self.fields['concern'].queryset = Concern.objects.all()
             elif agency is not None:
                 self.fields['concern'].queryset = Concern.objects.filter(
                     ofw__agency_org=agency,
                 )
+            elif has_agency_assignment(user):
+                self.fields['concern'].queryset = Concern.objects.none()
             else:
                 self.fields['concern'].queryset = Concern.objects.filter(user=user)
 
@@ -77,6 +81,8 @@ class StyledModelForm(forms.ModelForm):
                     pk=agency.pk,
                 )
                 self.fields['agency_org'].initial = agency
+            elif has_agency_assignment(user):
+                self.fields['agency_org'].queryset = Agency.objects.none()
             else:
                 self.fields['agency_org'].queryset = Agency.objects.filter(
                     is_active=True,
@@ -108,6 +114,17 @@ class OFWProfileForm(StyledModelForm):
             'city_abroad', 'employer_name', 'occupation', 'agency_org',
             'deployment_date', 'contract_end_date', 'welfare_status', 'remarks',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if (
+            self.user is not None
+            and not (self.user.is_superuser or self.user.is_staff)
+        ):
+            # An OFW may maintain their own identity/contact fields through the
+            # generic endpoint, but case-management fields stay staff-only.
+            for name in ('agency_org', 'welfare_status', 'remarks'):
+                self.fields.pop(name, None)
 
 
 class WelfareAssessmentForm(StyledModelForm):

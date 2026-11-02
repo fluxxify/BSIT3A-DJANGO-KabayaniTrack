@@ -1,0 +1,108 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <h2 class="page-title mb-0">{{ page_title }}</h2>
+        </div>
+        <div class="col-auto text-end">
+          <a href="?status=all" class="btn btn-sm btn-outline-secondary">{{ status_filter|title }} only → All</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <div class="badge bg-warning-lt text-warning">
+      Pending = awaiting admin review
+    </div>
+    <div class="badge bg-success-lt text-success">
+      Approved = added to Safe Places directory
+    </div>
+    <div class="badge bg-secondary-lt text-secondary">
+      Rejected = not approved
+    </div>
+  </div>
+
+  {% if suggestions %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>Safe Place</th>
+            <th>Type</th>
+            <th>Country / City</th>
+            <th>Suggested by</th>
+            <th class="w-1">Status</th>
+            <th class="text-end w-1">Created</th>
+            <th class="w-1">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for suggestion in suggestions %}
+          <tr>
+            <td>
+              <a href="#" class="text-decoration-none fw-medium">{{ suggestion.name }}</a>
+              <div class="text-muted small">{{ suggestion.address|default:"No address" }}</div>
+              {% if suggestion.phone %}
+              <div class="text-muted small"><i class="fas fa-phone me-1"></i>{{ suggestion.phone }}</div>
+              {% endif %}
+            </td>
+            <td>{{ suggestion.get_location_type_display }}</td>
+            <td>{{ suggestion.city|default:"" }}{% if suggestion.city and suggestion.country %}, {% endif %}{{ suggestion.country }}</td>
+            <td>
+              <div class="text-muted small">{{ suggestion.submitted_by.get_full_name|default:suggestion.submitted_by.username }}</div>
+              {% if suggestion.submitted_by.ofw_profiles.first.agency_org %}
+              <div class="text-muted smaller">{{ suggestion.submitted_by.ofw_profiles.first.agency_org.name }}</div>
+              {% else %}
+              <div class="text-muted smaller">No agency</div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{% if suggestion.status == 'pending' %}warning{% elif suggestion.status == 'approved' %}success{% else %}secondary{% endif %}-lt text-{% if suggestion.status == 'pending' %}warning{% elif suggestion.status == 'approved' %}success{% else %}secondary{% endif %}">
+                {{ suggestion.get_status_display }}
+              </span>
+            </td>
+            <td class="text-end text-muted">{{ suggestion.created_at|date:"M d, Y H:i" }}</td>
+            <td class="text-end">
+              <div class="d-flex flex-wrap gap-1 justify-content-end action-buttons">
+                {% if suggestion.status == 'pending' %}
+                <form action="{% url 'ofw:safe_location_suggestion_approve' suggestion.pk %}" method="post" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Approve this safe place and add it to the directory?');">
+                    <i class="fas fa-check me-1"></i>Approve
+                  </button>
+                </form>
+                <form action="{% url 'ofw:safe_location_suggestion_reject' suggestion.pk %}" method="post" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Reject this safe place suggestion?');">
+                    <i class="fas fa-times me-1"></i>Reject
+                  </button>
+                </form>
+                {% else %}
+                <span class="btn btn-sm btn-outline-secondary disabled">
+                  {{ suggestion.get_status_display }}
+                </span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-clipboard-list fa-3x mb-3"></i>
+    <p>No {{ status_filter }} safe place suggestions.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -36,6 +36,7 @@ urlpatterns = [
     path('profiles/ajax/save/', views.profile_save_ajax, name='profile_save_ajax'),
     path('profiles/ajax/delete/<int:pk>/', views.profile_delete_ajax, name='profile_delete_ajax'),
     path('profiles/ajax/delete-all/', views.profile_delete_all_ajax, name='profile_delete_all_ajax'),
+    path('profiles/ajax/export/', views.profile_export_ajax, name='profile_export'),
 
     # Welfare assessments
     path('welfare/', views.assessment_list_page, name='assessment_list'),
@@ -44,6 +45,7 @@ urlpatterns = [
     path('welfare/ajax/save/', views.assessment_save_ajax, name='assessment_save_ajax'),
     path('welfare/ajax/delete/<int:pk>/', views.assessment_delete_ajax, name='assessment_delete_ajax'),
     path('welfare/ajax/delete-all/', views.assessment_delete_all_ajax, name='assessment_delete_all_ajax'),
+    path('welfare/ajax/export/', views.assessment_export_ajax, name='assessment_export'),
 
     # Check-ins
     path('checkins/', views.checkin_list_page, name='checkin_list'),
@@ -53,6 +55,7 @@ urlpatterns = [
     path('checkins/ajax/save/', views.checkin_save_ajax, name='checkin_save_ajax'),
     path('checkins/ajax/delete/<int:pk>/', views.checkin_delete_ajax, name='checkin_delete_ajax'),
     path('checkins/ajax/delete-all/', views.checkin_delete_all_ajax, name='checkin_delete_all_ajax'),
+    path('checkins/ajax/export/', views.checkin_export_ajax, name='checkin_export'),
 
     # Concerns
     path('concerns/', views.concern_list_page, name='concern_list'),
@@ -63,6 +66,7 @@ urlpatterns = [
     path('concerns/ajax/delete/<int:pk>/', views.concern_delete_ajax, name='concern_delete_ajax'),
     path('concerns/ajax/delete-all/', views.concern_delete_all_ajax, name='concern_delete_all_ajax'),
     path('concerns/proofs/<int:pk>/delete/', views.concern_proof_delete, name='concern_proof_delete'),
+    path('concerns/ajax/export/', views.concern_export_ajax, name='concern_export'),
 
     # Emergency contacts
     path('contacts/', views.contact_list_page, name='contact_list'),
@@ -71,6 +75,7 @@ urlpatterns = [
     path('contacts/ajax/save/', views.contact_save_ajax, name='contact_save_ajax'),
     path('contacts/ajax/delete/<int:pk>/', views.contact_delete_ajax, name='contact_delete_ajax'),
     path('contacts/ajax/delete-all/', views.contact_delete_all_ajax, name='contact_delete_all_ajax'),
+    path('contacts/ajax/export/', views.contact_export_ajax, name='contact_export'),
 
     # Monitoring reports
     path('reports/', views.report_list_page, name='report_list'),
@@ -79,6 +84,7 @@ urlpatterns = [
     path('reports/ajax/save/', views.report_save_ajax, name='report_save_ajax'),
     path('reports/ajax/delete/<int:pk>/', views.report_delete_ajax, name='report_delete_ajax'),
     path('reports/ajax/delete-all/', views.report_delete_all_ajax, name='report_delete_all_ajax'),
+    path('reports/ajax/export/', views.report_export_ajax, name='report_export'),
 
     # --- Emergency warning & location tracker ---
 
@@ -112,4 +118,14 @@ urlpatterns = [
     path('portal/emergency-sos/', views.ofw_emergency_sos, name='portal_emergency_sos'),
     path('portal/emergency-sos/cancel/', views.cancel_sos, name='portal_cancel_sos'),
     path('portal/suggest-safe-place/', portal_views.portal_suggest_safe_place, name='portal_suggest_safe_place'),
+    path('portal/emergency-alerts/', portal_views.portal_emergency_alerts, name='portal_emergency_alerts'),
+    path('portal/police-reports/', portal_views.portal_police_reports, name='portal_police_reports'),
+
+    # Safe location suggestions (management review)
+    path('safe-location-suggestions/', views.safe_location_suggestions_page, name='safe_location_suggestions'),
+    path('safe-location-suggestions/<int:pk>/approve/', views.safe_location_suggestion_approve, name='safe_location_suggestion_approve'),
+    path('safe-location-suggestions/<int:pk>/reject/', views.safe_location_suggestion_reject, name='safe_location_suggestion_reject'),
+
+    # OFW activity log
+    path('ofw-activity/', views.ofw_activity_page, name='ofw_activity'),
 ]

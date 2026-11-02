@@ -38,6 +38,7 @@ from .models import (
     PoliceReport,
     RiskLevel,
     SafeLocation,
+    SafeLocationSuggestion,
     WelfareAssessment,
     WelfareStatus,
 )
@@ -104,6 +105,16 @@ _report_status_badge = {
     'submitted': 'bg-warning-lt text-warning',
     'approved': 'bg-success-lt text-success',
 }
+
+
+def _json_for_script(value):
+    """Serialize data for a ``<script>`` block without allowing tag breakout."""
+    return (
+        json.dumps(value)
+        .replace('<', '\\u003c')
+        .replace('>', '\\u003e')
+        .replace('&', '\\u0026')
+    )
 
 
 def _notify_assessment_saved(obj, created, actor, previous):
@@ -395,6 +406,10 @@ def profile_delete_all_ajax(request):
     return _profiles['delete_all_ajax'](request)
 
 
+def profile_export_ajax(request):
+    return _profiles['export_ajax'](request)
+
+
 @login_required(login_url='login')
 def profile_detail(request, pk):
     profile = get_object_or_404(crud._scoped(request.user, OFWProfile), pk=pk)
@@ -484,6 +499,10 @@ def assessment_delete_all_ajax(request):
     return _assessments['delete_all_ajax'](request)
 
 
+def assessment_export_ajax(request):
+    return _assessments['export_ajax'](request)
+
+
 def checkin_list_page(request):
     return _checkins['page'](request)
 
@@ -507,6 +526,10 @@ def checkin_delete_ajax(request, pk):
 @login_required(login_url='login')
 def checkin_delete_all_ajax(request):
     return _checkins['delete_all_ajax'](request)
+
+
+def checkin_export_ajax(request):
+    return _checkins['export_ajax'](request)
 
 
 def concern_list_page(request):
@@ -536,6 +559,10 @@ def concern_delete_all_ajax(request):
     return _concerns['delete_all_ajax'](request)
 
 
+def concern_export_ajax(request):
+    return _concerns['export_ajax'](request)
+
+
 def contact_list_page(request):
     return _contacts['page'](request)
 
@@ -561,6 +588,10 @@ def contact_delete_all_ajax(request):
     return _contacts['delete_all_ajax'](request)
 
 
+def contact_export_ajax(request):
+    return _contacts['export_ajax'](request)
+
+
 def report_list_page(request):
     return _reports['page'](request)
 
@@ -584,6 +615,10 @@ def report_delete_ajax(request, pk):
 @login_required(login_url='login')
 def report_delete_all_ajax(request):
     return _reports['delete_all_ajax'](request)
+
+
+def report_export_ajax(request):
+    return _reports['export_ajax'](request)
 
 
 def dashboard_stats(user):
@@ -767,10 +802,10 @@ def dashboard_stats(user):
         'deployment_countries': deployment_countries,
         'map_regions': map_regions,
         'map_markers': map_markers,
-        'map_regions_json': json.dumps(map_regions),
-        'map_markers_json': json.dumps(map_markers),
-        'map_ofws_json': json.dumps(map_ofws),
-        'country_links_json': json.dumps(country_links),
+        'map_regions_json': _json_for_script(map_regions),
+        'map_markers_json': _json_for_script(map_markers),
+        'map_ofws_json': _json_for_script(map_ofws),
+        'country_links_json': _json_for_script(country_links),
     }
 
 
@@ -781,14 +816,14 @@ def dashboard_stats(user):
 
 def _management_scope(user):
     """Return OFWProfiles visible to this management user."""
-    from apps.users.agencies import agency_for_user
+    from apps.users.agencies import agency_for_user, has_agency_assignment
 
     if user.is_superuser:
         return OFWProfile.objects.all()
     agency = agency_for_user(user)
     if agency is not None:
         return OFWProfile.objects.filter(agency_org=agency)
-    if user.is_staff:
+    if user.is_staff and not has_agency_assignment(user):
         return OFWProfile.objects.all()
     return OFWProfile.objects.none()
 
@@ -1632,3 +1667,203 @@ def cancel_sos(request):
         level=Notification.Level.INFO,
     )
     return JsonResponse({'status': 'cancelled'})
+
+
+# ---------------------------------------------------------------------------
+# Safe Location Suggestions (OFW-submitted, admin-approved)
+# ---------------------------------------------------------------------------
+
+
+@login_required(login_url='login')
+def safe_location_suggestions_page(request):
+    """List OFW-submitted safe place suggestions pending admin review.
+
+    Admin sees all suggestions; agency staff see only their agency's OFWs'
+    suggestions.
+    """
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    from apps.users.agencies import agency_for_user
+
+    suggestions = SafeLocationSuggestion.objects.select_related(
+        'submitted_by', 'reviewed_by'
+    ).order_by('-created_at')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            suggestions = suggestions.filter(
+                submitted_by__ofw_profiles__agency_org=agency
+            ).distinct()
+        else:
+            suggestions = suggestions.none()
+
+    status_filter = request.GET.get('status', 'pending')
+    if status_filter == 'all':
+        pass
+    else:
+        suggestions = suggestions.filter(status=status_filter)
+
+    return render(request, 'ofw/safe_location_suggestions.html', {
+        'suggestions': suggestions,
+        'status_filter': status_filter,
+        'page_title': 'Safe Place Suggestions',
+        'page_pretitle': 'Review OFW-submitted safe places',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def safe_location_suggestion_approve(request, pk):
+    """Approve a safe place suggestion and promote it to SafeLocation."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
+
+    from apps.users.agencies import agency_for_user
+
+    suggestion = get_object_or_404(
+        SafeLocationSuggestion.objects.all(), pk=pk
+    )
+
+    # Agency staff can only approve suggestions from their own agency's OFWs.
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is None:
+            return HttpResponseForbidden('Agency assignment required.')
+        if not suggestion.submitted_by.ofw_profiles.filter(
+            agency_org=agency
+        ).exists():
+            return HttpResponseForbidden('Not your agency\'s suggestion.')
+
+    if suggestion.status != SafeLocationSuggestion.Status.PENDING:
+        messages.info(request, 'This suggestion has already been reviewed.')
+        return redirect('ofw:safe_location_suggestions')
+
+    location = SafeLocation.objects.create(
+        name=suggestion.name,
+        location_type=suggestion.location_type,
+        country=suggestion.country,
+        city=suggestion.city,
+        address=suggestion.address,
+        phone=suggestion.phone,
+        latitude=suggestion.latitude,
+        longitude=suggestion.longitude,
+        is_active=True,
+    )
+
+    suggestion.status = SafeLocationSuggestion.Status.APPROVED
+    suggestion.reviewed_by = request.user
+    suggestion.reviewed_at = timezone.now()
+    suggestion.save(update_fields=[
+        'status', 'reviewed_by', 'reviewed_at', 'updated_at',
+    ])
+
+    notify(
+        suggestion.submitted_by,
+        'Safe place suggestion approved',
+        f'Your suggested safe place "{location.name}" has been approved '
+        f'and added to the Safe Places Near Me directory.',
+        url=reverse('ofw:safe_locations'),
+        level=Notification.Level.SUCCESS,
+    )
+
+    messages.success(
+        request,
+        f'Safe place "{location.name}" has been approved and added.'
+    )
+    return redirect('ofw:safe_location_suggestions')
+
+
+@login_required(login_url='login')
+@require_POST
+def safe_location_suggestion_reject(request, pk):
+    """Reject a safe place suggestion."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
+
+    from apps.users.agencies import agency_for_user
+
+    suggestion = get_object_or_404(
+        SafeLocationSuggestion.objects.all(), pk=pk
+    )
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is None:
+            return HttpResponseForbidden('Agency assignment required.')
+        if not suggestion.submitted_by.ofw_profiles.filter(
+            agency_org=agency
+        ).exists():
+            return HttpResponseForbidden('Not your agency\'s suggestion.')
+
+    if suggestion.status != SafeLocationSuggestion.Status.PENDING:
+        messages.info(request, 'This suggestion has already been reviewed.')
+        return redirect('ofw:safe_location_suggestions')
+
+    suggestion.status = SafeLocationSuggestion.Status.REJECTED
+    suggestion.reviewed_by = request.user
+    suggestion.reviewed_at = timezone.now()
+    suggestion.save(update_fields=[
+        'status', 'reviewed_by', 'reviewed_at', 'updated_at',
+    ])
+
+    notify(
+        suggestion.submitted_by,
+        'Safe place suggestion not approved',
+        f'Your suggested safe place "{suggestion.name}" was not approved '
+        f'by the management team.',
+        url=reverse('ofw:portal_suggest_safe_place'),
+        level=Notification.Level.INFO,
+    )
+
+    messages.info(
+        request,
+        f'Safe place suggestion "{suggestion.name}" has been rejected.'
+    )
+    return redirect('ofw:safe_location_suggestions')
+
+
+# ---------------------------------------------------------------------------
+# OFW Activity Log (inactive account detection + management oversight)
+# ---------------------------------------------------------------------------
+
+
+@login_required(login_url='login')
+def ofw_activity_page(request):
+    """List OFW account activity for management oversight.
+
+    Admin sees all OFWs; agency staff see only their agency's OFWs.
+    Shows login/activity timestamps and inactivity flags.
+    """
+    if not (request.user.is_superuser or request.user.is_staff):
+        return redirect('dashboard')
+
+    from apps.users.agencies import agency_for_user
+
+    activities = OFWActivity.objects.select_related('user').order_by('-updated_at')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            activities = activities.filter(
+                user__ofw_profiles__agency_org=agency
+            ).distinct()
+        else:
+            activities = activities.none()
+
+    active_only = request.GET.get('active') == '1'
+    inactive_only = request.GET.get('inactive') == '1'
+
+    if active_only:
+        activities = activities.filter(is_account_active=True)
+    elif inactive_only:
+        activities = activities.filter(is_account_active=False)
+
+    return render(request, 'ofw/ofw_activity.html', {
+        'activities': activities,
+        'active_only': active_only,
+        'inactive_only': inactive_only,
+        'page_title': 'OFW Activity Log',
+        'page_pretitle': 'OFW login and profile activity',
+    })

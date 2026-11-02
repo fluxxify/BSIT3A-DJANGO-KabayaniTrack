@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
@@ -24,6 +25,9 @@ MAX_FAILED_ATTEMPTS = 5
 LOCK_DURATION = timedelta(minutes=15)
 INVALID_LOGIN_MESSAGE = 'Invalid username or password.'
 LOCKED_MESSAGE = 'Too many failed attempts. Locked for 15 minutes.'
+
+REGISTRATION_MAX_ATTEMPTS = 5
+REGISTRATION_LOCKOUT_MINUTES = 15
 
 
 def _lock_key(request, username):
@@ -230,6 +234,22 @@ def register_view(request, agency_slug=None):
     if request.method == 'GET':
         return render(request, 'auth/register.html', context)
 
+    # Rate-limit registrations by IP to prevent abuse.
+    client_ip = request.META.get('REMOTE_ADDR', '')
+    reg_key = f'reg:{client_ip}'
+    reg_attempts = cache.get(reg_key, 0)
+    if reg_attempts >= REGISTRATION_MAX_ATTEMPTS:
+        messages.error(
+            request,
+            f'Too many registration attempts. Try again in '
+            f'{REGISTRATION_LOCKOUT_MINUTES} minutes.',
+            extra_tags='lock',
+        )
+        return render(request, 'auth/register.html', {
+            **context, 'locked': True,
+        })
+    cache.set(reg_key, reg_attempts + 1, REGISTRATION_LOCKOUT_MINUTES * 60)
+
     form_data = {
         'username': request.POST.get('username', ''),
         'first_name': request.POST.get('first_name', ''),
@@ -305,4 +325,5 @@ def register_view(request, agency_slug=None):
         logger.exception('Could not create registration notifications for %s', user.pk)
 
     login(request, user)
+    cache.delete(reg_key)
     return redirect('ofw:portal')

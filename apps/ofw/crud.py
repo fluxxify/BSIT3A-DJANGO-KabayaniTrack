@@ -5,6 +5,7 @@ the project (list, get, save, delete) plus a page view.  This module builds
 those views so the entity modules stay small and consistent.
 """
 
+import csv
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -12,13 +13,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.html import escape
 from django.views.decorators.http import require_POST
 
-from apps.users.agencies import agency_for_user
+from apps.users.agencies import agency_for_user, has_agency_assignment, is_global_staff
 
 from .models import EmergencyContact, MonitoringReport, OFWProfile
 
@@ -38,6 +39,10 @@ def _scoped(user, model):
     agency = agency_for_user(user)
     if user.is_staff:
         if agency is None:
+            # A staff account with an agency row whose agency is disabled must
+            # see nothing, not every agency's records.
+            if has_agency_assignment(user):
+                return model.objects.none()
             # Legacy global staff account.
             return model.objects.all()
         if model is OFWProfile:
@@ -307,6 +312,14 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     @login_required(login_url='login')
     @require_POST
     def save_ajax(request):
+        if not (request.user.is_superuser or request.user.is_staff):
+            if model is not OFWProfile:
+                return JsonResponse(
+                    {'error': 'Management accounts only.'}, status=403
+                )
+            if not request.user.ofw_profiles.exists() and request.POST.get('id'):
+                return JsonResponse({'error': 'Profile not found.'}, status=404)
+
         record_id = request.POST.get('id')
         previous = {}
         if record_id:
@@ -317,6 +330,15 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
                 for field in model._meta.fields
             }
         else:
+            if (
+                model is OFWProfile
+                and not (request.user.is_superuser or request.user.is_staff)
+                and request.user.ofw_profiles.exists()
+            ):
+                return JsonResponse(
+                    {'error': 'Your account already has an OFW profile.'},
+                    status=400,
+                )
             obj = model()
             is_update = False
 
@@ -327,7 +349,13 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
         obj = form.save(commit=False)
         agency = agency_for_user(request.user)
-        if agency is not None:
+        if not (request.user.is_superuser or request.user.is_staff):
+            # Non-staff accounts may only save their own profile; never let the
+            # generic endpoint attach it to an agency or another user.
+            obj.user = request.user
+            if hasattr(obj, 'agency_org'):
+                obj.agency_org = None
+        elif agency is not None:
             if hasattr(obj, 'agency_org'):
                 obj.agency_org = agency
             if model is MonitoringReport:
@@ -355,6 +383,8 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     @login_required(login_url='login')
     @require_POST
     def delete_ajax(request, pk):
+        if not (request.user.is_superuser or request.user.is_staff):
+            return JsonResponse({'error': 'Management accounts only.'}, status=403)
         obj = get_object_or_404(_scoped(request.user, model), pk=pk)
         label = str(obj)
         if on_delete:
@@ -366,8 +396,11 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     @login_required(login_url='login')
     @require_POST
     def delete_all_ajax(request):
-        if not (request.user.is_superuser or request.user.is_staff):
-            return JsonResponse({'error': 'Not allowed.'}, status=403)
+        if not request.user.is_superuser:
+            return JsonResponse(
+                {'error': 'Only administrators can delete all records.'},
+                status=403,
+            )
 
         queryset = _scoped(request.user, model)
         count = queryset.count()
@@ -388,6 +421,39 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         messages.success(request, f'All {entity.lower()} records ({count}) have been deleted successfully.')
         return JsonResponse({'status': 'deleted_all', 'count': count})
 
+    @login_required(login_url='login')
+    def export_ajax(request):
+        """Export the current filtered queryset as CSV."""
+        queryset = _base_queryset(request)
+
+        # Build header from form field names, excluding relational/file fields
+        # that don't serialize well to CSV.
+        field_names = [name for name in form_field_names if name not in ('profile_picture', 'attachment')]
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{entity.lower()}_export.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(field_names)
+
+        for obj in queryset:
+            row = []
+            for name in field_names:
+                value = getattr(obj, name, '')
+                if callable(value):
+                    value = value()
+                if isinstance(value, (date, datetime)):
+                    value = value.isoformat()
+                elif hasattr(value, 'pk'):
+                    value = str(value.pk)
+                elif value is None:
+                    value = ''
+                row.append(str(value))
+            writer.writerow(row)
+
+        messages.success(request, f'Exported {queryset.count()} {entity.lower() if entity.endswith("s") else entity + "s"} records to CSV.')
+        return response
+
     return {
         'page': page,
         'list_ajax': list_ajax,
@@ -395,4 +461,5 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         'save_ajax': save_ajax,
         'delete_ajax': delete_ajax,
         'delete_all_ajax': delete_all_ajax,
+        'export_ajax': export_ajax,
     }

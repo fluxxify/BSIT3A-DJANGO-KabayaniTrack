@@ -1,0 +1,91 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="container-xl">
+      <div class="row align-items-center">
+        <div class="col">
+          <div class="page-pretitle">{{ page_pretitle }}</div>
+          <h2 class="page-title mb-0">{{ page_title }}</h2>
+        </div>
+        <div class="col-auto text-end">
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{% if active_only or inactive_only %}{% url 'ofw:ofw_activity' %}{% else %}?active=1{% endif %}" class="btn btn-sm btn-outline-{% if active_only %}success{% else %}primary{% endif %}">Active only</a>
+            <a href="{% if active_only or inactive_only %}{% url 'ofw:ofw_activity' %}{% else %}?inactive=1{% endif %}" class="btn btn-sm btn-outline-{% if inactive_only %}warning{% else %}primary{% endif %}">Inactive only</a>
+            <a href="{% url 'ofw:ofw_activity' %}" class="btn btn-sm btn-outline-secondary">All</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  {% if activities %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>OFW</th>
+            <th>Username</th>
+            <th>Agency</th>
+            <th class="w-1">Status</th>
+            <th class="text-end w-1">Last Login</th>
+            <th class="text-end w-1">Last Activity</th>
+            <th class="text-end w-1">Days Inactive</th>
+            <th class="w-1">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for activity in activities %}
+          <tr>
+            <td>
+              <a href="{% url 'ofw:profile_detail' activity.user.ofw_profiles.first.pk %}" class="text-decoration-none fw-medium">
+                {{ activity.user.ofw_profiles.first.full_name|default:activity.user.username }}
+              </a>
+              <div class="text-muted small">{{ activity.user.username }}</div>
+            </td>
+            <td>{{ activity.user.username }}</td>
+            <td>
+              {% if activity.user.ofw_profiles.first.agency_org %}
+              {{ activity.user.ofw_profiles.first.agency_org.name }}
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{% if activity.is_account_active %}success{% else %}warning{% endif %}-lt text-{% if activity.is_account_active %}success{% else %}warning{% endif %}">
+                {% if activity.is_account_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            </td>
+            <td class="text-end text-muted">{{ activity.last_login_at|date:"M d, Y H:i"|default:"—" }}</td>
+            <td class="text-end text-muted">{{ activity.last_activity_at|date:"M d, Y H:i"|default:"—" }}</td>
+            <td class="text-end">
+              <span class="fw-medium {% if activity.days_inactive >= 3 %}text-danger{% else %}text-muted{% endif %}">
+                {{ activity.days_inactive }}
+              </span>
+            </td>
+            <td class="text-end">
+              {% if not activity.is_account_active and activity.days_inactive >= 3 %}
+              <a href="{% url 'ofw:request_ofw_location' activity.user.ofw_profiles.first.pk %}" class="btn btn-sm btn-outline-primary" onclick="return confirm('Send a location request to this OFW?');">
+                <i class="fas fa-location-arrow me-1"></i>Request Location
+              </a>
+              {% else %}
+              <span class="btn btn-sm btn-outline-secondary disabled">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="text-muted text-center py-5">
+    <i class="fas fa-history fa-3x mb-3"></i>
+    <p>No OFW activity records found.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

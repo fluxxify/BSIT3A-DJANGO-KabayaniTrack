@@ -96,6 +96,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'mysite.security.SecurityHeadersMiddleware',
 ]
 
 # WhiteNoise is only needed when Django is not serving static files itself.
@@ -130,6 +131,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            # PythonAnywhere runs several workers; wait instead of failing with
+            # "database is locked" during a short write burst.
+            'timeout': 20,
+        },
     }
 }
 
@@ -157,7 +163,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Manila'
 
 USE_I18N = True
 
@@ -208,12 +214,20 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 512 * 1024 * 1024  # 512 MB
 # Files above this threshold spill to a temp file on disk instead of RAM.
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 DATA_UPLOAD_MAX_NUMBER_FILES = 20
-# Email configuration
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+# Email configuration.  Development uses the console backend; production must
+# deliver real mail so a reset link is never printed on a public page.
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+    if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
+)
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@kabayani-track.local')
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.pythonanywhere.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+# Password reset tokens expire after one hour by default.
+PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', '3600'))
 

@@ -68,6 +68,14 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'ofw_activity' %}active{% endif %}" href="{% url 'ofw:ofw_activity' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-history text-info"></i>
+            </span>
+            <span class="nav-link-title">OFW Activity Log</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'assessment_list' %}active{% endif %}" href="{% url 'ofw:assessment_list' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-heart-pulse"></i>
@@ -138,6 +146,14 @@
               <i class="nav-icon fas fa-shield-alt text-info"></i>
             </span>
             <span class="nav-link-title">Safe Place Guide</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'safe_location_suggestions' %}active{% endif %}" href="{% url 'ofw:safe_location_suggestions' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-clipboard-check text-info"></i>
+            </span>
+            <span class="nav-link-title">Safe Place Suggestions</span>
           </a>
         </li>
         <li class="nav-item">

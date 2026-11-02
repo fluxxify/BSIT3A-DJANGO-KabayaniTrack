@@ -634,3 +634,45 @@ def portal_suggest_safe_place(request):
         'profile': profile,
         'my_suggestions': my_suggestions,
     })
+
+
+@login_required(login_url='login')
+def portal_emergency_alerts(request):
+    """OFW views their own emergency alerts."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Please complete your profile first.')
+        return redirect('ofw:portal_profile')
+
+    alerts = EmergencyAlert.objects.filter(ofw=profile).order_by('-created_at')
+
+    return render(request, 'ofw/portal/emergency_alerts.html', {
+        'profile': profile,
+        'alerts': alerts,
+        'page_title': 'My Emergency Alerts',
+    })
+
+
+@login_required(login_url='login')
+def portal_police_reports(request):
+    """OFW views police reports filed about them."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Please complete your profile first.')
+        return redirect('ofw:portal_profile')
+
+    reports = PoliceReport.objects.filter(ofw=profile).order_by('-reported_at')
+
+    return render(request, 'ofw/portal/police_reports.html', {
+        'profile': profile,
+        'reports': reports,
+        'page_title': 'My Police Reports',
+    })
