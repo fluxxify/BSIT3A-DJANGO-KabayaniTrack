@@ -34,13 +34,22 @@
   {% else %}
   An emergency alert is open and management/your agency has been notified.
   {% endif %}
-  <form method="post" action="{% url 'ofw:portal_cancel_sos' %}" class="d-inline">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-outline-secondary btn-sm ms-2" onclick="return confirm('Cancel this emergency alert? Mark it as a false alarm?');">
-      <i class="fas fa-times me-1"></i>Cancel SOS
-    </button>
-  </form>
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- Prominent Cancel SOS action -->
+<div class="card alert-danger border-danger mb-3">
+  <div class="card-body text-center">
+    <i class="fas fa-bell text-danger fa-2x mb-2"></i>
+    <h6 class="card-title text-danger">Emergency Alert is Open</h6>
+    <p class="text-muted small mb-3">Mark this as a false alarm to notify management that you are safe.</p>
+    <form method="post" action="{% url 'ofw:portal_cancel_sos' %}" class="d-inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-lg" onclick="return confirm('Cancel this emergency alert? Management will be notified that you are safe.');">
+        <i class="fas fa-times me-2"></i>Cancel SOS
+      </button>
+    </form>
+  </div>
 </div>
 {% endif %}
 
