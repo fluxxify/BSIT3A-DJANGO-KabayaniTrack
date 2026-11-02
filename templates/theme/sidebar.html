@@ -60,11 +60,19 @@
           </span>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'emergency_alerts' or request.resolver_match.url_name == 'emergency_guide' or request.resolver_match.url_name == 'location_tracker' %}active{% endif %}" href="{% url 'ofw:emergency_alerts' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'emergency_alerts' or request.resolver_match.url_name == 'emergency_guide' %}active{% endif %}" href="{% url 'ofw:emergency_alerts' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-truck-medical text-danger"></i>
             </span>
             <span class="nav-link-title">Emergency Guidance</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'location_tracker' %}active{% endif %}" href="{% url 'ofw:location_tracker' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-earth-asia text-info"></i>
+            </span>
+            <span class="nav-link-title">Live OFW Map</span>
           </a>
         </li>
         <li class="nav-item">

@@ -13,6 +13,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from .activity import refresh_activity_for_user
 from .forms import (
@@ -31,7 +32,9 @@ from .models import (
     EmergencyAlert,
     EmergencyContact,
     Notification,
+    LocationTracker,
     OFWActivity,
+    OFWLocationSharing,
     OFWProfile,
     PoliceReport,
     SafeLocationSuggestion,
@@ -44,6 +47,7 @@ from .views import (
     _condition_badge,
     _severity_badge,
     _welfare_badge,
+    location_tracker_ping,
 )
 
 
@@ -180,6 +184,61 @@ def portal_home(request):
         'latest_police_report': latest_police_report,
     }
     return render(request, 'ofw/portal/home.html', context)
+
+
+@login_required(login_url='login')
+def portal_location_sharing(request):
+    """OFW-controlled, opt-in browser location sharing for their agency."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.error(request, 'Complete your OFW profile before sharing your location.')
+        return redirect('ofw:portal_profile')
+
+    sharing, _ = OFWLocationSharing.objects.get_or_create(ofw=profile)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'enable':
+            sharing.is_enabled = True
+            sharing.enabled_at = timezone.now()
+            sharing.save(update_fields=['is_enabled', 'enabled_at', 'updated_at'])
+            messages.success(request, 'Live location sharing is enabled. Keep this page open for updates.')
+        elif action == 'disable':
+            sharing.is_enabled = False
+            sharing.enabled_at = None
+            sharing.save(update_fields=['is_enabled', 'enabled_at', 'updated_at'])
+            messages.info(request, 'Live location sharing is off.')
+        return redirect('ofw:portal_location_sharing')
+
+    latest_ping = LocationTracker.objects.filter(ofw=profile).order_by('-recorded_at').first()
+    return render(request, 'ofw/portal/location_sharing.html', {
+        'profile': profile,
+        'sharing': sharing,
+        'latest_ping': latest_ping,
+        'page_title': 'Live Location Sharing',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def portal_location_sharing_ping(request):
+    """Accept a non-emergency location ping only while the OFW opted in."""
+    if not is_ofw(request.user):
+        return JsonResponse({'error': 'OFW accounts only.'}, status=403)
+    profile = _profile_for(request.user)
+    if profile is None or not OFWLocationSharing.objects.filter(
+        ofw=profile, is_enabled=True
+    ).exists():
+        return JsonResponse({'error': 'Live location sharing is not enabled.'}, status=403)
+
+    # Reuse the shared coordinate validation and ping creation, but never mark
+    # opt-in background location updates as emergency SOS events.
+    request.POST = request.POST.copy()
+    request.POST['is_emergency'] = '0'
+    return location_tracker_ping(request)
 
 
 @login_required(login_url='login')

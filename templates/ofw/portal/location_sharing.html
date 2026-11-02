@@ -1,0 +1,145 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none">
+    <div class="row align-items-center g-2">
+      <div class="col">
+        <div class="page-pretitle">OFW Portal</div>
+        <h2 class="page-title mb-0">Share Live Location</h2>
+        <div class="text-muted small mt-1">Let your agency see your current location anywhere, including the Philippines.</div>
+      </div>
+      <div class="col-auto">
+        {% if sharing.is_enabled %}
+        <span class="badge bg-success-lt text-success"><i class="fas fa-location-dot me-1"></i>Sharing enabled</span>
+        {% else %}
+        <span class="badge bg-secondary-lt text-secondary">Sharing off</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="alert alert-info">
+    <strong>Your choice:</strong> location sharing starts only after you turn it on and allow location access in your browser. Keep this page open for live updates. You can turn sharing off here at any time.
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h3 class="card-title"><i class="fas fa-earth-asia text-info me-2"></i>Worldwide GPS sharing</h3>
+      <p class="text-muted">Your device's GPS coordinates work across countries and cities. The agency map shows your latest shared position and when it was recorded. It does not depend on your saved deployment country or city.</p>
+      {% if latest_ping %}
+      <p class="small mb-3">Last location sent: <strong>{{ latest_ping.recorded_at|date:"F j, Y, g:i A" }}</strong></p>
+      {% else %}
+      <p class="small text-muted mb-3">No location has been shared from this account yet.</p>
+      {% endif %}
+
+      {% if sharing.is_enabled %}
+      <div id="sharingStatus" class="alert alert-secondary py-2" role="status">Connecting to your device location…</div>
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="disable">
+        <button type="submit" class="btn btn-outline-danger"><i class="fas fa-location-crosshairs-slash me-1"></i>Turn off sharing</button>
+      </form>
+      {% else %}
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="enable">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-location-dot me-1"></i>Turn on live location</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if sharing.is_enabled %}
+<script>
+(function () {
+  var statusEl = document.getElementById('sharingStatus');
+  var watchId = null;
+  var refreshTimer = null;
+  var posting = false;
+  var lastSentAt = 0;
+  var lastLat = null;
+  var lastLng = null;
+
+  function setStatus(message, kind) {
+    statusEl.className = 'alert alert-' + kind + ' py-2';
+    statusEl.textContent = message;
+  }
+
+  function distanceMeters(lat1, lng1, lat2, lng2) {
+    var toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad;
+    var dLng = (lng2 - lng1) * toRad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function sendPosition(position) {
+    var coords = position.coords;
+    var moved = lastLat === null || distanceMeters(coords.latitude, coords.longitude, lastLat, lastLng) >= 50;
+    if (posting || (!moved && Date.now() - lastSentAt < 15000)) return;
+    posting = true;
+    setStatus('Sharing your location…', 'info');
+    fetch('{% url "ofw:portal_location_sharing_ping" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'latitude=' + encodeURIComponent(coords.latitude.toFixed(6)) +
+        '&longitude=' + encodeURIComponent(coords.longitude.toFixed(6)) +
+        '&accuracy=' + encodeURIComponent(Math.round(coords.accuracy || 0))
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) throw new Error(data.error || 'Location update failed.');
+        lastSentAt = Date.now();
+        lastLat = coords.latitude;
+        lastLng = coords.longitude;
+        setStatus('Live location shared · last update ' + new Date(lastSentAt).toLocaleTimeString(), 'success');
+      });
+    }).catch(function (error) {
+      setStatus(error.message || 'Unable to share location. Check your connection and browser permission.', 'danger');
+    }).finally(function () {
+      posting = false;
+    });
+  }
+
+  function locationError(error) {
+    if (error && error.code === 1) {
+      setStatus('Location permission was denied. Allow location access in your browser settings to share.', 'warning');
+    } else {
+      setStatus('Could not get a fresh GPS position. Keep this page open and check your device location setting.', 'warning');
+    }
+  }
+
+  if (!navigator.geolocation) {
+    setStatus('This browser does not support location sharing.', 'danger');
+    return;
+  }
+
+  watchId = navigator.geolocation.watchPosition(sendPosition, locationError, {
+    enableHighAccuracy: true,
+    maximumAge: 5000,
+    timeout: 20000
+  });
+  refreshTimer = window.setInterval(function () {
+    navigator.geolocation.getCurrentPosition(sendPosition, locationError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+  }, 15000);
+
+  window.addEventListener('pagehide', function () {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    if (refreshTimer !== null) window.clearInterval(refreshTimer);
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -36,6 +36,7 @@ from .models import (
     MonitoringReport,
     Notification,
     OFWActivity,
+    OFWLocationSharing,
     OFWProfile,
     PoliceReport,
     RiskLevel,
@@ -1311,13 +1312,13 @@ def safe_location_delete(request, pk):
 
 
 # ---------------------------------------------------------------------------
-# Location Tracker (real-time location pings during emergency)
+# Location Tracker (OFW opt-in and SOS location pings)
 # ---------------------------------------------------------------------------
 
 
 @login_required(login_url='login')
 def location_tracker_page(request):
-    """Live map and list of every OFW and their latest known location.
+    """Live map and list of every OFW and their latest shared location.
 
     Every OFW in the management scope appears once. OFWs who have never shared
     a location are still listed with a "No location" status, so management can
@@ -1348,6 +1349,10 @@ def location_tracker_page(request):
     history = list(pings_qs[:400])
 
     latest_by_ofw = {}
+    sharing_enabled = set(OFWLocationSharing.objects.filter(
+        ofw__in=profiles,
+        is_enabled=True,
+    ).values_list('ofw_id', flat=True))
     now = timezone.now()
     for ping in history:
         if ping.ofw_id in latest_by_ofw:
@@ -1380,6 +1385,7 @@ def location_tracker_page(request):
             'is_emergency': bool(ping and ping.is_emergency),
             'freshness': ping.freshness if ping else 'none',
             'freshness_label': ping.freshness_label if ping else 'No location',
+            'sharing_enabled': profile.pk in sharing_enabled,
         })
 
     # OFWs with a location first (newest first), then the rest alphabetically.

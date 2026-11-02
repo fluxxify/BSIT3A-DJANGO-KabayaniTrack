@@ -33,6 +33,7 @@
     <i class="fas fa-location-crosshairs mt-1"></i>
     <div>
       <strong>Lahat ng OFW</strong> ay nakalista dito, may location man o wala.
+      The map works globally, including the Philippines; an OFW must enable sharing in their portal and allow browser location access.
       <strong>Live now</strong> means the ping is under 10 minutes old. Older pings
       are labelled so nobody mistakes them for a current position.
       <strong>No location</strong> means the OFW has not shared one yet — call or
@@ -74,6 +75,7 @@
         {% endif %}
       </div>
       <div class="d-flex flex-wrap align-items-center gap-1 mt-2">
+        {% if row.sharing_enabled %}<span class="badge bg-primary-lt text-primary">Live sharing enabled</span>{% endif %}
         <span class="badge bg-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}-lt text-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}">
           {{ row.freshness_label }}
         </span>
@@ -134,6 +136,9 @@
             <td>
               {% if row.is_emergency %}
               <span class="badge bg-danger-lt text-danger">SOS</span>
+              {% endif %}
+              {% if row.sharing_enabled %}
+              <span class="badge bg-primary-lt text-primary">Sharing on</span>
               {% endif %}
               <span class="badge bg-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}-lt text-{% if row.freshness == 'live' %}success{% elif row.freshness == 'recent' %}info{% elif row.freshness == 'stale' %}warning{% else %}secondary{% endif %}">
                 {{ row.freshness_label }}
@@ -254,6 +259,7 @@
   marker{{ forloop.counter }}.bindPopup(
     '<b>{{ row.profile.full_name|escapejs }}</b><br>' +
     '{{ row.profile.country|escapejs }}<br>' +
+    '{% if row.sharing_enabled %}<span style="color:#206bc4;"><b>Live sharing enabled</b></span><br>{% endif %}' +
     '{% if row.is_emergency %}<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>{% endif %}' +
     '{{ row.freshness_label|escapejs }}<br>' +
     '{{ row.ping.recorded_at|date:"M d, Y H:i"|escapejs }}' +
@@ -282,12 +288,12 @@
     map.setView([15, 105], 3);
   }
 
-  // Keep the live view fresh without reloading while the tab is hidden.
-  var REFRESH_MS = 30000;
-  window.setInterval(function () {
-    if (!document.hidden) window.location.reload();
-  }, REFRESH_MS);
 })();
 </script>
 {% endif %}
+<script>
+window.setInterval(function () {
+  if (!document.hidden) window.location.reload();
+}, 15000);
+</script>
 {% endblock %}

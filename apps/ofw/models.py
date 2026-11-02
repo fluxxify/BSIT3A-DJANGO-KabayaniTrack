@@ -626,10 +626,9 @@ class SafeLocation(models.Model):
 
 
 class LocationTracker(models.Model):
-    """Real-time location pings for an OFW during an emergency.
+    """Location pings an OFW explicitly shares with management.
 
-    When an OFW triggers SOS, their location can be tracked and shared with
-    management and emergency responders.
+    Pings can come from an active SOS or from the OFW's opt-in live sharing.
     """
 
     ofw = models.ForeignKey(
@@ -650,6 +649,26 @@ class LocationTracker(models.Model):
 
     def __str__(self):
         return f'{self.ofw.full_name} @ {self.latitude},{self.longitude}'
+
+
+class OFWLocationSharing(models.Model):
+    """An OFW's explicit opt-in for ongoing browser-based location sharing."""
+
+    ofw = models.OneToOneField(
+        OFWProfile,
+        related_name='location_sharing',
+        on_delete=models.CASCADE,
+    )
+    is_enabled = models.BooleanField(default=False)
+    enabled_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tblofwlocationsharing'
+
+    def __str__(self):
+        state = 'sharing' if self.is_enabled else 'not sharing'
+        return f'{self.ofw.full_name} — {state}'
 
 
 class MonitoringReport(models.Model):

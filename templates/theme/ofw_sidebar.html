@@ -45,6 +45,12 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_location_sharing' %}active{% endif %}" href="{% url 'ofw:portal_location_sharing' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-location-dot text-info"></i></span>
+            <span class="nav-link-title">Share Live Location</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'portal_profile' %}active{% endif %}" href="{% url 'ofw:portal_profile' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-id-card"></i></span>
             <span class="nav-link-title">My Profile</span>
