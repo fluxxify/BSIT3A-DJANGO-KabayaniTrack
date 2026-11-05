@@ -1638,6 +1638,7 @@ def location_tracker_live(request):
             'city': ping.ofw.city_abroad or '',
             'agency': ping.ofw.agency_org.name if ping.ofw.agency_org else '',
             'contact': ping.ofw.contact_number or '',
+            'label': ping.location_label or '',
             'lat': float(ping.latitude),
             'lng': float(ping.longitude),
             'accuracy': ping.accuracy_meters,
@@ -1691,6 +1692,18 @@ def location_tracker_ping(request):
         accuracy_meters=accuracy_value,
         is_emergency=is_emergency,
     )
+
+    # Reverse-geocode for proof of where the OFW is (stored on the ping).
+    try:
+        from .geo import reverse_geocode
+        geo = reverse_geocode(latitude_value, longitude_value)
+        label = geo.get('label') or ''
+        if label:
+            ping.location_label = label
+            ping.save(update_fields=['location_label'])
+    except Exception:
+        # Geocode failure must not block the ping.
+        pass
 
     alert = None
     if is_emergency:
@@ -1847,6 +1860,60 @@ def location_context(request):
         'latitude': lat_value,
         'longitude': lng_value,
         'nearest': nearest,
+    })
+
+
+@login_required(login_url='login')
+def ofw_location_history(request, pk):
+    """Location history for one OFW — proof of where they've been."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return JsonResponse({'error': 'Management accounts only.'}, status=403)
+
+    from apps.users.agencies import agency_for_user
+
+    profiles = _management_scope(request.user)
+    profile = get_object_or_404(profiles, pk=pk)
+
+    pings = (
+        LocationTracker.objects
+        .filter(ofw=profile)
+        .order_by('-recorded_at')[:100]
+    )
+
+    now = timezone.now()
+    results = []
+    for ping in pings:
+        age_seconds = max(0, int((now - ping.recorded_at).total_seconds()))
+        if age_seconds <= 600:
+            freshness = 'live'
+            freshness_label = 'Live now'
+        elif age_seconds <= 3600:
+            freshness = 'recent'
+            freshness_label = f'{age_seconds // 60} min ago'
+        elif age_seconds <= 86400:
+            freshness = 'stale'
+            freshness_label = f'{age_seconds // 3600} hr ago'
+        else:
+            freshness = 'old'
+            freshness_label = f'{age_seconds // 86400} day(s) ago'
+        results.append({
+            'id': ping.pk,
+            'lat': float(ping.latitude),
+            'lng': float(ping.longitude),
+            'label': ping.location_label or '',
+            'accuracy': ping.accuracy_meters,
+            'recorded_at': ping.recorded_at.isoformat(),
+            'recorded_at_display': ping.recorded_at.strftime('%b %d, %Y %H:%M'),
+            'age_seconds': age_seconds,
+            'freshness': freshness,
+            'freshness_label': freshness_label,
+            'is_emergency': bool(ping.is_emergency),
+        })
+
+    return JsonResponse({
+        'ofw_id': profile.pk,
+        'ofw_name': profile.full_name,
+        'pings': results,
     })
 
 

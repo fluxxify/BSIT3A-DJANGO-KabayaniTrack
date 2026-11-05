@@ -121,6 +121,7 @@ urlpatterns = [
     path('location-tracker/', views.location_tracker_page, name='location_tracker'),
     path('location-tracker/ping/', views.location_tracker_ping, name='location_tracker_ping'),
     path('location-tracker/live/', views.location_tracker_live, name='location_tracker_live'),
+    path('location-tracker/history/<int:pk>/', views.ofw_location_history, name='ofw_location_history'),
     path('location-context/', views.location_context, name='location_context'),
 
     # OFW emergency SOS (portal)

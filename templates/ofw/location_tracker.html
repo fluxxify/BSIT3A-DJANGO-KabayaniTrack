@@ -241,7 +241,13 @@
 
   var markers = {};
   var circles = {};
+  var historyLines = {};
+  var historyPoints = {};
   var first = true;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 
   function markerIcon(freshness, isEmergency) {
     if (isEmergency) {
@@ -265,21 +271,27 @@
     return null;
   }
 
-  function addOrUpdateMarker(ofw) {
-    var latlng = [ofw.lat, ofw.lng];
-    var popupContent =
-      '<b>' + ofw.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</b><br>' +
-      (ofw.country ? ofw.country.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '<br>' : '') +
+  function popupContent(ofw) {
+    var labelHtml = ofw.label ? '<br><small style="color:#6c757d;"><i class="fas fa-map-marker-alt me-1"></i>' + esc(ofw.label) + '</small>' : '';
+    return (
+      '<b>' + esc(ofw.name) + '</b><br>' +
+      (ofw.country ? esc(ofw.country) + '<br>' : '') +
       (ofw.sharing_enabled ? '<span style="color:#206bc4;"><b>Live sharing enabled</b></span><br>' : '') +
       (ofw.is_emergency ? '<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>' : '') +
       (ofw.freshness === 'live' ? '<b>Live now</b><br>' : ofw.freshness_label + '<br>') +
-      ofw.recorded_at.replace('T', ' ') +
-      '<br>±' + (ofw.accuracy || 0) + ' m' +
-      '<br><a href="/ofw/emergency-guide/' + ofw.ofw_id + '/">Open call guide</a>';
+      esc(ofw.recorded_at.replace('T', ' ')) +
+      '<br>±' + (ofw.accuracy || 0) + ' m' + labelHtml +
+      '<br><a href="/ofw/emergency-guide/' + ofw.ofw_id + '/">Open call guide</a>' +
+      '<br><a href="#" class="btn btn-sm btn-primary mt-2" onclick="loadHistory(' + ofw.ofw_id + ', \'' + esc(ofw.name).replace(/'/g, "\\'") + '\'); return false;"><i class="fas fa-history me-1"></i>View location history</a>'
+    );
+  }
+
+  function addOrUpdateMarker(ofw) {
+    var latlng = [ofw.lat, ofw.lng];
 
     if (markers[ofw.ofw_id]) {
       markers[ofw.ofw_id].setLatLng(latlng);
-      markers[ofw.ofw_id].setPopupContent(popupContent);
+      markers[ofw.ofw_id].setPopupContent(popupContent(ofw));
       if (circles[ofw.ofw_id]) {
         map.removeLayer(circles[ofw.ofw_id]);
         circles[ofw.ofw_id] = null;
@@ -295,7 +307,7 @@
       markers[ofw.ofw_id].setIcon(markerIcon(ofw.freshness, ofw.is_emergency));
     } else {
       var m = L.marker(latlng, { icon: markerIcon(ofw.freshness, ofw.is_emergency) }).addTo(map);
-      m.bindPopup(popupContent);
+      m.bindPopup(popupContent(ofw));
       markers[ofw.ofw_id] = m;
       if (ofw.accuracy && ofw.accuracy > 0) {
         circles[ofw.ofw_id] = L.circle(latlng, {
@@ -310,6 +322,62 @@
     if (first) {
       first = false;
     }
+  }
+
+  function loadHistory(ofwId, ofwName) {
+    if (historyLines[ofwId]) {
+      // Toggle off
+      map.removeLayer(historyLines[ofwId]);
+      delete historyLines[ofwId];
+      delete historyPoints[ofwId];
+      return;
+    }
+    fetch('{% url "ofw:ofw_location_history" ofwId %}', {
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) {
+        var pings = data.pings || [];
+        if (pings.length === 0) {
+          alert('No location history for ' + ofwName + '.');
+          return;
+        }
+        var latlngs = pings.map(function (p) { return [p.lat, p.lng]; });
+        var line = L.polyline(latlngs, {
+          color: '#206bc4',
+          weight: 3,
+          opacity: 0.7,
+          dashArray: '6, 10'
+        }).addTo(map);
+        historyLines[ofwId] = line;
+
+        // Markers for each history point (newest = green, oldest = gray)
+        pings.forEach(function (p, i) {
+          var isNewest = (i === 0);
+          var c = isNewest ? '#2fb344' : '#6c757d';
+          var pt = L.circleMarker([p.lat, p.lng], {
+            radius: 5,
+            color: c,
+            fillColor: c,
+            fillOpacity: 0.9,
+            weight: 2
+          }).addTo(map);
+          pt.bindPopup(
+            '<b>' + esc(ofwName) + '</b><br>' +
+            (p.label ? esc(p.label) + '<br>' : '') +
+            p.recorded_at_display + '<br>' +
+            '±' + (p.accuracy || 0) + ' m' +
+            (p.is_emergency ? ' <span style="color:#d63939;"><b>SOS</b></span>' : '')
+          );
+          historyPoints[ofwId] = historyPoints[ofwId] || [];
+          historyPoints[ofwId].push(pt);
+        });
+
+        map.fitBounds(line.getBounds().pad(0.2), { maxZoom: 14 });
+      })
+      .catch(function () {
+        alert('Could not load location history.');
+      });
   }
 
   function loadLive() {

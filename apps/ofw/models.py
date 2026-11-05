@@ -638,6 +638,8 @@ class LocationTracker(models.Model):
     )
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    location_label = models.CharField(max_length=200, blank=True,
+        help_text='Reverse-geocoded address label (proof of where).')
     accuracy_meters = models.PositiveIntegerField(null=True, blank=True)
     is_emergency = models.BooleanField(default=False,
         help_text='True when this ping was sent during an SOS emergency.')
