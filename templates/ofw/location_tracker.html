@@ -163,6 +163,11 @@
                 <a href="{% url 'ofw:emergency_guide' row.profile.pk %}" class="btn btn-sm btn-outline-danger">
                   <i class="fas fa-headset"></i><span class="d-none d-lg-inline ms-1">Guide</span>
                 </a>
+                <a href="#" class="btn btn-sm btn-outline-info"
+                   onclick="loadHistory({{ row.profile.pk }}, '{{ row.profile.full_name|escapejs }}'); return false;"
+                   title="View location history">
+                  <i class="fas fa-history"></i><span class="d-none d-lg-inline ms-1">History</span>
+                </a>
               </div>
             </td>
           </tr>
@@ -332,7 +337,7 @@
       delete historyPoints[ofwId];
       return;
     }
-    fetch('{% url "ofw:ofw_location_history" ofwId %}', {
+    fetch('{% url "ofw:ofw_location_history" row.profile.pk %}', {
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
       .then(function (resp) { return resp.json(); })
