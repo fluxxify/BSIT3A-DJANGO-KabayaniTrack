@@ -4,19 +4,19 @@
 <div class="sos-page">
 <div class="page-header d-print-none" aria-label="Page header">
   <div class="row align-items-center g-2">
-    <div class="col">
+    <div class="col-12 col-md">
       <div class="page-pretitle">Emergency SOS</div>
       <h2 class="page-title mb-0">Emergency Assistance</h2>
       <div class="text-muted small mt-1">Send your location and get directions to the nearest safe place.</div>
     </div>
-    <div class="col-auto">
+    <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
       {% if agency_phone %}
       <a href="tel:{{ agency_phone }}" class="btn btn-success btn-sm">
         <i class="fas fa-headset me-1"></i>Call Agency
       </a>
       {% endif %}
-      <a href="tel:911" class="btn btn-danger btn-sm">
-        <i class="fas fa-phone me-1"></i>Call 911
+      <a href="tel:{{ emergency_phone|default:'112' }}" class="btn btn-danger btn-sm">
+        <i class="fas fa-phone me-1"></i>Call {{ emergency_phone|default:"112" }}
       </a>
     </div>
   </div>
@@ -25,7 +25,7 @@
 {% if profile %}
 <div class="alert alert-danger alert-dismissible fade show py-2 small">
   <i class="fas fa-exclamation-triangle me-1"></i>
-  If you are in danger, call 911 first. Then use the nearest safe place below.
+  If you are in danger, call {{ emergency_phone|default:"112" }} first. Then use the nearest safe place below.
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 
@@ -34,7 +34,9 @@
 <div class="alert alert-{% if open_alert.level == 'critical' %}danger{% elif open_alert.level == 'danger' %}warning{% else %}info{% endif %} alert-dismissible fade show py-2 small">
   <i class="fas fa-bell me-1"></i>
   <strong>Management has been alerted.</strong>
-  {% if open_alert.acknowledged_by %}
+  {% if open_alert.status == 'escalated' %}
+  Your case has been escalated to the police. Call your agency or the police now.
+  {% elif open_alert.acknowledged_by %}
   Your emergency has been acknowledged by {{ open_alert.acknowledged_by.username }}.
   {% else %}
   An emergency alert is open and management/your agency has been notified.
@@ -42,6 +44,7 @@
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 
+{% if can_cancel_alert %}
 <!-- Prominent Cancel SOS action -->
 <div class="card alert-danger border-danger mb-3">
   <div class="card-body text-center">
@@ -56,6 +59,7 @@
     </form>
   </div>
 </div>
+{% endif %}
 {% endif %}
 
 <!-- Location status -->
@@ -80,6 +84,50 @@
         </button>
       </div>
       <div id="locationResult" class="mt-3"></div>
+    </div>
+  </div>
+
+  <!-- Country-aware emergency numbers -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="card-title mb-0">
+        <i class="fas fa-phone-volume me-2"></i>Emergency numbers for {{ location_country|default:"your area" }}
+      </h5>
+    </div>
+    <div class="list-group list-group-flush">
+      {% for contact in local_hotlines %}
+      <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="min-w-0">
+          <div class="fw-medium">{{ contact.name }}</div>
+          <div class="text-muted small">
+            {{ contact.get_contact_type_display }}{% if contact.city %} · {{ contact.city }}{% endif %}
+            {% if contact.notes %} · {{ contact.notes }}{% endif %}
+          </div>
+        </div>
+        <a href="tel:{{ contact.dial_number }}" class="btn btn-sm btn-danger flex-shrink-0">
+          <i class="fas fa-phone me-1"></i>{{ contact.phone }}
+        </a>
+      </div>
+      {% endfor %}
+      {% if national_hotlines %}
+      <div class="list-group-item bg-secondary-lt">
+        <div class="subheader mb-0">Philippine national hotlines</div>
+      </div>
+      {% for contact in national_hotlines %}
+      <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="min-w-0">
+          <div class="fw-medium">{{ contact.name }}</div>
+          <div class="text-muted small">{{ contact.get_contact_type_display }}</div>
+        </div>
+        <a href="tel:{{ contact.dial_number }}" class="btn btn-sm btn-outline-secondary flex-shrink-0">
+          <i class="fas fa-phone me-1"></i>{{ contact.phone }}
+        </a>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+    <div class="card-footer text-muted small">
+      Local numbers are based on your saved deployment country. If a number is wrong, call your agency instead.
     </div>
   </div>
 
@@ -123,8 +171,8 @@
       <ol class="eg-steps" id="guideSteps"></ol>
 
       <div class="eg-actions d-grid gap-2 d-sm-flex mt-3">
-        <a href="tel:911" class="btn btn-danger flex-grow-1">
-          <i class="fas fa-phone me-1"></i>Call 911
+        <a href="tel:{{ emergency_phone|default:'112' }}" class="btn btn-danger flex-grow-1">
+          <i class="fas fa-phone me-1"></i>Call {{ emergency_phone|default:"112" }}
         </a>
         <a href="#" id="guideCallPlace" class="btn btn-success flex-grow-1 d-none">
           <i class="fas fa-phone me-1"></i>Call safe place
@@ -309,8 +357,8 @@
 
   <!-- Sticky emergency actions (phones only) -->
   <div class="sos-sticky d-lg-none">
-    <a href="tel:911" class="btn btn-danger">
-      <i class="fas fa-phone me-1"></i>Call 911
+    <a href="tel:{{ emergency_phone|default:'112' }}" class="btn btn-danger">
+      <i class="fas fa-phone me-1"></i>Call {{ emergency_phone|default:"112" }}
     </a>
     <button type="button" class="btn btn-danger" id="sosStickySend">
       <i class="fas fa-broadcast-tower me-1"></i>Send Location
@@ -449,18 +497,73 @@
       });
   }
 
+  var alertSent = false;
+  var alertRequest = '{% url "ofw:portal_sos_alert" %}';
+
+  function raiseAlert() {
+    // Alert management first: this must not depend on GPS permission.
+    return fetch(alertRequest, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: ''
+    })
+      .then(function (resp) {
+        return resp.json().catch(function () { return {}; });
+      })
+      .then(function (data) {
+        if (data && data.status === 'ok') {
+          alertSent = true;
+          return data;
+        }
+        return null;
+      })
+      .catch(function () { return null; });
+  }
+
   btn.addEventListener('click', function () {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting location...';
-    result.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-location-crosshairs me-2"></i>Getting your location… This can take a few seconds.</div>';
-    setStatus('busy', 'Getting your location…', 'Allow location access if your browser asks.');
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Sending alert...';
+    result.innerHTML = '<div class="alert alert-info py-2 small"><i class="fas fa-bell me-2"></i>Alerting management first, then getting your location…</div>';
+    setStatus('busy', 'Sending alert to management…', 'Your location will follow when the device responds.');
 
-    KabayaniLocation.getPosition()
+    raiseAlert()
+      .then(function (alertData) {
+        if (alertData && alertData.status === 'ok') {
+          setStatus(
+            'busy',
+            'Alert sent to management',
+            'Getting your location… Allow location access if your browser asks.'
+          );
+          result.innerHTML = '<div class="alert alert-warning py-2 small">' +
+            '<i class="fas fa-bell me-2"></i><strong>Management has been alerted.</strong> ' +
+            'Now sending your location so they can guide you.</div>';
+        } else {
+          setStatus('busy', 'Getting your location…', 'Allow location access if your browser asks.');
+        }
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Getting location...';
+        return KabayaniLocation.getPosition();
+      })
       .then(sendPing)
       .catch(function (err) {
         result.innerHTML = '<div class="alert alert-danger py-2 small">' +
           KabayaniLocation.describeError(err) + '</div>';
-        setStatus('warn', 'Location not sent', 'Check location permission and try again.');
+        if (alertSent) {
+          setStatus(
+            'warn',
+            'Alert sent — location not shared',
+            'Management knows you pressed SOS. Call them or the emergency number now.'
+          );
+          result.innerHTML += '<div class="alert alert-warning py-2 small mt-2">' +
+            '<i class="fas fa-bell me-2"></i><strong>Your SOS alert was sent.</strong> ' +
+            'Only your location failed. Call <a href="tel:{{ emergency_phone|default:"112" }}">' +
+            '{{ emergency_phone|default:"112" }}</a> and stay on the line.</div>';
+        } else {
+          setStatus('warn', 'Location not sent', 'Check location permission and try again.');
+        }
 
         if (err && err.code === 1) {
           var approxBtn = document.createElement('button');
@@ -521,6 +624,7 @@ window.KabayaniGuide = (function () {
   var lastFetchAt = 0;
   var lastFetchLat = null;
   var lastFetchLng = null;
+  var emergencyDial = '{{ emergency_phone|default:"112" }}';
 
   function esc(value) {
     return String(value == null ? '' : value)
@@ -586,11 +690,11 @@ window.KabayaniGuide = (function () {
 
     if (!nearest.length) {
       nameEl.textContent = 'No safe place registered near you';
-      metaEl.textContent = 'Call 911 and stay on the line.';
+      metaEl.textContent = 'Call ' + emergencyDial + ' and stay on the line.';
       distEl.textContent = '—';
       dirEl.textContent = '—';
       etaEl.textContent = '—';
-      stepsEl.innerHTML = '<li>Call <a href="tel:911">911</a> and stay on the line.</li>' +
+      stepsEl.innerHTML = '<li>Call <a href="tel:' + emergencyDial + '">' + emergencyDial + '</a> and stay on the line.</li>' +
         '<li>Move to a crowded, well-lit place if it is safe to do so.</li>';
       return;
     }
@@ -617,7 +721,7 @@ window.KabayaniGuide = (function () {
     var steps = [];
     steps.push('Walk <strong>' + esc(target.distance_text) + '</strong> ' +
       esc(target.direction.toLowerCase()) + ' to <strong>' + esc(target.name) + '</strong>.');
-    steps.push('If the way is not safe, call <a href="tel:911">911</a> and stay on the line.');
+    steps.push('If the way is not safe, call <a href="tel:' + emergencyDial + '">' + emergencyDial + '</a> and stay on the line.');
     if (nearest.length > 1) {
       var alt = nearest[1];
       steps.push('Other option: <strong>' + esc(alt.name) + '</strong> — ' +
@@ -644,7 +748,7 @@ window.KabayaniGuide = (function () {
       })
       .catch(function () {
         nameEl.textContent = 'Unable to load nearby safe places';
-        metaEl.textContent = 'Call 911 and stay on the line.';
+        metaEl.textContent = 'Call ' + emergencyDial + ' and stay on the line.';
       });
   }
 

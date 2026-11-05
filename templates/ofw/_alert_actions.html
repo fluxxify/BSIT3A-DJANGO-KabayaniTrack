@@ -26,8 +26,17 @@
     <i class="fas fa-exclamation-triangle me-1"></i> Escalate
   </button>
 </form>
-{% elif alert.police_report %}
+{% endif %}
+{% if alert.police_report %}
 <a href="{% url 'ofw:police_reports' %}" class="btn btn-sm btn-outline-secondary">
   <i class="fas fa-file-alt me-1"></i> Report
 </a>
+{% endif %}
+{% if alert.status != 'resolved' %}
+<form method="post" action="{% url 'ofw:resolve_alert' alert.pk %}" class="d-inline">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-sm btn-outline-success" onclick="return confirm('Mark this alert as resolved? The OFW will be notified that they are confirmed safe.')">
+    <i class="fas fa-circle-check me-1"></i> Resolve
+  </button>
+</form>
 {% endif %}

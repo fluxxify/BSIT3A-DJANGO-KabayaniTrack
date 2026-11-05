@@ -76,6 +76,22 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'safe_locations' %}active{% endif %}" href="{% url 'ofw:safe_locations' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-shield-alt text-success"></i>
+            </span>
+            <span class="nav-link-title">Safe Places</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'safe_location_suggestions' %}active{% endif %}" href="{% url 'ofw:safe_location_suggestions' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-map-location-dot text-primary"></i>
+            </span>
+            <span class="nav-link-title">Place Suggestions</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'profile_list' %}active{% endif %}" href="{% url 'ofw:profile_list' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-passport"></i>

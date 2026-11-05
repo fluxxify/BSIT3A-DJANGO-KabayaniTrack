@@ -23,7 +23,7 @@ from .forms import (
     OFWSelfConcernForm,
     SafeLocationSuggestionForm,
 )
-from .hotlines import automatic_local_hotlines, philippine_national_hotlines
+from .hotlines import hotlines_for_country
 from .locations import (
     COUNTRY_CHOICES,
     COUNTRY_GEO,
@@ -81,56 +81,9 @@ def _profile_for(user):
     return OFWProfile.objects.filter(user=user).order_by('id').first()
 
 
-def _hotline_number(contact):
-    return contact.dial_number or (contact.phone or '').strip()
-
-
-def _dedupe_hotlines(contacts, key_func):
-    """Keep the first row for each key while preserving priority order."""
-    seen = set()
-    result = []
-    for contact in contacts:
-        key = key_func(contact)
-        if key and key in seen:
-            continue
-        seen.add(key)
-        result.append(contact)
-    return result
-
-
 def _hotlines_for(location_country):
-    """Public hotlines for the OFW's deployment country plus the PH national ones.
-
-    Database entries are authoritative and come first.  Bundled country data
-    fills in local emergency numbers when management has not added any, so an
-    OFW always has at least one local number plus the Philippine hotlines.
-    Returns a ``(local_hotlines, national_hotlines)`` tuple.
-    """
-    country = canonical_country(location_country)
-    public_contacts = list(
-        EmergencyContact.objects
-        .filter(contact_type__in=EmergencyContact.PUBLIC_TYPES)
-        .order_by('country', 'contact_type', 'name')
-    )
-
-    db_local = []
-    db_national = []
-    for contact in public_contacts:
-        contact_country = canonical_country(contact.country)
-        if country and country != 'Philippines' and contact_country == country:
-            db_local.append(contact)
-        elif contact_country == 'Philippines':
-            db_national.append(contact)
-
-    local = _dedupe_hotlines(
-        db_local + automatic_local_hotlines(country),
-        _hotline_number,
-    )
-    national = _dedupe_hotlines(
-        db_national + philippine_national_hotlines(),
-        _hotline_number,
-    )
-    return local, national
+    """Public hotlines for the OFW's deployment country plus PH national ones."""
+    return hotlines_for_country(location_country)
 
 
 def _latest_ping(profile):

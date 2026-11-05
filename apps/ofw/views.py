@@ -25,6 +25,7 @@ from .forms import (
     WelfareAssessmentForm,
 )
 from .geo import reverse_geocode
+from .hotlines import hotlines_for_country
 from .locations import COUNTRY_GEO, canonical_country
 from .models import (
     CheckIn,
@@ -1084,12 +1085,16 @@ def acknowledge_alert(request, pk):
     alert.save(update_fields=['status', 'acknowledged_by', 'acknowledged_at', 'updated_at'])
 
     notify(
-        request.user,
-        'Emergency alert acknowledged',
-        f'You acknowledged the alert for {alert.ofw.full_name}. '
-        f'Next step: call the OFW directly.',
-        url=reverse('ofw:emergency_alerts'),
-        level=Notification.Level.SUCCESS,
+        alert.ofw.user,
+        'Your emergency has been acknowledged',
+        f'Your agency acknowledged your emergency alert and is trying to '
+        f'reach you. Keep your phone reachable and stay on the SOS page.',
+        url=reverse('ofw:portal_emergency_sos'),
+        level=Notification.Level.WARNING,
+    )
+    messages.success(
+        request,
+        f'Alert acknowledged for {alert.ofw.full_name}. The OFW has been notified.',
     )
     return redirect('ofw:emergency_alerts')
 
@@ -1146,7 +1151,66 @@ def escalate_to_police(request, pk):
         agency=alert.ofw.agency_org,
     )
 
+    notify(
+        alert.ofw.user,
+        'Your case was escalated to the police',
+        'Your agency could not reach you, so a police report was started. '
+        'If you are safe, open Emergency SOS and cancel the alert or contact '
+        'your agency immediately.',
+        url=reverse('ofw:portal_emergency_sos'),
+        level=Notification.Level.DANGER,
+    )
+    messages.success(
+        request,
+        f'Escalated {alert.ofw.full_name} to the police and notified the OFW.',
+    )
+
     return redirect('ofw:police_reports')
+
+
+@login_required(login_url='login')
+@require_POST
+def resolve_alert(request, pk):
+    """Close an emergency alert once the OFW is confirmed safe."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return HttpResponseForbidden('Management accounts only.')
+    alert = get_object_or_404(_management_alert_scope(request.user), pk=pk)
+
+    if alert.status == EmergencyAlert.Status.RESOLVED:
+        messages.info(request, 'This emergency alert is already resolved.')
+        return redirect('ofw:emergency_alerts')
+
+    alert.status = EmergencyAlert.Status.RESOLVED
+    alert.message = (
+        f'{alert.message}\n\nResolved by '
+        f'{request.user.get_full_name() or request.user.username}: OFW confirmed safe.'
+    )
+    alert.save(update_fields=['status', 'message', 'updated_at'])
+
+    notify(
+        alert.ofw.user,
+        'Your emergency alert was resolved',
+        'Your agency confirmed you are safe and closed the emergency alert. '
+        'You can still call them if you need help.',
+        url=reverse('ofw:portal_emergency_alerts'),
+        level=Notification.Level.SUCCESS,
+    )
+    notify_managers(
+        title=f'Alert resolved: {alert.ofw.full_name}',
+        message=(
+            f'{request.user.get_full_name() or request.user.username} marked '
+            f'{alert.ofw.full_name} as safe and closed the emergency alert.'
+        ),
+        url=reverse('ofw:emergency_alerts'),
+        level=Notification.Level.SUCCESS,
+        exclude_user=request.user,
+        agency=alert.ofw.agency_org,
+    )
+    messages.success(
+        request,
+        f'Emergency alert for {alert.ofw.full_name} resolved. The OFW was notified.',
+    )
+    return redirect('ofw:emergency_alerts')
 
 
 @login_required(login_url='login')
@@ -1728,22 +1792,28 @@ def ofw_emergency_sos(request):
     # Latest open emergency alert for this OFW (so they see management has been alerted)
     open_alert = (
         EmergencyAlert.objects
-        .filter(ofw=profile, status=EmergencyAlert.Status.OPEN)
+        .filter(
+            ofw=profile,
+            status__in=[
+                EmergencyAlert.Status.OPEN,
+                EmergencyAlert.Status.ACKNOWLEDGED,
+                EmergencyAlert.Status.ESCALATED,
+            ],
+        )
         .order_by('-created_at')
         .first()
     )
 
-    # Public hotlines
-    from .hotlines import automatic_local_hotlines, philippine_national_hotlines
-    from .models import EmergencyContact
-
-    public_contacts = list(
-        EmergencyContact.objects
-        .filter(contact_type__in=EmergencyContact.PUBLIC_TYPES)
-        .order_by('country', 'contact_type', 'name')
-    )
-    db_local = [c for c in public_contacts if canonical_country(c.country) == location_country and location_country != 'Philippines']
-    db_national = [c for c in public_contacts if canonical_country(c.country) == 'Philippines']
+    # Country-aware hotlines: database rows first, bundled fallback second.
+    local_hotlines, national_hotlines = hotlines_for_country(location_country)
+    emergency_phone = next(
+        (
+            contact.dial_number
+            for contact in local_hotlines
+            if getattr(contact, 'contact_type', '') == 'emergency'
+        ),
+        '',
+    ) or _EMERGENCY_NUMBERS.get(location_country, '112')
 
     return render(request, 'ofw/portal/emergency_sos.html', {
         'profile': profile,
@@ -1752,23 +1822,35 @@ def ofw_emergency_sos(request):
         'safe_locations': safe_locations,
         'recent_pings': recent_pings,
         'open_alert': open_alert,
+        'can_cancel_alert': bool(
+            open_alert and open_alert.status in (
+                EmergencyAlert.Status.OPEN,
+                EmergencyAlert.Status.ACKNOWLEDGED,
+            )
+        ),
         'agency_phone': (
             profile.agency_org.phone
             if profile and profile.agency_org_id and profile.agency_org.phone else ''
         ),
-        'local_hotlines': db_local,
-        'national_hotlines': db_national,
+        'local_hotlines': local_hotlines,
+        'national_hotlines': national_hotlines,
+        'emergency_phone': emergency_phone,
         'page_title': 'Emergency SOS',
     })
 
 
 @login_required(login_url='login')
 @require_POST
-def cancel_sos(request):
-    """OFW cancels / marks their own open emergency alert as a false alarm."""
+def portal_sos_alert(request):
+    """Create or refresh an emergency alert before location is available.
+
+    The OFW's SOS button calls this first, so management is alerted even when
+    GPS permission is denied or the device cannot get a fix.  The follow-up
+    ping endpoint attaches coordinates to the same alert.
+    """
     from .roles import is_ofw
     if not is_ofw(request.user):
-        return redirect('dashboard')
+        return JsonResponse({'error': 'OFW accounts only.'}, status=403)
 
     profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()
     if profile is None:
@@ -1776,28 +1858,117 @@ def cancel_sos(request):
 
     alert = (
         EmergencyAlert.objects
-        .filter(ofw=profile, status=EmergencyAlert.Status.OPEN)
+        .filter(
+            ofw=profile,
+            status__in=[
+                EmergencyAlert.Status.OPEN,
+                EmergencyAlert.Status.ACKNOWLEDGED,
+            ],
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    created = alert is None
+    message = (
+        f'{profile.full_name} pressed the emergency SOS button. '
+        f'Location is being requested from the device.'
+    )
+    if created:
+        alert = EmergencyAlert.objects.create(
+            ofw=profile,
+            title=f'Emergency SOS from {profile.full_name}',
+            message=message,
+            level=EmergencyAlert.Level.CRITICAL,
+        )
+        notify_managers(
+            title=f'Emergency SOS from {profile.full_name}',
+            message=(
+                f'{profile.full_name} pressed SOS. Call the OFW now and open '
+                f'the emergency guide for their last known location.'
+            ),
+            url=reverse('ofw:emergency_guide', args=[profile.pk]),
+            level=Notification.Level.DANGER,
+            agency=profile.agency_org,
+            exclude_user=request.user,
+        )
+    else:
+        alert.level = EmergencyAlert.Level.CRITICAL
+        alert.message = (
+            f'{alert.message}\n\nSOS pressed again — '
+            f'location is being requested from the device.'
+        )
+        alert.save(update_fields=['level', 'message', 'updated_at'])
+
+    return JsonResponse({
+        'status': 'ok',
+        'alert_id': alert.pk,
+        'created': created,
+        'status_label': alert.get_status_display(),
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def cancel_sos(request):
+    """OFW cancels their open emergency alert and tells management they are safe."""
+    from .roles import is_ofw
+    if not is_ofw(request.user):
+        return redirect('dashboard')
+
+    profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()
+    if profile is None:
+        if request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': 'No OFW profile found.'}, status=400)
+        messages.error(request, 'Complete your profile before cancelling an alert.')
+        return redirect('ofw:portal_profile')
+
+    alert = (
+        EmergencyAlert.objects
+        .filter(
+            ofw=profile,
+            status__in=[
+                EmergencyAlert.Status.OPEN,
+                EmergencyAlert.Status.ACKNOWLEDGED,
+            ],
+        )
         .order_by('-created_at')
         .first()
     )
     if alert is None:
-        return JsonResponse({'error': 'No open emergency alert to cancel.'}, status=400)
+        if request.headers.get('Accept') == 'application/json':
+            return JsonResponse({'error': 'No open emergency alert to cancel.'}, status=400)
+        messages.info(request, 'There is no open emergency alert to cancel.')
+        return redirect('ofw:portal_emergency_sos')
 
     alert.status = EmergencyAlert.Status.RESOLVED
     alert.message = (
-        f'{alert.message}\n\nCancelled by OFW (false alarm) — {profile.full_name}.'
+        f'{alert.message}\n\nCancelled by OFW (false alarm / safe now) — '
+        f'{profile.full_name}.'
     )
     alert.save(update_fields=['status', 'message', 'updated_at'])
 
+    notify_managers(
+        title=f'SOS cancelled: {profile.full_name} is safe',
+        message=(
+            f'{profile.full_name} cancelled their emergency alert and marked '
+            f'themselves safe. No police escalation is needed.'
+        ),
+        url=reverse('ofw:emergency_guide', args=[profile.pk]),
+        level=Notification.Level.SUCCESS,
+        agency=profile.agency_org,
+    )
     notify(
         request.user,
         'Emergency alert cancelled',
         f'You cancelled the open emergency alert for {profile.full_name}. '
-        f'Management has been notified.',
+        f'Your agency has been notified that you are safe.',
         url=reverse('ofw:portal_emergency_sos'),
         level=Notification.Level.INFO,
     )
-    return JsonResponse({'status': 'cancelled'})
+    if request.headers.get('Accept') == 'application/json':
+        return JsonResponse({'status': 'cancelled'})
+    messages.success(request, 'Emergency alert cancelled. Your agency knows you are safe.')
+    return redirect('ofw:portal_emergency_sos')
 
 
 # ---------------------------------------------------------------------------

@@ -101,6 +101,7 @@ urlpatterns = [
     path('emergency-alerts/', views.emergency_alerts_page, name='emergency_alerts'),
     path('emergency-alerts/<int:pk>/acknowledge/', views.acknowledge_alert, name='acknowledge_alert'),
     path('emergency-alerts/<int:pk>/escalate/', views.escalate_to_police, name='escalate_to_police'),
+    path('emergency-alerts/<int:pk>/resolve/', views.resolve_alert, name='resolve_alert'),
 
     # Call guide with the nearest safe places
     path('emergency-guide/<int:pk>/', views.emergency_guide, name='emergency_guide'),
@@ -121,6 +122,7 @@ urlpatterns = [
 
     # OFW emergency SOS (portal)
     path('portal/emergency-sos/', views.ofw_emergency_sos, name='portal_emergency_sos'),
+    path('portal/emergency-sos/alert/', views.portal_sos_alert, name='portal_sos_alert'),
     path('portal/emergency-sos/cancel/', views.cancel_sos, name='portal_cancel_sos'),
     path('portal/suggest-safe-place/', portal_views.portal_suggest_safe_place, name='portal_suggest_safe_place'),
     path('portal/emergency-alerts/', portal_views.portal_emergency_alerts, name='portal_emergency_alerts'),

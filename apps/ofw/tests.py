@@ -1824,3 +1824,153 @@ class OFWConnectedSafetyPagesTests(TestCase):
                 response = self.client.get(reverse(f'ofw:{name}'))
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response.url, reverse('dashboard'))
+
+class SosWorkflowTests(TestCase):
+    """Alert-first SOS, resolution and country-aware hotlines."""
+
+    def setUp(self):
+        self.ofw = User.objects.create_user(
+            username='sos_workflow_ofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw,
+            first_name='Lina',
+            last_name='Cruz',
+            country='Saudi Arabia',
+            city_abroad='Riyadh',
+        )
+        self.staff = User.objects.create_user(
+            username='sos_workflow_staff', password='Passw0rd!23', is_staff=True
+        )
+        self.other_staff = User.objects.create_user(
+            username='sos_workflow_staff2', password='Passw0rd!23', is_staff=True
+        )
+        self.client.force_login(self.ofw)
+
+    def _open_alert(self):
+        return EmergencyAlert.objects.create(
+            ofw=self.profile,
+            title='Emergency SOS from Lina Cruz',
+            message='Pressed SOS.',
+            level=EmergencyAlert.Level.CRITICAL,
+        )
+
+    def test_alert_first_endpoint_creates_alert_without_ping(self):
+        response = self.client.post(reverse('ofw:portal_sos_alert'))
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['created'])
+        alert = EmergencyAlert.objects.get(pk=data['alert_id'])
+        self.assertEqual(alert.status, EmergencyAlert.Status.OPEN)
+        self.assertFalse(LocationTracker.objects.filter(ofw=self.profile).exists())
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='Emergency SOS',
+            ).exists()
+        )
+
+    def test_second_sos_press_reuses_active_alert(self):
+        first = self.client.post(reverse('ofw:portal_sos_alert')).json()
+        second = self.client.post(reverse('ofw:portal_sos_alert')).json()
+
+        self.assertFalse(second['created'])
+        self.assertEqual(first['alert_id'], second['alert_id'])
+        self.assertEqual(
+            EmergencyAlert.objects.filter(ofw=self.profile).count(), 1
+        )
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='Emergency SOS',
+            ).count(),
+            1,
+        )
+
+    def test_acknowledge_notifies_the_ofw(self):
+        alert = self._open_alert()
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse('ofw:acknowledge_alert', args=[alert.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.ACKNOWLEDGED)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.ofw,
+                title__icontains='acknowledged',
+            ).exists()
+        )
+
+    def test_resolve_notifies_ofw_and_other_managers(self):
+        alert = self._open_alert()
+        self.client.force_login(self.staff)
+
+        response = self.client.post(
+            reverse('ofw:resolve_alert', args=[alert.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.RESOLVED)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.ofw,
+                title__icontains='resolved',
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.other_staff,
+                title__icontains='Alert resolved',
+            ).exists()
+        )
+
+    def test_ofw_cannot_resolve_alerts(self):
+        alert = self._open_alert()
+
+        response = self.client.post(
+            reverse('ofw:resolve_alert', args=[alert.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.OPEN)
+
+    def test_cancel_sos_notifies_managers_and_redirects(self):
+        alert = self._open_alert()
+
+        response = self.client.post(reverse('ofw:portal_cancel_sos'))
+
+        self.assertEqual(response.status_code, 302)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.RESOLVED)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='SOS cancelled',
+            ).exists()
+        )
+
+    def test_sos_page_uses_country_hotlines(self):
+        response = self.client.get(reverse('ofw:portal_emergency_sos'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Emergency numbers for Saudi Arabia')
+        self.assertContains(response, 'Saudi Arabia police')
+        self.assertContains(response, 'Call 911')
+
+    def test_uae_emergency_button_uses_local_number(self):
+        self.profile.country = 'United Arab Emirates'
+        self.profile.city_abroad = 'Dubai'
+        self.profile.save(update_fields=['country', 'city_abroad'])
+
+        response = self.client.get(reverse('ofw:portal_emergency_sos'))
+
+        self.assertContains(response, 'Call 999')
+        self.assertNotContains(response, 'Call 911')

@@ -101,3 +101,49 @@ def automatic_local_hotlines(location_country):
 def philippine_national_hotlines():
     """Return the always-visible Philippine national hotlines."""
     return _entries(PHILIPPINE_HOTLINES, 'Philippines')
+
+
+def _dedupe_hotlines(contacts):
+    """Keep the first row for each dialable number, preserving priority."""
+    seen = set()
+    result = []
+    for contact in contacts:
+        key = contact.dial_number or (contact.phone or '').strip()
+        if key and key in seen:
+            continue
+        seen.add(key)
+        result.append(contact)
+    return result
+
+
+def hotlines_for_country(location_country):
+    """Public hotlines for an OFW's deployment country plus PH national ones.
+
+    Database entries are authoritative and come first.  Bundled country data
+    fills in local emergency numbers when management has not added any, so an
+    OFW always has at least one local number plus the Philippine hotlines.
+    Returns a ``(local_hotlines, national_hotlines)`` tuple.
+    """
+    country = canonical_country(location_country)
+    public_contacts = list(
+        EmergencyContact.objects
+        .filter(contact_type__in=EmergencyContact.PUBLIC_TYPES)
+        .order_by('country', 'contact_type', 'name')
+    )
+
+    db_local = []
+    db_national = []
+    for contact in public_contacts:
+        contact_country = canonical_country(contact.country)
+        if country and country != 'Philippines' and contact_country == country:
+            db_local.append(contact)
+        elif contact_country == 'Philippines':
+            db_national.append(contact)
+
+    local = _dedupe_hotlines(
+        db_local + automatic_local_hotlines(country)
+    )
+    national = _dedupe_hotlines(
+        db_national + philippine_national_hotlines()
+    )
+    return local, national
