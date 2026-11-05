@@ -111,6 +111,134 @@
     </div>
   </div>
 
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="subheader">Emergency Guidance</div>
+            <i class="fas fa-truck-medical text-danger"></i>
+          </div>
+          <div class="mt-2">
+            {% if active_alert_count %}
+            <span class="badge bg-danger-lt text-danger">{{ active_alert_count }} active alert{{ active_alert_count|pluralize }}</span>
+            {% else %}
+            <span class="badge bg-success-lt text-success">No active alert</span>
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-2">
+            {% if nearest_place %}
+            Nearest safe place: <strong>{{ nearest_place.name }}</strong>{% if nearest_place.distance_text %} · {{ nearest_place.distance_text }}{% endif %}
+            {% else %}
+            Add your country to see the nearest police station, hospital or embassy.
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-footer d-flex flex-wrap gap-2">
+          <a href="{% url 'ofw:portal_emergency_guidance' %}" class="btn btn-sm btn-danger">
+            <i class="fas fa-headset me-1"></i>Open guidance
+          </a>
+          <a href="{% url 'ofw:portal_emergency_sos' %}" class="btn btn-sm btn-outline-danger">
+            <i class="fas fa-location-crosshairs me-1"></i>Live SOS
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="subheader">My Live Location</div>
+            <i class="fas fa-earth-asia text-info"></i>
+          </div>
+          <div class="mt-2">
+            {% if sharing_enabled %}
+            <span class="badge bg-success-lt text-success"><i class="fas fa-location-dot me-1"></i>Sharing on</span>
+            {% else %}
+            <span class="badge bg-secondary-lt text-secondary">Sharing off</span>
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-2">
+            {% if latest_ping %}
+            Last shared {{ latest_ping.recorded_at|timesince }} ago.
+            {% else %}
+            No location shared yet. Turn it on so your agency can find you.
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'ofw:portal_location_sharing' %}" class="btn btn-sm btn-outline-primary">
+            <i class="fas fa-map-location-dot me-1"></i>Open my map
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="subheader">Login Warnings</div>
+            <i class="fas fa-clock {% if is_inactive %}text-warning{% else %}text-muted{% endif %}"></i>
+          </div>
+          <div class="mt-2">
+            {% if is_inactive %}
+            <span class="badge bg-warning-lt text-warning">No login for {{ inactive_days }} days</span>
+            {% else %}
+            <span class="badge bg-success-lt text-success">Active</span>
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-2">
+            {% if warning_count %}
+            {{ warning_count }} unread warning{{ warning_count|pluralize }} from your agency.
+            {% elif last_checkin %}
+            Last check-in {{ last_checkin.checkin_date|timesince }} ago.
+            {% else %}
+            Log a check-in so management knows you are safe.
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'ofw:portal_login_warnings' %}" class="btn btn-sm btn-outline-warning">
+            <i class="fas fa-clock-rotate-left me-1"></i>View warnings
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="subheader">Police Contact</div>
+            <i class="fas fa-building-shield text-danger"></i>
+          </div>
+          <div class="mt-2">
+            {% if latest_police_report %}
+            <span class="badge bg-{% if latest_police_report.status == 'submitted' %}warning{% elif latest_police_report.status == 'responded' %}success{% else %}secondary{% endif %}-lt text-{% if latest_police_report.status == 'submitted' %}warning{% elif latest_police_report.status == 'responded' %}success{% else %}secondary{% endif %}">
+              {{ latest_police_report.get_status_display }}
+            </span>
+            {% else %}
+            <span class="badge bg-success-lt text-success">No report filed</span>
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-2">
+            {% if nearest_police_station %}
+            Nearest station: <strong>{{ nearest_police_station.name }}</strong>{% if nearest_police_station.city %} · {{ nearest_police_station.city }}{% endif %}
+            {% elif latest_police_report and latest_police_report.police_station %}
+            Station: <strong>{{ latest_police_report.police_station }}</strong>
+            {% else %}
+            See the police number and station for your area.
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'ofw:portal_police_reports' %}" class="btn btn-sm btn-outline-danger">
+            <i class="fas fa-building-shield me-1"></i>Police contact
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card mt-3 border-danger">
     <div class="card-body">
       <div class="row g-2 align-items-center">

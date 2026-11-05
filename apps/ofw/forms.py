@@ -7,7 +7,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 
-from apps.users.agencies import agency_for_user, has_agency_assignment, is_global_staff
+from apps.users.agencies import (
+    agency_for_user,
+    has_agency_assignment,
+    is_global_staff,
+)
 from apps.users.models import Agency
 
 from .models import (

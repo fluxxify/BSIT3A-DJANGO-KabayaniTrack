@@ -70,7 +70,7 @@ body {
 }
 
 html {
-  font-size: 88%;
+  font-size: 100%;
 }
 
 .page {
@@ -947,12 +947,19 @@ html {
    Applied only with existing Tabler + custom CSS, no new deps.
    ============================================================ */
 
-/* Safe-area insets for iPhones with notch / home indicator */
-html {
-  padding-top: max(env(safe-area-inset-top), 0.5rem);
-  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
-  padding-left: max(env(safe-area-inset-left), 0.5rem);
-  padding-right: max(env(safe-area-inset-right), 0.5rem);
+/* Safe-area insets are applied to fixed chrome instead of the whole document. */
+@supports (padding: env(safe-area-inset-top)) {
+  .dh-topbar {
+    padding-top: env(safe-area-inset-top);
+  }
+  .page-sidebar,
+  .navbar-vertical {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .sos-sticky {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 @media (max-width: 767.98px) {
@@ -1004,9 +1011,11 @@ html {
 
   .table th,
   .table td {
-    white-space: nowrap;
     padding: 0.5rem 0.4rem;
     font-size: 0.8rem;
+  }
+  .table td {
+    overflow-wrap: anywhere;
   }
 
   .badge {

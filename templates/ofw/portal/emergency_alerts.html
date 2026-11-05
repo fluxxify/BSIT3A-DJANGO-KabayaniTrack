@@ -9,10 +9,29 @@
           <h2 class="page-title mb-0">{{ page_title }}</h2>
           <div class="text-muted small mt-1">Emergency alerts raised for you by management or by your own SOS check-ins.</div>
         </div>
+        <div class="col-auto d-flex flex-wrap gap-2">
+          <a href="{% url 'ofw:portal_emergency_guidance' %}" class="btn btn-danger btn-sm">
+            <i class="fas fa-headset me-1"></i>Emergency guidance
+          </a>
+          <a href="{% url 'ofw:portal_emergency_sos' %}" class="btn btn-outline-danger btn-sm">
+            <i class="fas fa-location-crosshairs me-1"></i>Live SOS
+          </a>
+        </div>
       </div>
     </div>
   </div>
   <br>
+
+  {% if nearest_places %}
+  <div class="alert alert-info d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+      <i class="fas fa-shield-alt me-1"></i>
+      Nearest safe place:
+      <strong>{{ nearest_places.0.name }}</strong>{% if nearest_places.0.distance_text %} · {{ nearest_places.0.distance_text }}{% endif %}
+    </div>
+    <a href="{% url 'ofw:portal_emergency_guidance' %}" class="btn btn-sm btn-outline-primary">See guidance</a>
+  </div>
+  {% endif %}
 
   {% if not profile %}
   <div class="alert alert-warning">

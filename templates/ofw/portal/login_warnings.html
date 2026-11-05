@@ -1,0 +1,156 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center g-2">
+      <div class="col-12 col-md">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+        <div class="text-muted small mt-1">
+          This is the same login clock your agency uses for welfare checks.
+        </div>
+      </div>
+      <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
+        {% if agency_phone %}
+        <a href="tel:{{ agency_phone }}" class="btn btn-success btn-sm">
+          <i class="fas fa-headset me-1"></i>Call agency
+        </a>
+        {% endif %}
+        <a href="{% url 'ofw:portal_checkins' %}" class="btn btn-primary btn-sm">
+          <i class="fas fa-clipboard-check me-1"></i>Log a check-in
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="row row-deck row-cards">
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Account status</div>
+          {% if is_inactive %}
+          <div class="h3 mb-0 text-warning">{{ warning_label }}</div>
+          <div class="text-muted small mt-1">No successful login for {{ days_inactive }} days.</div>
+          {% else %}
+          <div class="h3 mb-0 text-success">Active</div>
+          <div class="text-muted small mt-1">You are within the {{ threshold_days }}-day login window.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Last successful login</div>
+          <div class="h4 mb-0">
+            {% if activity.last_login_at %}
+            {{ activity.last_login_at|date:"M d, Y" }}
+            {% else %}
+            Never
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-1">
+            {% if activity.last_login_at %}{{ activity.last_login_at|date:"g:i A" }} · {{ activity.last_login_at|timesince }} ago{% else %}Account created {{ request.user.date_joined|date:"M d, Y" }}{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Last check-in</div>
+          <div class="h4 mb-0">
+            {% if last_checkin %}{{ last_checkin.checkin_date|date:"M d, Y" }}{% else %}None yet{% endif %}
+          </div>
+          <div class="text-muted small mt-1">
+            {% if last_checkin %}{{ last_checkin.get_condition_display }} · {{ last_checkin.checkin_date|timesince }} ago{% else %}A check-in tells management you are safe.{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Warning messages</div>
+          <div class="h4 mb-0">{{ warning_notifications|length }}</div>
+          <div class="text-muted small mt-1">Messages from your agency about your account.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if is_inactive %}
+  <div class="alert alert-warning mt-3">
+    <i class="fas fa-clock text-warning me-2"></i>
+    <strong>Your account has been inactive for {{ days_inactive }} day{{ days_inactive|pluralize }}.</strong>
+    Your agency may call you for a welfare check. Log a check-in or update your profile so they know you are safe.
+    {% if days_inactive > 5 %}
+    <div class="mt-2 small">After six days without contact, management can escalate your case to the police.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="row row-deck row-cards mt-1">
+    <div class="col-lg-7">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-bell text-warning me-2"></i>Warning messages</h3>
+        </div>
+        {% if warning_notifications %}
+        <div class="list-group list-group-flush">
+          {% for notification in warning_notifications %}
+          <div class="list-group-item">
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+              <div>
+                <div class="fw-medium">
+                  <span class="badge bg-{{ notification.level }}-lt text-{{ notification.level }} me-1">{{ notification.get_level_display }}</span>
+                  {{ notification.title }}
+                </div>
+                <div class="text-muted small mt-1">{{ notification.message }}</div>
+              </div>
+              <div class="text-muted small text-nowrap">{{ notification.created_at|date:"M d, H:i" }}</div>
+            </div>
+            {% if notification.url %}
+            <a href="{{ notification.url }}" class="small">Open</a>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-body text-muted text-center py-4">
+          <i class="fas fa-circle-check fa-2x text-success mb-2"></i>
+          <p class="mb-0">No warning messages. Keep checking in regularly.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-circle-info text-primary me-2"></i>How login warnings work</h3>
+        </div>
+        <div class="card-body">
+          <ol class="ps-3 mb-3">
+            <li class="mb-2"><strong>Day 3:</strong> your agency is warned that you have not logged in and may call you.</li>
+            <li class="mb-2"><strong>Day 6+:</strong> a follow-up warning is sent to management.</li>
+            <li><strong>No contact:</strong> management can escalate to the police and file a report.</li>
+          </ol>
+          <div class="text-muted small">
+            A successful login or a check-in resets the clock. Opening this page counts as activity on your account.
+          </div>
+          <div class="d-grid gap-2 mt-3">
+            <a href="{% url 'ofw:portal_checkins' %}" class="btn btn-primary">
+              <i class="fas fa-clipboard-check me-1"></i>I am safe — log a check-in
+            </a>
+            <a href="{% url 'ofw:portal_profile' %}" class="btn btn-outline-secondary">
+              <i class="fas fa-id-card me-1"></i>Update my profile
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center g-2">
+      <div class="col-12 col-md">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+        <div class="text-muted small mt-1">
+          Your own emergency plan: active alerts, the nearest safe place and one-tap numbers for {{ location_country|default:"your area" }}.
+        </div>
+      </div>
+      <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
+        {% if agency_phone %}
+        <a href="tel:{{ agency_phone }}" class="btn btn-success btn-sm">
+          <i class="fas fa-headset me-1"></i>Call agency
+        </a>
+        {% endif %}
+        <a href="{% url 'ofw:portal_emergency_sos' %}" class="btn btn-danger btn-sm">
+          <i class="fas fa-location-crosshairs me-1"></i>Open live SOS
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="alert alert-danger d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+      <i class="fas fa-exclamation-triangle me-1"></i>
+      <strong>If you are in immediate danger, call the police or emergency number first.</strong>
+      Then send your location so management can guide you.
+    </div>
+    {% if police_hotline %}
+    <a href="tel:{{ police_hotline.dial_number }}" class="btn btn-danger">
+      <i class="fas fa-phone me-1"></i>Police · {{ police_hotline.phone }}
+    </a>
+    {% endif %}
+  </div>
+
+  {% if open_alert %}
+  <div class="card border-danger mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+        <div>
+          <div class="text-danger fw-bold">
+            <i class="fas fa-bell me-1"></i>{{ open_alert.title }}
+          </div>
+          <div class="text-muted small mt-1">{{ open_alert.message|default:"Management has been alerted and can see your shared location." }}</div>
+        </div>
+        <span class="badge bg-danger-lt text-danger">{{ open_alert.get_status_display }}</span>
+      </div>
+      <div class="text-muted small mt-2">
+        Raised {{ open_alert.created_at|timesince }} ago.
+        {% if open_alert.acknowledged_by %}
+        Acknowledged by {{ open_alert.acknowledged_by.get_full_name|default:open_alert.acknowledged_by.username }}.
+        {% else %}
+        Waiting for management to acknowledge.
+        {% endif %}
+      </div>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <a href="{% url 'ofw:portal_emergency_sos' %}" class="btn btn-danger btn-sm">
+          <i class="fas fa-location-crosshairs me-1"></i>Send my location
+        </a>
+        <a href="{% url 'ofw:portal_emergency_alerts' %}" class="btn btn-outline-danger btn-sm">
+          <i class="fas fa-list me-1"></i>All my alerts
+        </a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <div class="fw-medium"><i class="fas fa-circle-check text-success me-1"></i>No active emergency alert</div>
+        <div class="text-muted small">Your alert history is always available if management raises one later.</div>
+      </div>
+      <a href="{% url 'ofw:portal_emergency_alerts' %}" class="btn btn-sm btn-outline-secondary">
+        View alert history
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row row-deck row-cards">
+    <div class="col-lg-7">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-shield-alt text-primary me-2"></i>Nearest safe places</h3>
+          <a href="{% url 'ofw:safe_locations' %}" class="ms-auto small">All safe places</a>
+        </div>
+        <div class="card-body">
+          {% if latest_ping %}
+          <div class="text-muted small mb-2">
+            Based on your last shared location {{ latest_ping.recorded_at|timesince }} ago.
+          </div>
+          {% else %}
+          <div class="text-muted small mb-2">
+            No location shared yet. These are registered places for {{ location_country|default:"your country" }}.
+            <a href="{% url 'ofw:portal_emergency_sos' %}">Share your location</a> for exact distances.
+          </div>
+          {% endif %}
+
+          <div class="row g-2">
+            {% for place in nearest_places %}
+            <div class="col-md-6">
+              <div class="card h-100">
+                <div class="card-body">
+                  <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                    <div class="fw-medium">{{ place.name }}</div>
+                    <span class="badge bg-secondary-lt text-secondary">{{ place.type }}</span>
+                  </div>
+                  {% if place.distance_text %}
+                  <div class="text-danger small fw-medium mt-1">
+                    {{ place.distance_text }}{% if place.direction %} · {{ place.direction }}{% endif %}{% if place.walking_minutes %} · {{ place.walking_minutes }} min walk{% endif %}
+                  </div>
+                  {% endif %}
+                  <div class="text-muted small mt-1">
+                    {% if place.address %}{{ place.address }}<br>{% endif %}
+                    {% if place.city %}{{ place.city }}, {% endif %}{{ place.country }}
+                  </div>
+                </div>
+                <div class="card-footer d-flex gap-2">
+                  {% if place.phone %}
+                  <a href="tel:{{ place.phone }}" class="btn btn-sm btn-success flex-grow-1">
+                    <i class="fas fa-phone me-1"></i>Call
+                  </a>
+                  {% endif %}
+                  {% if place.maps_url %}
+                  <a href="{{ place.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
+                    <i class="fas fa-map-marker-alt me-1"></i>Directions
+                  </a>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+              <div class="text-muted text-center py-4">
+                <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+                <p class="mb-1">No safe places are registered for your area yet.</p>
+                <p class="small mb-0">Ask your agency to add a police station, hospital or embassy near you.</p>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-phone-volume text-danger me-2"></i>Emergency numbers</h3>
+        </div>
+        <div class="card-body">
+          {% if police_hotline %}
+          <a href="tel:{{ police_hotline.dial_number }}" class="btn btn-danger w-100 mb-2">
+            <i class="fas fa-building-shield me-2"></i>Police · {{ police_hotline.phone }}
+          </a>
+          {% endif %}
+          {% for contact in local_hotlines|slice:":4" %}
+          <a href="tel:{{ contact.dial_number }}" class="btn btn-outline-danger w-100 mb-2 text-start">
+            <i class="fas fa-phone me-2"></i>{{ contact.name }} · {{ contact.phone }}
+          </a>
+          {% endfor %}
+          {% for contact in national_hotlines|slice:":4" %}
+          <a href="tel:{{ contact.dial_number }}" class="btn btn-outline-secondary w-100 mb-2 text-start">
+            <i class="fas fa-flag me-2"></i>{{ contact.name }} · {{ contact.phone }}
+          </a>
+          {% endfor %}
+          <a href="{% url 'ofw:portal_sos' %}" class="btn btn-ghost-secondary w-100 mt-1">
+            See all emergency contacts
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if family_contacts %}
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-people-roof text-success me-2"></i>My family contacts</h3>
+      <a href="{% url 'ofw:portal_contacts' %}" class="ms-auto small">Manage</a>
+    </div>
+    <div class="list-group list-group-flush">
+      {% for contact in family_contacts %}
+      <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <div class="fw-medium">{{ contact.name }}</div>
+          <div class="text-muted small">{{ contact.relationship|default:contact.get_contact_type_display }} · {{ contact.phone }}</div>
+        </div>
+        <a href="tel:{{ contact.dial_number }}" class="btn btn-sm btn-outline-success">
+          <i class="fas fa-phone me-1"></i>Call
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,12 +1,26 @@
 {% extends "theme/base.html" %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #myLocationMap {
+    height: 340px;
+    width: 100%;
+    border-radius: 0.5rem;
+    background: #e9ecef;
+  }
+  @media (max-width: 575.98px) {
+    #myLocationMap { height: 260px; }
+  }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none">
     <div class="row align-items-center g-2">
       <div class="col">
-        <div class="page-pretitle">OFW Portal</div>
-        <h2 class="page-title mb-0">Share Live Location</h2>
-        <div class="text-muted small mt-1">Let your agency see your current location anywhere, including the Philippines.</div>
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+        <div class="text-muted small mt-1">See the same live position your agency sees, plus the nearest safe places.</div>
       </div>
       <div class="col-auto">
         {% if sharing.is_enabled %}
@@ -24,11 +38,35 @@
   </div>
 
   <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-map-location-dot text-info me-2"></i>My live map</h3>
+      <div class="card-actions">
+        {% if latest_ping %}
+        <span class="text-muted small">Last update {{ latest_ping.recorded_at|timesince }} ago</span>
+        {% else %}
+        <span class="text-muted small">No location shared yet</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="myLocationMap"
+           {% if latest_ping %}data-own-lat="{{ latest_ping.latitude }}" data-own-lng="{{ latest_ping.longitude }}" data-own-time="{{ latest_ping.recorded_at|date:'M d, H:i' }}"{% endif %}></div>
+      <div class="d-flex flex-wrap gap-3 mt-2 text-muted small">
+        <span><span class="badge bg-danger">&nbsp;</span> My last shared location</span>
+        <span><span class="badge bg-primary">&nbsp;</span> Safe place</span>
+        {% if location_country %}<span>Showing places in {{ location_country }}.</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
     <div class="card-body">
       <h3 class="card-title"><i class="fas fa-earth-asia text-info me-2"></i>Worldwide GPS sharing</h3>
-      <p class="text-muted">Your device's GPS coordinates work across countries and cities. The agency map shows your latest shared position and when it was recorded. It does not depend on your saved deployment country or city.</p>
+      <p class="text-muted">Your device's GPS coordinates work across countries and cities. Your agency sees your latest shared position and when it was recorded. It does not depend on your saved deployment country or city.</p>
       {% if latest_ping %}
-      <p class="small mb-3">Last location sent: <strong>{{ latest_ping.recorded_at|date:"F j, Y, g:i A" }}</strong></p>
+      <p class="small mb-3">Last location sent: <strong>{{ latest_ping.recorded_at|date:"F j, Y, g:i A" }}</strong>
+        {% if latest_ping.is_emergency %}<span class="badge bg-danger-lt text-danger ms-1">Emergency ping</span>{% endif %}
+      </p>
       {% else %}
       <p class="small text-muted mb-3">No location has been shared from this account yet.</p>
       {% endif %}
@@ -49,14 +87,143 @@
       {% endif %}
     </div>
   </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-shield-alt text-primary me-2"></i>Safe places near my last location</h3>
+      <a href="{% url 'ofw:safe_locations' %}" class="ms-auto small">All safe places</a>
+    </div>
+    <div class="card-body">
+      {% if not latest_ping %}
+      <div class="alert alert-warning py-2 small mb-3">
+        Turn on live location to sort these places by exact distance and walking time.
+      </div>
+      {% endif %}
+      <div class="row g-2">
+        {% for place in nearest_places %}
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                <div class="fw-medium">{{ place.name }}</div>
+                <span class="badge bg-secondary-lt text-secondary">{{ place.type }}</span>
+              </div>
+              {% if place.distance_text %}
+              <div class="text-danger small fw-medium mt-1">
+                {{ place.distance_text }}{% if place.direction %} · {{ place.direction }}{% endif %}{% if place.walking_minutes %} · {{ place.walking_minutes }} min walk{% endif %}
+              </div>
+              {% endif %}
+              <div class="text-muted small mt-1">
+                {% if place.address %}{{ place.address }}<br>{% endif %}
+                {% if place.city %}{{ place.city }}, {% endif %}{{ place.country }}
+              </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+              {% if place.phone %}
+              <a href="tel:{{ place.phone }}" class="btn btn-sm btn-success flex-grow-1">
+                <i class="fas fa-phone me-1"></i>Call
+              </a>
+              {% endif %}
+              {% if place.maps_url %}
+              <a href="{{ place.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">
+                <i class="fas fa-map-marker-alt me-1"></i>Directions
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+          <div class="text-muted text-center py-4">
+            <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+            <p class="mb-1">No safe places registered for your area yet.</p>
+            <p class="small mb-0">Ask your agency to add a police station, hospital or embassy near you.</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 </div>
+
+{{ map_places|json_script:"live-map-places" }}
+{{ map_center|json_script:"live-map-center" }}
 {% endblock %}
 
 {% block extra_js %}
-{% if sharing.is_enabled %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
+  // --- Map: my last known position + safe places -------------------------
+  var mapEl = document.getElementById('myLocationMap');
+  function initMap() {
+    if (!mapEl || !window.L) { return; }
+    var center = JSON.parse(document.getElementById('live-map-center').textContent || '{}');
+    var places = JSON.parse(document.getElementById('live-map-places').textContent || '[]');
+    var map = L.map(mapEl, { scrollWheelZoom: false }).setView(
+      [center.lat || 12.8797, center.lng || 121.7740],
+      center.zoom || 5
+    );
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, attribution: 'Tiles &copy; Esri' }
+    ).addTo(map);
+
+    var bounds = [];
+    var ownLat = mapEl.getAttribute('data-own-lat');
+    var ownLng = mapEl.getAttribute('data-own-lng');
+    if (ownLat && ownLng) {
+      var own = L.circleMarker([parseFloat(ownLat), parseFloat(ownLng)], {
+        radius: 9,
+        color: '#d63939',
+        fillColor: '#d63939',
+        fillOpacity: 0.85,
+        weight: 3
+      }).addTo(map);
+      own.bindPopup('My last shared location<br><span class="text-muted">' +
+        (mapEl.getAttribute('data-own-time') || '') + '</span>');
+      bounds.push([parseFloat(ownLat), parseFloat(ownLng)]);
+    }
+
+    places.forEach(function (place) {
+      var marker = L.circleMarker([place.lat, place.lng], {
+        radius: 7,
+        color: '#206bc4',
+        fillColor: '#206bc4',
+        fillOpacity: 0.75,
+        weight: 2
+      }).addTo(map);
+      var parts = ['<strong>' + escapeHtml(place.name) + '</strong>'];
+      if (place.type) { parts.push('<span class="text-muted">' + escapeHtml(place.type) + '</span>'); }
+      if (place.address) { parts.push(escapeHtml(place.address)); }
+      if (place.phone) { parts.push('Phone: ' + escapeHtml(place.phone)); }
+      if (place.maps_url) {
+        parts.push('<a href="' + escapeHtml(place.maps_url) + '" target="_blank" rel="noopener">Directions</a>');
+      }
+      marker.bindPopup(parts.join('<br>'));
+      bounds.push([place.lat, place.lng]);
+    });
+
+    if (bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMap);
+  } else {
+    initMap();
+  }
+
+  // --- Opt-in live sharing ----------------------------------------------
   var statusEl = document.getElementById('sharingStatus');
+  if (!statusEl) { return; }
   var watchId = null;
   var refreshTimer = null;
   var posting = false;
@@ -141,5 +308,4 @@
   });
 })();
 </script>
-{% endif %}
 {% endblock %}

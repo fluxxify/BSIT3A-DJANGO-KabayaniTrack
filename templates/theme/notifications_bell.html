@@ -1,5 +1,5 @@
 <div class="dropdown dh-notif">
-  <a href="{% url 'ofw:notifications' %}"
+  <button type="button"
      class="btn btn-icon btn-outline-secondary position-relative dh-notif-toggle"
      data-bs-toggle="dropdown"
      data-bs-auto-close="outside"
@@ -11,7 +11,7 @@
       {% if unread_notifications_count > 99 %}99+{% else %}{{ unread_notifications_count }}{% endif %}
     </span>
     {% endif %}
-  </a>
+  </button>
 
   <div class="dropdown-menu dropdown-menu-end dh-notif-menu">
     <div class="dh-notif-menu-header">

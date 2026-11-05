@@ -47,7 +47,7 @@
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'portal_location_sharing' %}active{% endif %}" href="{% url 'ofw:portal_location_sharing' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-location-dot text-info"></i></span>
-            <span class="nav-link-title">Share Live Location</span>
+            <span class="nav-link-title">My Live Location</span>
           </a>
         </li>
         <li class="nav-item">
@@ -72,6 +72,34 @@
           <a class="nav-link {% if request.resolver_match.url_name == 'portal_contacts' %}active{% endif %}" href="{% url 'ofw:portal_contacts' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-address-book"></i></span>
             <span class="nav-link-title">Emergency Contacts</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <span class="dh-nav-section">Safety &amp; Support</span>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_emergency_guidance' or request.resolver_match.url_name == 'portal_emergency_sos' %}active{% endif %}" href="{% url 'ofw:portal_emergency_guidance' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-truck-medical text-danger"></i></span>
+            <span class="nav-link-title">Emergency Guidance</span>
+          </a>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_emergency_alerts' %}active{% endif %}" href="{% url 'ofw:portal_emergency_alerts' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-bell text-warning"></i></span>
+            <span class="nav-link-title">My Emergency Alerts</span>
+          </a>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_login_warnings' %}active{% endif %}" href="{% url 'ofw:portal_login_warnings' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-clock text-warning"></i></span>
+            <span class="nav-link-title">Login Warnings</span>
+          </a>
+        </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link {% if request.resolver_match.url_name == 'portal_police_reports' %}active{% endif %}" href="{% url 'ofw:portal_police_reports' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="nav-icon fas fa-building-shield text-danger"></i></span>
+            <span class="nav-link-title">Police Contact</span>
           </a>
         </li>
 

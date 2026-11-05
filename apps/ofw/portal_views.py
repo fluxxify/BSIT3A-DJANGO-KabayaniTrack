@@ -24,7 +24,12 @@ from .forms import (
     SafeLocationSuggestionForm,
 )
 from .hotlines import automatic_local_hotlines, philippine_national_hotlines
-from .locations import COUNTRY_CHOICES, canonical_country, cities_for_country
+from .locations import (
+    COUNTRY_CHOICES,
+    COUNTRY_GEO,
+    canonical_country,
+    cities_for_country,
+)
 from .models import (
     CheckIn,
     Concern,
@@ -37,6 +42,7 @@ from .models import (
     OFWLocationSharing,
     OFWProfile,
     PoliceReport,
+    SafeLocation,
     SafeLocationSuggestion,
     WelfareAssessment,
 )
@@ -48,6 +54,7 @@ from .views import (
     _severity_badge,
     _welfare_badge,
     location_tracker_ping,
+    nearest_safe_places,
 )
 
 
@@ -126,6 +133,153 @@ def _hotlines_for(location_country):
     return local, national
 
 
+def _latest_ping(profile):
+    if profile is None:
+        return None
+    return (
+        LocationTracker.objects
+        .filter(ofw=profile)
+        .order_by('-recorded_at')
+        .first()
+    )
+
+
+def _country_places(profile):
+    """Active safe places for the OFW's deployment country (all if unset)."""
+    country = canonical_country(profile.country) if profile and profile.country else ''
+    places = SafeLocation.objects.filter(is_active=True)
+    if country:
+        country_places = places.filter(country__iexact=country)
+        if country_places.exists():
+            places = country_places
+    return places.order_by('location_type', 'name')
+
+
+def _place_row(place):
+    """A template-friendly safe-place row (with coordinates when available)."""
+    has_coords = place.has_coords
+    return {
+        'id': place.pk,
+        'name': place.name,
+        'type': place.get_location_type_display(),
+        'type_key': place.location_type,
+        'city': place.city,
+        'country': place.country,
+        'address': place.address,
+        'phone': place.phone,
+        'tel': ''.join(
+            char for char in (place.phone or '') if char.isdigit() or char == '+'
+        ),
+        'latitude': float(place.latitude) if has_coords else None,
+        'longitude': float(place.longitude) if has_coords else None,
+        'distance_km': None,
+        'distance_text': '',
+        'walking_minutes': None,
+        'bearing': None,
+        'direction': '',
+        'maps_url': (
+            'https://www.google.com/maps/dir/?api=1&destination='
+            f'{place.latitude},{place.longitude}'
+            if has_coords else ''
+        ),
+    }
+
+
+def _safety_places(profile, latest_ping=None, limit=6):
+    """Nearest safe places from the last ping, or the country's saved places."""
+    latest_ping = latest_ping if latest_ping is not None else _latest_ping(profile)
+    if latest_ping is not None:
+        rows = nearest_safe_places(
+            latest_ping.latitude,
+            latest_ping.longitude,
+            limit=limit,
+        )
+        if rows:
+            return rows
+    return [_place_row(place) for place in _country_places(profile)[:limit]]
+
+
+def _map_places(profile, latest_ping=None):
+    """Safe-place markers for the OFW's own map, nearest first when known."""
+    latest_ping = latest_ping if latest_ping is not None else _latest_ping(profile)
+    places = list(_country_places(profile))
+    if latest_ping is not None:
+        ordered = nearest_safe_places(
+            latest_ping.latitude,
+            latest_ping.longitude,
+            limit=None,
+            locations=places,
+        )
+        by_id = {place.pk: place for place in places}
+        places = [by_id[row['id']] for row in ordered if row['id'] in by_id]
+
+    markers = []
+    for place in places:
+        if not place.has_coords:
+            continue
+        markers.append({
+            'name': place.name,
+            'type': place.get_location_type_display(),
+            'type_key': place.location_type,
+            'lat': float(place.latitude),
+            'lng': float(place.longitude),
+            'phone': place.phone,
+            'address': place.address,
+            'maps_url': (
+                'https://www.google.com/maps/dir/?api=1&destination='
+                f'{place.latitude},{place.longitude}'
+            ),
+        })
+    return markers[:80]
+
+
+def _map_center(profile, latest_ping=None):
+    """Best map centre: the last shared point, then the country, then PH."""
+    latest_ping = latest_ping if latest_ping is not None else _latest_ping(profile)
+    if latest_ping is not None:
+        return {
+            'lat': float(latest_ping.latitude),
+            'lng': float(latest_ping.longitude),
+            'zoom': 14,
+        }
+    country = canonical_country(profile.country) if profile and profile.country else ''
+    if country in COUNTRY_GEO:
+        _iso2, lat, lng = COUNTRY_GEO[country]
+        return {'lat': float(lat), 'lng': float(lng), 'zoom': 5}
+    return {'lat': 12.8797, 'lng': 121.7740, 'zoom': 5}
+
+
+def _police_hotline(local_hotlines, national_hotlines):
+    """Pick the police row from the local or national hotline lists."""
+    contacts = list(local_hotlines) + list(national_hotlines)
+    for contact in contacts:
+        if getattr(contact, 'contact_type', '') == 'police':
+            return contact
+    for contact in contacts:
+        if 'police' in (getattr(contact, 'name', '') or '').lower():
+            return contact
+    return None
+
+
+def _nearest_police_station(profile, latest_ping=None):
+    """Closest registered police station, with a country fallback."""
+    latest_ping = latest_ping if latest_ping is not None else _latest_ping(profile)
+    places = [
+        place for place in _country_places(profile)
+        if place.location_type == SafeLocation.LocationType.POLICE_STATION
+    ]
+    if latest_ping is not None:
+        rows = nearest_safe_places(
+            latest_ping.latitude,
+            latest_ping.longitude,
+            limit=1,
+            locations=places,
+        )
+        if rows:
+            return rows[0]
+    return _place_row(places[0]) if places else None
+
+
 @login_required(login_url='login')
 def portal_home(request):
     guard = _guard(request)
@@ -148,6 +302,35 @@ def portal_home(request):
     # Police report status: any open/submitted police report for this OFW?
     police_reports = PoliceReport.objects.filter(ofw=profile).order_by('-reported_at') if profile else []
     latest_police_report = police_reports.first() if police_reports else None
+
+    # Connected safety modules: the OFW sees the same alert, location and
+    # police information that management sees, but limited to their own case.
+    latest_ping = _latest_ping(profile)
+    active_alerts = (
+        EmergencyAlert.objects.filter(ofw=profile)
+        .exclude(status=EmergencyAlert.Status.RESOLVED)
+        .order_by('-created_at')
+        if profile else EmergencyAlert.objects.none()
+    )
+    latest_alert = active_alerts.first()
+    sharing_enabled = bool(
+        profile and OFWLocationSharing.objects.filter(
+            ofw=profile, is_enabled=True
+        ).exists()
+    )
+    nearest_place = None
+    if profile is not None:
+        places = _safety_places(profile, latest_ping=latest_ping, limit=1)
+        nearest_place = places[0] if places else None
+    nearest_police_station = _nearest_police_station(
+        profile, latest_ping=latest_ping
+    )
+    warning_notifications = Notification.objects.filter(
+        recipient=request.user,
+        level__in=[Notification.Level.WARNING, Notification.Level.DANGER],
+        is_read=False,
+    )
+    last_checkin = my_checkins.order_by('-checkin_date').first()
 
     checkin_rows = [
         {'obj': c, 'badge': _condition_badge.get(c.condition, 'bg-secondary-lt text-secondary')}
@@ -182,6 +365,14 @@ def portal_home(request):
         'last_login_at': activity.last_login_at,
         'has_ever_logged_in': activity.last_login_at is not None,
         'latest_police_report': latest_police_report,
+        'latest_ping': latest_ping,
+        'latest_alert': latest_alert,
+        'active_alert_count': active_alerts.count(),
+        'sharing_enabled': sharing_enabled,
+        'nearest_place': nearest_place,
+        'nearest_police_station': nearest_police_station,
+        'warning_count': warning_notifications.count(),
+        'last_checkin': last_checkin,
     }
     return render(request, 'ofw/portal/home.html', context)
 
@@ -213,12 +404,21 @@ def portal_location_sharing(request):
             messages.info(request, 'Live location sharing is off.')
         return redirect('ofw:portal_location_sharing')
 
-    latest_ping = LocationTracker.objects.filter(ofw=profile).order_by('-recorded_at').first()
+    latest_ping = _latest_ping(profile)
+    nearest_places = _safety_places(profile, latest_ping=latest_ping, limit=6)
+    map_places = _map_places(profile, latest_ping=latest_ping)
+    map_center = _map_center(profile, latest_ping=latest_ping)
+    country = canonical_country(profile.country) if profile.country else ''
     return render(request, 'ofw/portal/location_sharing.html', {
         'profile': profile,
         'sharing': sharing,
         'latest_ping': latest_ping,
-        'page_title': 'Live Location Sharing',
+        'nearest_places': nearest_places,
+        'map_places': map_places,
+        'map_center': map_center,
+        'location_country': country,
+        'page_title': 'My Live Location',
+        'page_pretitle': 'Live OFW Map',
     })
 
 
@@ -239,6 +439,128 @@ def portal_location_sharing_ping(request):
     request.POST = request.POST.copy()
     request.POST['is_emergency'] = '0'
     return location_tracker_ping(request)
+
+
+@login_required(login_url='login')
+def portal_emergency_guidance(request):
+    """OFW counterpart of the management Emergency Guidance console.
+
+    Shows the OFW's own active alerts, the nearest registered safe place and
+    the emergency numbers for their deployment country, then links to the live
+    SOS guide that streams location updates to management.
+    """
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Complete your profile so guidance can use your country.')
+        return redirect('ofw:portal_profile')
+
+    country = canonical_country(profile.country) if profile.country else ''
+    city = profile.city_abroad.strip() if profile.city_abroad else ''
+    latest_ping = _latest_ping(profile)
+    nearest_places = _safety_places(profile, latest_ping=latest_ping, limit=4)
+    alerts = EmergencyAlert.objects.filter(ofw=profile).order_by('-created_at')
+    active_alerts = alerts.exclude(status=EmergencyAlert.Status.RESOLVED)
+    open_alert = active_alerts.first()
+    local_hotlines, national_hotlines = _hotlines_for(country)
+    police_hotline = _police_hotline(local_hotlines, national_hotlines)
+    if police_hotline is not None:
+        # The police row gets its own prominent button, so drop the duplicate
+        # from the general list to avoid showing the same number twice.
+        local_hotlines = [
+            contact for contact in local_hotlines
+            if contact.dial_number != police_hotline.dial_number
+        ]
+        national_hotlines = [
+            contact for contact in national_hotlines
+            if contact.dial_number != police_hotline.dial_number
+        ]
+    family_contacts = (
+        EmergencyContact.objects
+        .filter(user=request.user)
+        .exclude(contact_type__in=EmergencyContact.PUBLIC_TYPES)
+        .order_by('contact_type', 'name')[:4]
+    )
+
+    return render(request, 'ofw/portal/emergency_guidance.html', {
+        'profile': profile,
+        'location_country': country,
+        'location_city': city,
+        'latest_ping': latest_ping,
+        'nearest_places': nearest_places,
+        'alerts': alerts[:10],
+        'active_alert_count': active_alerts.count(),
+        'open_alert': open_alert,
+        'local_hotlines': local_hotlines,
+        'national_hotlines': national_hotlines,
+        'police_hotline': police_hotline,
+        'family_contacts': family_contacts,
+        'agency_phone': (
+            profile.agency_org.phone
+            if profile.agency_org_id and profile.agency_org.phone else ''
+        ),
+        'page_title': 'Emergency Guidance',
+        'page_pretitle': 'OFW Portal',
+    })
+
+
+@login_required(login_url='login')
+def portal_login_warnings(request):
+    """OFW counterpart of the management Login Warnings console.
+
+    The OFW sees the same activity clock that management uses: last successful
+    login, days inactive, the 3-day warning stage and the 6-day follow-up
+    stage, plus any warning messages received from their agency.
+    """
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    activity = refresh_activity_for_user(request.user)
+    days_inactive = activity.days_inactive
+    is_inactive = days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
+    if days_inactive > 5:
+        warning_stage = 'followup'
+        warning_label = 'Follow-up overdue'
+    elif is_inactive:
+        warning_stage = 'warning'
+        warning_label = 'Welfare check needed'
+    else:
+        warning_stage = 'active'
+        warning_label = 'Account active'
+
+    warning_notifications = Notification.objects.filter(
+        recipient=request.user,
+        level__in=[Notification.Level.WARNING, Notification.Level.DANGER],
+    ).order_by('-created_at')[:20]
+    last_checkin = (
+        CheckIn.objects.filter(ofw__user=request.user)
+        .order_by('-checkin_date')
+        .first()
+    )
+    agency_phone = (
+        profile.agency_org.phone
+        if profile and profile.agency_org_id and profile.agency_org.phone else ''
+    )
+
+    return render(request, 'ofw/portal/login_warnings.html', {
+        'profile': profile,
+        'activity': activity,
+        'days_inactive': days_inactive,
+        'is_inactive': is_inactive,
+        'warning_stage': warning_stage,
+        'warning_label': warning_label,
+        'warning_notifications': warning_notifications,
+        'last_checkin': last_checkin,
+        'agency_phone': agency_phone,
+        'threshold_days': OFWActivity.INACTIVE_THRESHOLD_DAYS,
+        'page_title': 'Login Warnings',
+        'page_pretitle': 'Account Activity',
+    })
 
 
 @login_required(login_url='login')
@@ -707,17 +1029,23 @@ def portal_emergency_alerts(request):
         return redirect('ofw:portal_profile')
 
     alerts = EmergencyAlert.objects.filter(ofw=profile).order_by('-created_at')
+    active_alerts = alerts.exclude(status=EmergencyAlert.Status.RESOLVED)
+    latest_ping = _latest_ping(profile)
+    nearest_places = _safety_places(profile, latest_ping=latest_ping, limit=3)
 
     return render(request, 'ofw/portal/emergency_alerts.html', {
         'profile': profile,
         'alerts': alerts,
+        'active_alert_count': active_alerts.count(),
+        'open_alert': active_alerts.first(),
+        'nearest_places': nearest_places,
         'page_title': 'My Emergency Alerts',
     })
 
 
 @login_required(login_url='login')
 def portal_police_reports(request):
-    """OFW views police reports filed about them."""
+    """OFW views police reports and the local police contact for their case."""
     guard = _guard(request)
     if guard:
         return guard
@@ -728,9 +1056,25 @@ def portal_police_reports(request):
         return redirect('ofw:portal_profile')
 
     reports = PoliceReport.objects.filter(ofw=profile).order_by('-reported_at')
+    latest_ping = _latest_ping(profile)
+    country = canonical_country(profile.country) if profile.country else ''
+    local_hotlines, national_hotlines = _hotlines_for(country)
+    police_hotline = _police_hotline(local_hotlines, national_hotlines)
+    nearest_station = _nearest_police_station(profile, latest_ping=latest_ping)
+    agency_phone = (
+        profile.agency_org.phone
+        if profile.agency_org_id and profile.agency_org.phone else ''
+    )
 
     return render(request, 'ofw/portal/police_reports.html', {
         'profile': profile,
         'reports': reports,
-        'page_title': 'My Police Reports',
+        'latest_report': reports.first(),
+        'latest_ping': latest_ping,
+        'police_hotline': police_hotline,
+        'nearest_station': nearest_station,
+        'agency_phone': agency_phone,
+        'location_country': country,
+        'page_title': 'Police Contact',
+        'page_pretitle': 'OFW Portal',
     })

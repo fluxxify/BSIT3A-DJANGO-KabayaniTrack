@@ -19,6 +19,10 @@ def _shows_link_instead_of_email():
     instead. Any SMTP-based backend sends a real email.
     """
     backend = settings.EMAIL_BACKEND or ''
+    # Never expose a working reset link on a production page.  The link is a
+    # local-development convenience only; production must deliver it by email.
+    if not settings.DEBUG:
+        return False
     return backend.endswith(
         ('console.EmailBackend', 'filebased.EmailBackend')
     )

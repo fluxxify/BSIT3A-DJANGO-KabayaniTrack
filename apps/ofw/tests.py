@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -20,11 +21,14 @@ from apps.ofw.models import (
     CheckIn,
     Concern,
     ConcernProof,
+    EmergencyAlert,
     EmergencyContact,
     LocationTracker,
     MonitoringReport,
     Notification,
+    OFWActivity,
     OFWProfile,
+    PoliceReport,
     SafeLocation,
 )
 from apps.ofw.roles import mark_as_ofw
@@ -1403,7 +1407,7 @@ class SafeLocationNearbyTests(TestCase):
     def test_ofw_sees_near_me_page_with_all_active_locations(self):
         response = self.client.get(reverse('ofw:safe_locations'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Safe Places Near Me')
+        self.assertContains(response, 'Safe Place Guide')
         self.assertContains(response, 'id="useMyLocationBtn"')
         self.assertContains(response, 'class="col-sm-6 col-lg-4 loc-card"')
         self.assertContains(response, 'Philippine General Hospital')
@@ -1682,3 +1686,141 @@ class LocationRetentionCommandTests(TestCase):
 
         call_command('prune_location_history', execute=True, stdout=StringIO())
         self.assertFalse(LocationTracker.objects.filter(pk=ping.pk).exists())
+
+class OFWConnectedSafetyPagesTests(TestCase):
+    """OFW-side pages connected to the agency safety consoles."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='safety_ofw', password='Passw0rd!23'
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user,
+            first_name='Mila',
+            last_name='Santos',
+            country='United Arab Emirates',
+            city_abroad='Dubai',
+        )
+        self.staff = User.objects.create_user(
+            username='safety_staff', password='Passw0rd!23', is_staff=True
+        )
+        self.police = SafeLocation.objects.create(
+            name='Dubai Police Station',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='United Arab Emirates',
+            city='Dubai',
+            address='Al Barsha',
+            phone='+971 4 999 9999',
+            latitude='25.204800',
+            longitude='55.270800',
+        )
+        self.hospital = SafeLocation.objects.create(
+            name='Dubai Central Hospital',
+            location_type=SafeLocation.LocationType.HOSPITAL,
+            country='United Arab Emirates',
+            city='Dubai',
+            phone='+971 4 888 8888',
+            latitude='25.210000',
+            longitude='55.280000',
+        )
+        self.ping = LocationTracker.objects.create(
+            ofw=self.profile,
+            latitude='25.204800',
+            longitude='55.270800',
+        )
+        self.alert = EmergencyAlert.objects.create(
+            ofw=self.profile,
+            title='Welfare check needed',
+            message='No login for four days.',
+            level=EmergencyAlert.Level.WARNING,
+        )
+        self.report = PoliceReport.objects.create(
+            ofw=self.profile,
+            title='Missing OFW follow-up',
+            description='Agency cannot reach the OFW.',
+            police_station='Dubai Police Station',
+            police_contact='+971 4 999 9999',
+            status=PoliceReport.Status.SUBMITTED,
+            reported_by=self.staff,
+        )
+        self.client.force_login(self.user)
+
+    def test_dashboard_links_to_connected_safety_features(self):
+        response = self.client.get(reverse('ofw:portal'))
+        self.assertEqual(response.status_code, 200)
+        for label in [
+            'Emergency Guidance', 'My Live Location', 'Login Warnings',
+            'Police Contact',
+        ]:
+            with self.subTest(label=label):
+                self.assertContains(response, label)
+        for name in [
+            'portal_emergency_guidance', 'portal_location_sharing',
+            'portal_login_warnings', 'portal_police_reports',
+        ]:
+            with self.subTest(name=name):
+                self.assertContains(response, reverse(f'ofw:{name}'))
+
+    def test_emergency_guidance_shows_alert_and_nearest_places(self):
+        response = self.client.get(reverse('ofw:portal_emergency_guidance'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'ofw/portal/emergency_guidance.html')
+        self.assertContains(response, 'Emergency Guidance')
+        self.assertContains(response, 'Welfare check needed')
+        self.assertContains(response, 'Dubai Police Station')
+        self.assertContains(response, 'Dubai Central Hospital')
+
+    def test_live_location_page_has_map_and_nearest_places(self):
+        response = self.client.get(reverse('ofw:portal_location_sharing'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'ofw/portal/location_sharing.html')
+        self.assertContains(response, 'id="myLocationMap"')
+        self.assertContains(response, 'id="live-map-places"')
+        self.assertContains(response, 'Dubai Police Station')
+        self.assertContains(response, 'data-own-lat="25.204800"')
+
+    def test_login_warnings_page_shows_inactive_days(self):
+        old_login = timezone.now() - timedelta(days=4)
+        self.user.last_login = old_login
+        self.user.save(update_fields=['last_login'])
+        OFWActivity.objects.update_or_create(
+            user=self.user,
+            defaults={'last_login_at': old_login},
+        )
+        response = self.client.get(reverse('ofw:portal_login_warnings'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'ofw/portal/login_warnings.html')
+        self.assertContains(response, 'No successful login for 4 days')
+        self.assertContains(response, 'Welfare check needed')
+
+    def test_login_warnings_page_lists_warning_message(self):
+        Notification.objects.create(
+            recipient=self.user,
+            title='Your agency is checking on you',
+            message='Please open Emergency SOS and share your location.',
+            level=Notification.Level.WARNING,
+        )
+        response = self.client.get(reverse('ofw:portal_login_warnings'))
+        self.assertContains(response, 'Your agency is checking on you')
+
+    def test_police_contact_page_shows_station_hotline_and_report(self):
+        response = self.client.get(reverse('ofw:portal_police_reports'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'ofw/portal/police_reports.html')
+        self.assertContains(response, 'Police Contact')
+        self.assertContains(response, 'Dubai Police Station')
+        self.assertContains(response, 'Missing OFW follow-up')
+        self.assertContains(response, 'tel:999')
+
+    def test_connected_safety_pages_are_ofw_only(self):
+        self.client.force_login(self.staff)
+        for name in [
+            'portal_emergency_guidance',
+            'portal_location_sharing',
+            'portal_login_warnings',
+            'portal_police_reports',
+        ]:
+            with self.subTest(name=name):
+                response = self.client.get(reverse(f'ofw:{name}'))
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.url, reverse('dashboard'))

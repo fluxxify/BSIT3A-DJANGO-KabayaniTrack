@@ -448,9 +448,22 @@ class PasswordResetTests(TestCase):
         self.assertNotContains(response, '/reset/')
 
     @override_settings(
-        EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend'
+        EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend',
+        DEBUG=False,
     )
-    def test_console_backend_shows_link_on_page(self):
+    def test_console_backend_hides_link_in_production(self):
+        """A reset link must never be rendered on a public page."""
+        response = self._post_email()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, '/reset/')
+        self.assertContains(response, 'Check your email')
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend',
+        DEBUG=True,
+    )
+    def test_console_backend_shows_link_in_local_development(self):
         response = self._post_email()
 
         self.assertEqual(response.status_code, 200)
