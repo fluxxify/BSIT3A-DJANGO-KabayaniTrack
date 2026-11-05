@@ -125,6 +125,7 @@ git pull
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python manage.py migrate --noinput
+python manage.py seed_safe_locations
 python manage.py collectstatic --noinput
 ```
 

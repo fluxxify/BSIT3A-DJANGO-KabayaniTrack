@@ -9,6 +9,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from apps.ofw.forms import CheckInForm
 from apps.ofw.hotlines import (
@@ -2226,3 +2228,21 @@ class CaseLifecycleTests(TestCase):
                 title__icontains='responded',
             ).exists()
         )
+
+
+class CheckDeployTests(TestCase):
+    """The deploy health-check command verifies migrations and safe locations."""
+
+    def setUp(self):
+        from io import StringIO
+        self.stdout = StringIO()
+        call_command('seed_safe_locations', verbosity=0)
+
+    def test_check_deploy_passes_when_healthy(self):
+        # Should not raise: migrations applied and safe locations seeded.
+        call_command('check_deploy', stdout=self.stdout)
+
+    def test_check_deploy_fails_without_safe_locations(self):
+        SafeLocation.objects.all().delete()
+        with self.assertRaises(CommandError):
+            call_command('check_deploy', stdout=self.stdout)
