@@ -1974,3 +1974,140 @@ class SosWorkflowTests(TestCase):
 
         self.assertContains(response, 'Call 999')
         self.assertNotContains(response, 'Call 911')
+
+
+class OfwInactivityCommandTests(TestCase):
+    """check_ofw_inactivity sends 3-day warnings and 6-day follow-ups."""
+
+    def setUp(self):
+        from io import StringIO
+        self.stdout = StringIO()
+
+        self.staff = User.objects.create_user(
+            username='inact_staff', password='Passw0rd!23', is_staff=True
+        )
+        self.active_ofw = User.objects.create_user(
+            username='inact_active_ofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.active_ofw)
+        OFWProfile.objects.create(
+            user=self.active_ofw, first_name='Active', last_name='User',
+            country='Philippines',
+        )
+        OFWActivity.objects.update_or_create(
+            user=self.active_ofw,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=1),
+                'days_inactive': 1,
+                'is_account_active': True,
+                'warning_sent_at': None,
+                'followup_sent_at': None,
+            },
+        )
+
+        self.inactive3 = User.objects.create_user(
+            username='inact_ofw_3d', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.inactive3)
+        self.profile3 = OFWProfile.objects.create(
+            user=self.inactive3, first_name='Three', last_name='Days',
+            country='Qatar',
+        )
+        self.activity3 = OFWActivity.objects.update_or_create(
+            user=self.inactive3,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=4),
+                'days_inactive': 4,
+                'is_account_active': False,
+                'warning_sent_at': None,
+                'followup_sent_at': None,
+            },
+        )[0]
+
+        self.inactive6 = User.objects.create_user(
+            username='inact_ofw_6d', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.inactive6)
+        self.profile6 = OFWProfile.objects.create(
+            user=self.inactive6, first_name='Six', last_name='Days',
+            country='Qatar',
+        )
+        self.activity6 = OFWActivity.objects.update_or_create(
+            user=self.inactive6,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=7),
+                'days_inactive': 7,
+                'is_account_active': False,
+                'warning_sent_at': None,
+                'followup_sent_at': None,
+            },
+        )[0]
+
+    def _run(self):
+        from django.core.management import call_command
+        call_command('check_ofw_inactivity', stdout=self.stdout)
+
+    def test_day_three_warning_sent_to_managers(self):
+        self._run()
+        self.activity3.refresh_from_db()
+        self.assertNotEqual(self.activity3.warning_sent_at, None)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                level=Notification.Level.WARNING,
+                title__icontains='login warning',
+            ).exists()
+        )
+
+    def test_day_six_follow_up_sent_to_managers(self):
+        self._run()
+        self.activity6.refresh_from_db()
+        self.assertNotEqual(self.activity6.followup_sent_at, None)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                level=Notification.Level.DANGER,
+                title__icontains='Follow-up overdue',
+            ).exists()
+        )
+
+    def test_active_ofw_not_notified(self):
+        self._run()
+        self.assertFalse(
+            Notification.objects.filter(
+                recipient=self.staff,
+                recipient__username='inact_active_ofw',
+            ).exists()
+        )
+        self.assertEqual(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='warning',
+            ).count(), 1
+        )
+
+    def test_command_is_idempotent(self):
+        self._run()
+        first_count = Notification.objects.filter(
+            recipient=self.staff, title__icontains='login warning'
+        ).count()
+        self._run()
+        second_count = Notification.objects.filter(
+            recipient=self.staff, title__icontains='login warning'
+        ).count()
+        self.assertEqual(first_count, second_count)
+
+    def test_output_summaries_inactive_count(self):
+        self._run()
+        out = self.stdout.getvalue()
+        self.assertIn('inactive', out.lower())
+
+    def test_inactive_ofw_receives_check_in_reminder(self):
+        self._run()
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.inactive3,
+                level=Notification.Level.WARNING,
+                title__icontains='Check-in reminder',
+            ).exists()
+        )

@@ -5,7 +5,7 @@ from django.db import transaction
 from django.urls import reverse
 
 from .models import OFWActivity, Notification
-from .notifications import notify_inactivity_managers
+from .notifications import notify, notify_inactivity_managers
 
 
 def refresh_activity_status(activity, now=None):
@@ -113,6 +113,18 @@ def _send_due_inactivity_notification(activity, profile, now):
         if created:
             activity.warning_sent_at = now
             activity.save(update_fields=['warning_sent_at', 'updated_at'])
+            notify(
+                activity.user,
+                'Check-in reminder from your agency',
+                (
+                    f'Hi {profile.first_name or activity.user.first_name}, '
+                    f'your agency has not seen you log in for {days} days. '
+                    f'Log a check-in so they know you are safe, or open '
+                    f'Emergency SOS if you need help.'
+                ),
+                url=reverse('ofw:portal_login_warnings'),
+                level=Notification.Level.WARNING,
+            )
 
 
 def refresh_activity_for_user(user, now=None):
