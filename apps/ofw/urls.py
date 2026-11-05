@@ -70,6 +70,7 @@ urlpatterns = [
     path('concerns/ajax/delete/<int:pk>/', views.concern_delete_ajax, name='concern_delete_ajax'),
     path('concerns/ajax/delete-all/', views.concern_delete_all_ajax, name='concern_delete_all_ajax'),
     path('concerns/proofs/<int:pk>/delete/', views.concern_proof_delete, name='concern_proof_delete'),
+    path('concerns/<int:pk>/status/', views.concern_status_ajax, name='concern_status_ajax'),
     path('concerns/ajax/export/', views.concern_export_ajax, name='concern_export'),
 
     # Emergency contacts
@@ -109,6 +110,7 @@ urlpatterns = [
     # Police reports
     path('police-reports/', views.police_reports_page, name='police_reports'),
     path('police-reports/<int:pk>/submit/', views.police_report_submit, name='police_report_submit'),
+    path('police-reports/<int:pk>/status/', views.police_report_status_ajax, name='police_report_status_ajax'),
 
     # Safe locations
     path('safe-locations/', views.safe_locations_page, name='safe_locations'),

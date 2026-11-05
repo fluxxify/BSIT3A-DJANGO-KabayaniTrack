@@ -2111,3 +2111,118 @@ class OfwInactivityCommandTests(TestCase):
                 title__icontains='Check-in reminder',
             ).exists()
         )
+
+
+class ErrorPageTests(TestCase):
+    """Production-ready error pages render with the right status and content."""
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.factory = RequestFactory()
+        from apps.core.views import handler403, handler404, handler500
+        self.handler403 = handler403
+        self.handler404 = handler404
+        self.handler500 = handler500
+
+    def test_404_returns_not_found_page(self):
+        request = self.factory.get('/nonexistent-page-xyz/')
+        response = self.handler404(request)
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, '404', status_code=404)
+        self.assertContains(response, '/nonexistent-page-xyz/', status_code=404)
+
+    def test_403_returns_forbidden_page(self):
+        request = self.factory.get('/ofw/admin-only/')
+        response = self.handler403(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, '403', status_code=403)
+        self.assertContains(response, 'Forbidden', status_code=403)
+
+    def test_500_returns_server_error_page(self):
+        request = self.factory.get('/ofw/server-error/')
+        response = self.handler500(request)
+        self.assertEqual(response.status_code, 500)
+        self.assertContains(response, '500', status_code=500)
+        self.assertContains(response, 'Server error', status_code=500)
+
+
+class CaseLifecycleTests(TestCase):
+    """Management can transition concern and police-report status."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='lifecycle_staff', password='Passw0rd!23', is_staff=True
+        )
+        self.ofw_user = User.objects.create_user(
+            username='lifecycle_ofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw_user)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Case', last_name='OFW',
+            country='Philippines',
+        )
+        self.concern = Concern.objects.create(
+            ofw=self.profile, user=self.ofw_user,
+            title='Unpaid salary', category=Concern.Category.SALARY,
+            severity=Concern.Severity.HIGH, status=Concern.Status.OPEN,
+            reported_date=timezone.localdate(),
+            description='Employer has not paid for two months.',
+        )
+        self.report = PoliceReport.objects.create(
+            ofw=self.profile, title='Missing OFW follow-up',
+            description='No response after warning.',
+            status=PoliceReport.Status.DRAFT,
+            reported_by=self.staff,
+        )
+        self.client.force_login(self.staff)
+
+    def test_staff_can_transition_concern_status(self):
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': 'resolved'},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertEqual(data['status_display'], 'Resolved')
+        self.concern.refresh_from_db()
+        self.assertEqual(self.concern.status, Concern.Status.RESOLVED)
+        self.assertIsNotNone(self.concern.resolved_date)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.ofw_user,
+                title__icontains='resolved',
+            ).exists()
+        )
+
+    def test_ofw_cannot_transition_concern_status(self):
+        self.client.force_login(self.ofw_user)
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': 'closed'},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_invalid_status_rejected(self):
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': 'not_a_status'},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_staff_can_transition_police_report_status(self):
+        response = self.client.post(
+            reverse('ofw:police_report_status_ajax', args=[self.report.pk]),
+            {'status': 'responded'},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status_display'], 'Police Responded')
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, PoliceReport.Status.RESPONDED)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.ofw_user,
+                title__icontains='responded',
+            ).exists()
+        )

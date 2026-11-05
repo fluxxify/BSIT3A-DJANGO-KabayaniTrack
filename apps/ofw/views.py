@@ -478,6 +478,118 @@ def concern_proof_delete(request, pk):
     return JsonResponse({'status': 'deleted'})
 
 
+@login_required(login_url='login')
+@require_POST
+def concern_status_ajax(request, pk):
+    """Transition a concern's status (management only)."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return JsonResponse({'error': 'Management accounts only.'}, status=403)
+    concern = get_object_or_404(crud._scoped(request.user, Concern), pk=pk)
+    new_status = (request.POST.get('status') or '').strip()
+    valid = dict(Concern.Status.choices)
+    if new_status not in valid:
+        return JsonResponse({'error': 'Invalid status.'}, status=400)
+    if concern.status == new_status:
+        return JsonResponse({
+            'status': 'ok', 'status_display': concern.get_status_display(),
+        })
+    old_status = concern.status
+    concern.status = new_status
+    if new_status == Concern.Status.RESOLVED and not concern.resolved_date:
+        from django.utils import timezone
+        concern.resolved_date = timezone.localdate()
+    concern.save(update_fields=['status', 'resolved_date', 'updated_at'])
+
+    from .notifications import notify
+    if new_status == Concern.Status.RESOLVED:
+        notify(
+            concern.user,
+            'Your concern has been resolved',
+            f'Your concern "{concern.title}" has been marked as resolved by '
+            f'your agency.',
+            url=reverse('ofw:portal_concerns'),
+            level=Notification.Level.SUCCESS,
+        )
+        notify_managers(
+            f'Concern resolved: {concern.title}',
+            f'{request.user.get_full_name() or request.user.username} marked '
+            f'{concern.title} as resolved.',
+            url=reverse('ofw:concern_list'),
+            level=Notification.Level.SUCCESS,
+            agency=concern.ofw.agency_org,
+            exclude_user=request.user,
+        )
+    messages.success(
+        request,
+        f'Concern "{concern.title}" is now {concern.get_status_display()}.',
+    )
+    return JsonResponse({
+        'status': 'ok',
+        'status_display': concern.get_status_display(),
+        'old_status': old_status,
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def police_report_status_ajax(request, pk):
+    """Transition a police report's status (management only)."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return JsonResponse({'error': 'Management accounts only.'}, status=403)
+    report = get_object_or_404(
+        crud._scoped(request.user, PoliceReport), pk=pk
+    )
+    new_status = (request.POST.get('status') or '').strip()
+    valid = dict(PoliceReport.Status.choices)
+    if new_status not in valid:
+        return JsonResponse({'error': 'Invalid status.'}, status=400)
+    if report.status == new_status:
+        return JsonResponse({
+            'status': 'ok', 'status_display': report.get_status_display(),
+        })
+    old_status = report.status
+    report.status = new_status
+    report.save(update_fields=['status', 'updated_at'])
+
+    from .notifications import notify, notify_managers
+    if new_status == PoliceReport.Status.RESPONDED:
+        notify(
+            report.ofw.user,
+            'Police have responded to your report',
+            f'The police station recorded for your report (“{report.title}”) '
+            f'has responded. Coordinate with your agency for next steps.',
+            url=reverse('ofw:portal_police_reports'),
+            level=Notification.Level.INFO,
+        )
+    elif new_status == PoliceReport.Status.CLOSED:
+        notify(
+            report.ofw.user,
+            'Your police report has been closed',
+            f'Your police report (“{report.title}”) has been closed by your '
+            f'agency. Contact them if you need further help.',
+            url=reverse('ofw:portal_police_reports'),
+            level=Notification.Level.INFO,
+        )
+    notify_managers(
+        f'Police report status changed: {report.title}',
+        f'{request.user.get_full_name() or request.user.username} changed the '
+        f'status of {report.title} to {report.get_status_display()}.',
+        url=reverse('ofw:police_reports'),
+        level=Notification.Level.INFO,
+        agency=report.ofw.agency_org,
+        exclude_user=request.user,
+    )
+    messages.success(
+        request,
+        f'Police report “{report.title}” is now {report.get_status_display()}.',
+    )
+    return JsonResponse({
+        'status': 'ok',
+        'status_display': report.get_status_display(),
+        'old_status': old_status,
+    })
+
+
 def assessment_list_page(request):
     return _assessments['page'](request)
 

@@ -12,7 +12,22 @@
         </h2>
       </div>
       <div class="col-auto ms-auto d-print-none">
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
+          {% if request.user.is_staff or request.user.is_superuser %}
+          <form method="post" action="{% url 'ofw:concern_status_ajax' concern.pk %}"
+                class="d-inline" id="concernStatusForm" data-url="{% url 'ofw:concern_status_ajax' concern.pk %}">
+            {% csrf_token %}
+            <select name="status" class="form-select form-select-sm d-inline w-auto"
+                    onchange="this.form.requestSubmit()">
+              {% for value, label in concern.status.field.choices %}
+              <option value="{{ value }}"{% if concern.status == value %} selected{% endif %}>
+                {{ label }}
+              </option>
+              {% endfor %}
+            </select>
+            <span class="text-muted small ms-1">Status</span>
+          </form>
+          {% endif %}
           {% if request.user.is_superuser %}
           <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#concernDeleteModal">
             <i class="fas fa-trash-alt me-1"></i> Delete
@@ -42,7 +57,7 @@
             <dt class="col-5 text-muted">Severity</dt>
             <dd class="col-7"><span class="badge {{ severity_badge }}">{{ concern.get_severity_display }}</span></dd>
             <dt class="col-5 text-muted">Status</dt>
-            <dd class="col-7"><span class="badge {{ status_badge }}">{{ concern.get_status_display }}</span></dd>
+            <dd class="col-7"><span class="badge {{ status_badge }} status-badge">{{ concern.get_status_display }}</span></dd>
             <dt class="col-5 text-muted">Reported Date</dt>
             <dd class="col-7">{{ concern.reported_date|date:"M d, Y" }}</dd>
             <dt class="col-5 text-muted">Resolved Date</dt>
@@ -238,4 +253,50 @@
 })();
 </script>
 {% endif %}
+
+<script>
+(function () {
+  var form = document.getElementById('concernStatusForm');
+  if (!form) return;
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var select = form.querySelector('select[name="status"]');
+    var btn = select;
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>';
+    fetch(form.getAttribute('data-url'), {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'status=' + encodeURIComponent(select.value),
+    }).then(async function (resp) {
+      var data = await resp.json().catch(function () { return {}; });
+      if (!resp.ok) throw new Error(data.error || 'Could not update status.');
+      var badge = document.querySelector('.status-badge');
+      if (badge) {
+        badge.textContent = data.status_display;
+        badge.className = 'badge ' + {
+          'Open': 'bg-secondary-lt text-secondary',
+          'In Progress': 'bg-info-lt text-info',
+          'Escalated': 'bg-warning-lt text-warning',
+          'Resolved': 'bg-success-lt text-success',
+          'Closed': 'bg-dark-lt text-dark',
+        }[data.status_display] || 'bg-secondary-lt text-secondary';
+      }
+      btn.innerHTML = '<i class="fas fa-check me-1"></i> Updated';
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }, 1200);
+    }).catch(function (err) {
+      alert(err.message);
+      btn.disabled = false;
+      btn.innerHTML = original;
+    });
+  });
+})();
+</script>
 {% endblock %}

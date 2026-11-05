@@ -327,3 +327,25 @@ def register_view(request, agency_slug=None):
     login(request, user)
     cache.delete(reg_key)
     return redirect('ofw:portal')
+
+
+# ---------------------------------------------------------------------------
+# Error pages (production-ready; also used in DEBUG via handler wiring below)
+# ---------------------------------------------------------------------------
+
+
+def handler403(request, exception=None, template_name='403.html'):
+    """403 Forbidden: the user is authenticated but not allowed to act."""
+    return render(request, template_name, status=403)
+
+
+def handler404(request, exception=None, template_name='404.html'):
+    """404 Not Found: the requested page does not exist."""
+    return render(request, template_name, {
+        'path': request.path,
+    }, status=404)
+
+
+def handler500(request, template_name='500.html'):
+    """500 Server Error: an unexpected error occurred."""
+    return render(request, template_name, status=500)
