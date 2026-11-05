@@ -11,22 +11,39 @@
   @media (max-width: 575.98px) {
     #myLocationMap { height: 260px; }
   }
+  .live-pulse {
+    position: relative;
+  }
+  .live-pulse::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 50%;
+    border: 2px solid #2fb344;
+    opacity: 0.6;
+    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  @keyframes ping {
+    75%, 100% { transform: scale(2); opacity: 0; }
+  }
 </style>
 {% endblock %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none">
     <div class="row align-items-center g-2">
-      <div class="col">
+      <div class="col-12 col-md">
         <div class="page-pretitle">{{ page_pretitle }}</div>
         <h2 class="page-title mb-0">{{ page_title }}</h2>
-        <div class="text-muted small mt-1">See the same live position your agency sees, plus the nearest safe places.</div>
+        <div class="text-muted small mt-1">
+          See the same live position your agency sees, plus the nearest safe places.
+        </div>
       </div>
-      <div class="col-auto">
+      <div class="col-12 col-md-auto d-flex flex-wrap gap-2 mt-2 mt-md-0">
         {% if sharing.is_enabled %}
-        <span class="badge bg-success-lt text-success"><i class="fas fa-location-dot me-1"></i>Sharing enabled</span>
+        <span class="badge bg-success-lt text-success w-100 w-md-auto"><i class="fas fa-location-dot me-1"></i>Sharing enabled</span>
         {% else %}
-        <span class="badge bg-secondary-lt text-secondary">Sharing off</span>
+        <span class="badge bg-secondary-lt text-secondary w-100 w-md-auto"><i class="fas fa-location-slash me-1"></i>Sharing off</span>
         {% endif %}
       </div>
     </div>
@@ -40,11 +57,11 @@
   <div class="card mb-3">
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-map-location-dot text-info me-2"></i>My live map</h3>
-      <div class="card-actions">
+      <div class="card-actions d-flex flex-wrap align-items-center gap-2 mt-2">
         {% if latest_ping %}
-        <span class="text-muted small">Last update {{ latest_ping.recorded_at|timesince }} ago</span>
+        <span class="badge bg-success-lt text-success"><i class="fas fa-clock me-1"></i>Last update {{ latest_ping.recorded_at|timesince }} ago</span>
         {% else %}
-        <span class="text-muted small">No location shared yet</span>
+        <span class="badge bg-secondary-lt text-secondary"><i class="fas fa-clock me-1"></i>No location shared yet</span>
         {% endif %}
       </div>
     </div>
@@ -52,9 +69,41 @@
       <div id="myLocationMap"
            {% if latest_ping %}data-own-lat="{{ latest_ping.latitude }}" data-own-lng="{{ latest_ping.longitude }}" data-own-time="{{ latest_ping.recorded_at|date:'M d, H:i' }}"{% endif %}></div>
       <div class="d-flex flex-wrap gap-3 mt-2 text-muted small">
-        <span><span class="badge bg-danger">&nbsp;</span> My last shared location</span>
+        <span><span class="badge bg-danger">&nbsp;</span> Your location</span>
         <span><span class="badge bg-primary">&nbsp;</span> Safe place</span>
         {% if location_country %}<span>Showing places in {{ location_country }}.</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h3 class="card-title"><i class="fas fa-earth-asia text-info me-2"></i>Your location right now</h3>
+      <div id="liveLocationInfo" class="text-muted small">
+        <i class="fas fa-circle-notch fa-spin me-2"></i>Detecting your location…
+      </div>
+      <div id="liveLocationCoords" class="d-none mt-2">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <div class="text-muted small">Latitude</div>
+            <div class="fw-medium" id="liveLat">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">Longitude</div>
+            <div class="fw-medium" id="liveLng">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">Accuracy</div>
+            <div class="fw-medium" id="liveAccuracy">—</div>
+          </div>
+        </div>
+        <div class="mt-2">
+          <div class="text-muted small">Last updated</div>
+          <div class="fw-medium" id="liveUpdatedAt">—</div>
+        </div>
+      </div>
+      <div id="liveLocationError" class="d-none alert alert-warning py-2 mt-2">
+        Could not detect your location. Allow location access in your browser, or turn on sharing and keep this page open.
       </div>
     </div>
   </div>
@@ -172,15 +221,16 @@
     var bounds = [];
     var ownLat = mapEl.getAttribute('data-own-lat');
     var ownLng = mapEl.getAttribute('data-own-lng');
+    var ownMarker = null;
     if (ownLat && ownLng) {
-      var own = L.circleMarker([parseFloat(ownLat), parseFloat(ownLng)], {
+      ownMarker = L.circleMarker([parseFloat(ownLat), parseFloat(ownLng)], {
         radius: 9,
         color: '#d63939',
         fillColor: '#d63939',
         fillOpacity: 0.85,
         weight: 3
       }).addTo(map);
-      own.bindPopup('My last shared location<br><span class="text-muted">' +
+      ownMarker.bindPopup('Your last shared location<br><span class="text-muted">' +
         (mapEl.getAttribute('data-own-time') || '') + '</span>');
       bounds.push([parseFloat(ownLat), parseFloat(ownLng)]);
     }
@@ -207,6 +257,10 @@
     if (bounds.length > 1) {
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
     }
+
+    // Expose map and ownMarker for live updates
+    window.__myLocationMap = map;
+    window.__myLocationMarker = ownMarker;
   }
 
   function escapeHtml(value) {
@@ -221,9 +275,81 @@
     initMap();
   }
 
-  // --- Opt-in live sharing ----------------------------------------------
+  // --- Live location display (right now) ---------------------------------
+  var infoEl = document.getElementById('liveLocationInfo');
+  var coordsEl = document.getElementById('liveLocationCoords');
+  var errorEl = document.getElementById('liveLocationError');
+  var latEl = document.getElementById('liveLat');
+  var lngEl = document.getElementById('liveLng');
+  var accEl = document.getElementById('liveAccuracy');
+  var timeEl = document.getElementById('liveUpdatedAt');
+  var sharingStatusEl = document.getElementById('sharingStatus');
+  var map = window.__myLocationMap;
+  var ownMarker = window.__myLocationMarker;
+
+  function showLivePosition(position) {
+    var c = position.coords;
+    var now = new Date();
+    latEl.textContent = c.latitude.toFixed(6);
+    lngEl.textContent = c.longitude.toFixed(6);
+    accEl.textContent = Math.round(c.accuracy || 0) + ' m';
+    timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    infoEl.classList.add('d-none');
+    errorEl.classList.add('d-none');
+    coordsEl.classList.remove('d-none');
+
+    // Update map marker for current position
+    if (map && window.L) {
+      var latlng = [c.latitude, c.longitude];
+      if (ownMarker) {
+        ownMarker.setLatLng(latlng);
+        ownMarker.bindPopup('Your location right now<br><span class="text-muted">' +
+          timeEl.textContent + ' · ±' + Math.round(c.accuracy || 0) + ' m</span>');
+      } else {
+        ownMarker = L.circleMarker(latlng, {
+          radius: 10,
+          color: '#2fb344',
+          fillColor: '#2fb344',
+          fillOpacity: 0.85,
+          weight: 3
+        }).addTo(map);
+        ownMarker.bindPopup('Your location right now<br><span class="text-muted">' +
+          timeEl.textContent + ' · ±' + Math.round(c.accuracy || 0) + ' m</span>');
+        window.__myLocationMarker = ownMarker;
+      }
+      map.setView(latlng, map.getZoom() > 13 ? map.getZoom() : 13);
+    }
+
+    if (sharingStatusEl) {
+      sharingStatusEl.className = 'alert alert-success py-2';
+      sharingStatusEl.textContent = 'Live location detected · ' + timeEl.textContent;
+    }
+  }
+
+  function showLiveError(error) {
+    infoEl.classList.add('d-none');
+    coordsEl.classList.add('d-none');
+    errorEl.classList.remove('d-none');
+    if (sharingStatusEl) {
+      sharingStatusEl.className = 'alert alert-warning py-2';
+      sharingStatusEl.textContent = 'Location not available: ' + (error && error.message ? error.message : 'Allow location access in your browser.');
+    }
+  }
+
+  // Show current position immediately if available, then keep watching
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showLivePosition, showLiveError, {
+      enableHighAccuracy: true,
+      maximumAge: 10000,
+      timeout: 15000
+    });
+  } else {
+    showLiveError({ message: 'This browser does not support location.' });
+  }
+
+  // --- Opt-in live sharing (send to server) ------------------------------
   var statusEl = document.getElementById('sharingStatus');
-  if (!statusEl) { return; }
+  if (!statusEl && !sharingStatusEl) { return; }
   var watchId = null;
   var refreshTimer = null;
   var posting = false;
@@ -232,8 +358,10 @@
   var lastLng = null;
 
   function setStatus(message, kind) {
-    statusEl.className = 'alert alert-' + kind + ' py-2';
-    statusEl.textContent = message;
+    var el = sharingStatusEl || statusEl;
+    if (!el) return;
+    el.className = 'alert alert-' + kind + ' py-2';
+    el.textContent = message;
   }
 
   function distanceMeters(lat1, lng1, lat2, lng2) {

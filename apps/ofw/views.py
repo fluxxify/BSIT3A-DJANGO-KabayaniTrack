@@ -1586,6 +1586,72 @@ def location_tracker_page(request):
 
 
 @login_required(login_url='login')
+def location_tracker_live(request):
+    """JSON of latest location per OFW for the admin live map to poll."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        return JsonResponse({'error': 'Management accounts only.'}, status=403)
+
+    from apps.users.agencies import agency_for_user
+
+    profiles = list(
+        _management_scope(request.user).select_related('user', 'agency_org')
+    )
+
+    latest_qs = LocationTracker.objects.select_related(
+        'ofw__user', 'ofw__agency_org'
+    ).order_by('ofw_id', '-recorded_at')
+
+    if not request.user.is_superuser:
+        agency = agency_for_user(request.user)
+        if agency is not None:
+            latest_qs = latest_qs.filter(ofw__agency_org=agency)
+        else:
+            latest_qs = latest_qs.none()
+
+    # Keep only the latest ping per OFW (Django doesn't have distinct on ofw_id easily,
+    # so do it in Python from the ordered queryset).
+    seen = set()
+    results = []
+    now = timezone.now()
+    sharing = set(
+        OFWLocationSharing.objects.filter(
+            ofw__in=profiles, is_enabled=True
+        ).values_list('ofw_id', flat=True)
+    )
+    for ping in latest_qs:
+        if ping.ofw_id in seen:
+            continue
+        seen.add(ping.ofw_id)
+        age_seconds = max(0, int((now - ping.recorded_at).total_seconds()))
+        if age_seconds <= 600:
+            freshness = 'live'
+        elif age_seconds <= 3600:
+            freshness = 'recent'
+        elif age_seconds <= 86400:
+            freshness = 'stale'
+        else:
+            freshness = 'old'
+        results.append({
+            'ofw_id': ping.ofw_id,
+            'name': ping.ofw.full_name,
+            'country': ping.ofw.country or '',
+            'city': ping.ofw.city_abroad or '',
+            'agency': ping.ofw.agency_org.name if ping.ofw.agency_org else '',
+            'contact': ping.ofw.contact_number or '',
+            'lat': float(ping.latitude),
+            'lng': float(ping.longitude),
+            'accuracy': ping.accuracy_meters,
+            'recorded_at': ping.recorded_at.isoformat(),
+            'age_seconds': age_seconds,
+            'freshness': freshness,
+            'is_emergency': bool(ping.is_emergency),
+            'sharing_enabled': ping.ofw_id in sharing,
+        })
+
+    return JsonResponse({'ofws': results})
+
+
+@login_required(login_url='login')
 @require_POST
 def location_tracker_ping(request):
     """OFW or management submits a location ping during an emergency."""

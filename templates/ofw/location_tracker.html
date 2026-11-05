@@ -226,7 +226,6 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if located_rows %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
@@ -240,50 +239,119 @@
     attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>'
   }).addTo(map);
 
-  var markers = [];
+  var markers = {};
+  var circles = {};
   var first = true;
 
-  {% for row in rows %}
-  {% if row.ping %}
-  var marker{{ forloop.counter }} = L.marker([{{ row.ping.latitude }}, {{ row.ping.longitude }}]).addTo(map);
-  marker{{ forloop.counter }}.bindPopup(
-    '<b>{{ row.profile.full_name|escapejs }}</b><br>' +
-    '{{ row.profile.country|escapejs }}<br>' +
-    '{% if row.sharing_enabled %}<span style="color:#206bc4;"><b>Live sharing enabled</b></span><br>{% endif %}' +
-    '{% if row.is_emergency %}<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>{% endif %}' +
-    '{{ row.freshness_label|escapejs }}<br>' +
-    '{{ row.ping.recorded_at|date:"M d, Y H:i"|escapejs }}' +
-    '<br><a href="{% url 'ofw:emergency_guide' row.profile.pk %}">Open call guide</a>'
-  );
-  {% if row.is_emergency or row.freshness == 'live' %}
-  marker{{ forloop.counter }}.setIcon(L.divIcon({
-    className: '',
-    html: '<span style="display:block;width:16px;height:16px;border-radius:50%;background:{% if row.is_emergency %}#d63939{% else %}#2fb344{% endif %};border:2px solid #fff;box-shadow:0 0 0 2px {% if row.is_emergency %}#d63939{% else %}#2fb344{% endif %};"></span>',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -8]
-  }));
-  {% endif %}
-  markers.push(marker{{ forloop.counter }});
-  {% if first %}
-  first = false;
-  {% endif %}
-  {% endif %}
-  {% endfor %}
-
-  if (markers.length) {
-    var group = L.featureGroup(markers);
-    map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
-  } else {
-    map.setView([15, 105], 3);
+  function markerIcon(freshness, isEmergency) {
+    if (isEmergency) {
+      return L.divIcon({
+        className: '',
+        html: '<span style="display:block;width:18px;height:18px;border-radius:50%;background:#d63939;border:2px solid #fff;box-shadow:0 0 0 3px #d63939;animation:pulse 1.5s infinite;"></span>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        popupAnchor: [0, -9]
+      });
+    }
+    if (freshness === 'live') {
+      return L.divIcon({
+        className: '',
+        html: '<span style="display:block;width:16px;height:16px;border-radius:50%;background:#2fb344;border:2px solid #fff;box-shadow:0 0 0 2px #2fb344;"></span>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+        popupAnchor: [0, -8]
+      });
+    }
+    return null;
   }
 
+  function addOrUpdateMarker(ofw) {
+    var latlng = [ofw.lat, ofw.lng];
+    var popupContent =
+      '<b>' + ofw.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</b><br>' +
+      (ofw.country ? ofw.country.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '<br>' : '') +
+      (ofw.sharing_enabled ? '<span style="color:#206bc4;"><b>Live sharing enabled</b></span><br>' : '') +
+      (ofw.is_emergency ? '<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>' : '') +
+      (ofw.freshness === 'live' ? '<b>Live now</b><br>' : ofw.freshness_label + '<br>') +
+      ofw.recorded_at.replace('T', ' ') +
+      '<br>±' + (ofw.accuracy || 0) + ' m' +
+      '<br><a href="/ofw/emergency-guide/' + ofw.ofw_id + '/">Open call guide</a>';
+
+    if (markers[ofw.ofw_id]) {
+      markers[ofw.ofw_id].setLatLng(latlng);
+      markers[ofw.ofw_id].setPopupContent(popupContent);
+      if (circles[ofw.ofw_id]) {
+        map.removeLayer(circles[ofw.ofw_id]);
+        circles[ofw.ofw_id] = null;
+      }
+      if (ofw.accuracy && ofw.accuracy > 0) {
+        circles[ofw.ofw_id] = L.circle(latlng, {
+          radius: ofw.accuracy,
+          color: ofw.freshness === 'live' ? '#2fb344' : '#6c757d',
+          fillOpacity: 0.15,
+          weight: 1
+        }).addTo(map);
+      }
+      markers[ofw.ofw_id].setIcon(markerIcon(ofw.freshness, ofw.is_emergency));
+    } else {
+      var m = L.marker(latlng, { icon: markerIcon(ofw.freshness, ofw.is_emergency) }).addTo(map);
+      m.bindPopup(popupContent);
+      markers[ofw.ofw_id] = m;
+      if (ofw.accuracy && ofw.accuracy > 0) {
+        circles[ofw.ofw_id] = L.circle(latlng, {
+          radius: ofw.accuracy,
+          color: ofw.freshness === 'live' ? '#2fb344' : '#6c757d',
+          fillOpacity: 0.15,
+          weight: 1
+        }).addTo(map);
+      }
+    }
+
+    if (first) {
+      first = false;
+    }
+  }
+
+  function loadLive() {
+    fetch('{% url "ofw:location_tracker_live" %}', {
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (resp) { return resp.json(); })
+      .then(function (data) {
+        var ofws = data.ofws || [];
+        var bounds = [];
+        ofws.forEach(function (ofw) {
+          addOrUpdateMarker(ofw);
+          bounds.push([ofw.lat, ofw.lng]);
+        });
+
+        Object.keys(markers).forEach(function (id) {
+          var stillThere = ofws.some(function (o) { return o.ofw_id == id; });
+          if (!stillThere) {
+            map.removeLayer(markers[id]);
+            delete markers[id];
+            if (circles[id]) {
+              map.removeLayer(circles[id]);
+              delete circles[id];
+            }
+          }
+        });
+
+        if (bounds.length && first) {
+          var group = L.featureGroup(Object.values(markers));
+          if (group.getLayers().length) {
+            map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
+          }
+        }
+      })
+      .catch(function () {
+        // Silently fail; next poll will retry
+      });
+  }
+
+  loadLive();
+  window.setInterval(loadLive, 10000);
+
 })();
-</script>
-{% endif %}
-<script>
-window.setInterval(function () {
-  if (!document.hidden) window.location.reload();
-}, 15000);
 </script>
 {% endblock %}
