@@ -38,7 +38,7 @@
       <strong>Live now</strong> means the ping is under 10 minutes old. Older pings
       are labelled so nobody mistakes them for a current position.
       <strong>No location</strong> means the OFW has not shared one yet — call or
-      request their location from this page. The map updates automatically every 10 seconds.
+      request their location from this page. The map updates automatically every 5 seconds.
     </div>
   </div>
 
@@ -51,7 +51,7 @@
       </h5>
       <div class="card-actions text-muted small">
         <span id="mapUpdatedAt"></span>
-        <span class="ms-2"><i class="fas fa-circle text-success" style="font-size:.55rem;vertical-align:middle;"></i> Live · auto-updates every 10s</span>
+        <span class="ms-2"><i class="fas fa-circle text-success" style="font-size:.55rem;vertical-align:middle;"></i> Live · updates every 5s</span>
       </div>
     </div>
     <div class="card-body p-0 position-relative">
@@ -283,6 +283,8 @@
   var historyLines = {};
   var historyPoints = {};
   var hasFit = false;
+  var lastUpdatedAt = null;
+  var POLL_MS = 5000;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -333,11 +335,32 @@
     );
   }
 
+  // Smoothly slide a marker from its old position to the new one so movement
+  // is actually visible instead of jumping between polls.
+  function animateMarker(marker, from, to, duration) {
+    var start = null;
+    function step(ts) {
+      if (start === null) { start = ts; }
+      var t = Math.min((ts - start) / duration, 1);
+      var lat = from[0] + (to[0] - from[0]) * t;
+      var lng = from[1] + (to[1] - from[1]) * t;
+      marker.setLatLng([lat, lng]);
+      if (t < 1) { window.requestAnimationFrame(step); }
+    }
+    window.requestAnimationFrame(step);
+  }
+
   function addOrUpdateMarker(ofw) {
     var latlng = [ofw.lat, ofw.lng];
 
     if (markers[ofw.ofw_id]) {
-      markers[ofw.ofw_id].setLatLng(latlng);
+      var current = markers[ofw.ofw_id].getLatLng();
+      var movedEnough =
+        Math.abs(current.lat - latlng[0]) > 0.000001 ||
+        Math.abs(current.lng - latlng[1]) > 0.000001;
+      if (movedEnough) {
+        animateMarker(markers[ofw.ofw_id], [current.lat, current.lng], latlng, 900);
+      }
       markers[ofw.ofw_id].setPopupContent(popupContent(ofw));
       if (circles[ofw.ofw_id]) {
         map.removeLayer(circles[ofw.ofw_id]);
@@ -489,7 +512,8 @@
         }
         var updatedEl = document.getElementById('mapUpdatedAt');
         if (updatedEl) {
-          updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          lastUpdatedAt = Date.now();
+          updateAgeLabel();
         }
 
         if (bounds.length && !hasFit) {
@@ -510,8 +534,21 @@
       });
   }
 
+  // Tick "Updated Xs ago" every second so the live clock is visibly moving.
+  function updateAgeLabel() {
+    var updatedEl = document.getElementById('mapUpdatedAt');
+    if (!updatedEl || !lastUpdatedAt) { return; }
+    var secs = Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000));
+    var clock = new Date(lastUpdatedAt).toLocaleTimeString(
+      [], { hour: '2-digit', minute: '2-digit', second: '2-digit' }
+    );
+    updatedEl.innerHTML = '<span class="badge bg-success-lt text-success me-1">' +
+      secs + 's ago</span>' + clock;
+  }
+
   loadLive();
-  window.setInterval(loadLive, 10000);
+  window.setInterval(loadLive, POLL_MS);
+  window.setInterval(updateAgeLabel, 1000);
 
 })();
 </script>

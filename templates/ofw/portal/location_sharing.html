@@ -104,6 +104,7 @@
         <div class="mt-2">
           <div class="text-muted small">Last updated</div>
           <div class="fw-medium" id="liveUpdatedAt">—</div>
+          <div class="small text-success" id="liveAge"></div>
         </div>
       </div>
       <div id="liveLocationError" class="d-none alert alert-warning py-2 mt-2">
@@ -296,15 +297,25 @@
   var lngEl = document.getElementById('liveLng');
   var accEl = document.getElementById('liveAccuracy');
   var timeEl = document.getElementById('liveUpdatedAt');
+  var ageEl = document.getElementById('liveAge');
   var sharingStatusEl = document.getElementById('sharingStatus');
+  var lastLiveAt = null;
+
+  function updateLiveAge() {
+    if (!ageEl || !lastLiveAt) { return; }
+    var secs = Math.max(0, Math.round((Date.now() - lastLiveAt) / 1000));
+    ageEl.textContent = secs + 's ago';
+  }
 
   function showLivePosition(position) {
     var c = position.coords;
     var now = new Date();
+    lastLiveAt = now.getTime();
     latEl.textContent = c.latitude.toFixed(6);
     lngEl.textContent = c.longitude.toFixed(6);
     accEl.textContent = Math.round(c.accuracy || 0) + ' m';
-    timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    updateLiveAge();
     infoEl.classList.add('d-none');
     errorEl.classList.add('d-none');
     coordsEl.classList.remove('d-none');
@@ -406,8 +417,8 @@
 
   function sendPosition(position) {
     var coords = position.coords;
-    var moved = lastLat === null || distanceMeters(coords.latitude, coords.longitude, lastLat, lastLng) >= 50;
-    if (posting || (!moved && Date.now() - lastSentAt < 15000)) return;
+    var moved = lastLat === null || distanceMeters(coords.latitude, coords.longitude, lastLat, lastLng) >= 30;
+    if (posting || (!moved && Date.now() - lastSentAt < 10000)) return;
     posting = true;
     setStatus('Sharing your location…', 'info');
     fetch('{% url "ofw:portal_location_sharing_ping" %}', {
@@ -458,7 +469,8 @@
       maximumAge: 0,
       timeout: 15000
     });
-  }, 15000);
+  }, 10000);
+  window.setInterval(updateLiveAge, 1000);
 
   window.addEventListener('pagehide', function () {
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
