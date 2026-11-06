@@ -307,7 +307,15 @@
         popupAnchor: [0, -8]
       });
     }
-    return null;
+    // Older/unknown pings: neutral gray dot. Never return null — Leaflet
+    // calls icon.createIcon() and crashes if the icon is null.
+    return L.divIcon({
+      className: '',
+      html: '<span style="display:block;width:14px;height:14px;border-radius:50%;background:#6c757d;border:2px solid #fff;box-shadow:0 0 0 2px #6c757d;"></span>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+      popupAnchor: [0, -7]
+    });
   }
 
   function popupContent(ofw) {
