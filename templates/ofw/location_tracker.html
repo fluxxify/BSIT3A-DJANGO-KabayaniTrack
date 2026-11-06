@@ -265,6 +265,29 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'libs/leaflet/leaflet.css' %}" />
+<style>
+  .map-pan {
+    display: grid;
+    grid-template-columns: repeat(3, 30px);
+    grid-template-rows: repeat(3, 30px);
+    gap: 2px;
+  }
+  .map-pan button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, .15);
+    border-radius: 4px;
+    background: #fff;
+    color: #1f2937;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  }
+  .map-pan button:hover { background: #f1f3f5; }
+  .map-pan span { display: block; }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -313,6 +336,50 @@
   }
 
   addBaseLayer(map);
+
+  // Dragging, pinch zoom and keyboard arrows stay enabled; pan buttons give a
+  // reliable way to move the map in every direction on a laptop or phone.
+  map.dragging.enable();
+  map.touchZoom.enable();
+
+  function addPanControl(targetMap) {
+    var PanControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd: function () {
+        var box = L.DomUtil.create('div', 'map-pan');
+        L.DomEvent.disableClickPropagation(box);
+        L.DomEvent.disableScrollPropagation(box);
+        var cells = [
+          null, ['&uarr;', 'Pan up', 0, -1], null,
+          ['&larr;', 'Pan left', -1, 0], null, ['&rarr;', 'Pan right', 1, 0],
+          null, ['&darr;', 'Pan down', 0, 1], null
+        ];
+        cells.forEach(function (cell) {
+          if (!cell) {
+            L.DomUtil.create('span', '', box);
+            return;
+          }
+          var button = L.DomUtil.create('button', '', box);
+          button.type = 'button';
+          button.title = cell[1];
+          button.setAttribute('aria-label', cell[1]);
+          button.innerHTML = cell[0];
+          L.DomEvent.on(button, 'click', function (event) {
+            L.DomEvent.stop(event);
+            var size = targetMap.getSize();
+            targetMap.panBy(
+              [cell[2] * size.x / 2, cell[3] * size.y / 2],
+              { animate: true }
+            );
+          });
+        });
+        return box;
+      }
+    });
+    targetMap.addControl(new PanControl());
+  }
+
+  addPanControl(map);
 
   var markers = {};
   var circles = {};

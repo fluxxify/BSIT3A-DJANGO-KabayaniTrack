@@ -1718,6 +1718,9 @@ class LocationTrackerPageTests(TestCase):
         self.assertContains(response, 'id="admin-map-places"')
         self.assertContains(response, 'Test Safe Hospital')
         self.assertContains(response, 'id="adminMapNearMe"')
+        # Pan buttons let the viewer move the map in every direction.
+        self.assertContains(response, 'Pan left')
+        self.assertContains(response, 'Pan right')
         # A back button is available at the top of the page.
         self.assertContains(response, 'fa-arrow-left')
 
@@ -1890,6 +1893,7 @@ class OFWConnectedSafetyPagesTests(TestCase):
         self.assertTemplateUsed(response, 'ofw/portal/location_sharing.html')
         self.assertContains(response, 'id="myLocationMap"')
         self.assertContains(response, 'id="live-map-places"')
+        self.assertContains(response, 'id="liveNearbyPlaces"')
         self.assertContains(response, 'Dubai Police Station')
         self.assertContains(response, 'Manila Safe Hospital')
         self.assertContains(response, 'data-own-lat="25.204800"')

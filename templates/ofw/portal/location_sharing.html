@@ -27,6 +27,27 @@
   @keyframes ping {
     75%, 100% { transform: scale(2); opacity: 0; }
   }
+  .map-pan {
+    display: grid;
+    grid-template-columns: repeat(3, 30px);
+    grid-template-rows: repeat(3, 30px);
+    gap: 2px;
+  }
+  .map-pan button {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, .15);
+    border-radius: 4px;
+    background: #fff;
+    color: #1f2937;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  }
+  .map-pan button:hover { background: #f1f3f5; }
+  .map-pan span { display: block; }
 </style>
 {% endblock %}
 {% block content %}
@@ -83,6 +104,7 @@
         <span><span class="badge bg-primary">&nbsp;</span> Safe place</span>
         <span>Map zooms to the safe places near you.</span>
       </div>
+      <div id="liveNearbyPlaces" class="mt-2 small"></div>
     </div>
   </div>
 
@@ -252,6 +274,50 @@
     });
     esri.addTo(map);
 
+    // Dragging, pinch zoom and keyboard arrows stay enabled; pan buttons give a
+    // reliable way to move the map in every direction on a laptop or phone.
+    map.dragging.enable();
+    map.touchZoom.enable();
+
+    function addPanControl(targetMap) {
+      var PanControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function () {
+          var box = L.DomUtil.create('div', 'map-pan');
+          L.DomEvent.disableClickPropagation(box);
+          L.DomEvent.disableScrollPropagation(box);
+          var cells = [
+            null, ['&uarr;', 'Pan up', 0, -1], null,
+            ['&larr;', 'Pan left', -1, 0], null, ['&rarr;', 'Pan right', 1, 0],
+            null, ['&darr;', 'Pan down', 0, 1], null
+          ];
+          cells.forEach(function (cell) {
+            if (!cell) {
+              L.DomUtil.create('span', '', box);
+              return;
+            }
+            var button = L.DomUtil.create('button', '', box);
+            button.type = 'button';
+            button.title = cell[1];
+            button.setAttribute('aria-label', cell[1]);
+            button.innerHTML = cell[0];
+            L.DomEvent.on(button, 'click', function (event) {
+              L.DomEvent.stop(event);
+              var size = targetMap.getSize();
+              targetMap.panBy(
+                [cell[2] * size.x / 2, cell[3] * size.y / 2],
+                { animate: true }
+              );
+            });
+          });
+          return box;
+        }
+      });
+      targetMap.addControl(new PanControl());
+    }
+
+    addPanControl(map);
+
     var ownLat = mapEl.getAttribute('data-own-lat');
     var ownLng = mapEl.getAttribute('data-own-lng');
     var ownMarker = null;
@@ -315,18 +381,102 @@
       }
     }
 
-    fitNearby(ownLatLng);
-
     // Expose map, ownMarker and the fit helper for live updates.
     window.__myLocationMap = map;
     window.__myLocationMarker = ownMarker;
     window.__fitNearbyPlaces = fitNearby;
+    window.__mapPlaces = places;
+
+    fitNearby(ownLatLng);
+    renderNearby(ownLatLng);
   }
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+
+  function bearingDeg(a, b) {
+    var toRad = Math.PI / 180;
+    var y = Math.sin((b[1] - a[1]) * toRad) * Math.cos(b[0] * toRad);
+    var x = Math.cos(a[0] * toRad) * Math.sin(b[0] * toRad) -
+      Math.sin(a[0] * toRad) * Math.cos(b[0] * toRad) *
+      Math.cos((b[1] - a[1]) * toRad);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function compassDirection(bearing) {
+    var points = ['north', 'north-east', 'east', 'south-east',
+      'south', 'south-west', 'west', 'north-west'];
+    return points[Math.round(bearing / 45) % 8];
+  }
+
+  function formatKm(km) {
+    if (km < 1) {
+      return Math.max(10, Math.round(km * 100) * 10) + ' m';
+    }
+    if (km < 10) { return km.toFixed(1) + ' km'; }
+    return Math.round(km) + ' km';
+  }
+
+  function mapsDirectionsUrl(origin, place) {
+    return 'https://www.google.com/maps/dir/?api=1&origin=' +
+      origin[0] + ',' + origin[1] +
+      '&destination=' + place.lat + ',' + place.lng;
+  }
+
+  function distanceKm(a, b) {
+    var toRad = Math.PI / 180;
+    var dLat = (b[0] - a[0]) * toRad;
+    var dLng = (b[1] - a[1]) * toRad;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a[0] * toRad) * Math.cos(b[0] * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  }
+
+  // List the safe places closest to the viewer's current position.
+  function renderNearby(anchor) {
+    var el = document.getElementById('liveNearbyPlaces');
+    if (!el || !anchor) { return; }
+    var list = (window.__mapPlaces || []).filter(function (place) {
+      return place && place.lat != null && place.lng != null;
+    }).map(function (place) {
+      var point = [place.lat, place.lng];
+      return {
+        place: place,
+        km: distanceKm(anchor, point),
+        direction: compassDirection(bearingDeg(anchor, point))
+      };
+    }).sort(function (a, b) { return a.km - b.km; });
+
+    if (!list.length) {
+      el.innerHTML = '<span class="text-muted">No safe places are saved yet.</span>';
+      return;
+    }
+
+    var nearby = list.filter(function (row) { return row.km <= 50; }).slice(0, 5);
+    var shown = nearby.length ? nearby : list.slice(0, 3);
+    var html = '<div class="fw-medium mb-1">' +
+      (nearby.length ? 'Safe places near you' : 'Nearest saved safe places') +
+      '</div>';
+
+    shown.forEach(function (row) {
+      var place = row.place;
+      html += '<div class="border-top py-1">' +
+        '<div class="d-flex justify-content-between gap-2">' +
+        '<span class="fw-medium text-truncate">' + escapeHtml(place.name) + '</span>' +
+        '<span class="text-muted text-nowrap">' + formatKm(row.km) +
+        ' · ' + row.direction + '</span>' +
+        '</div>' +
+        '<div class="text-muted">' + escapeHtml(place.type || '') +
+        ' · <a href="' + mapsDirectionsUrl(anchor, place) +
+        '" target="_blank" rel="noopener">Directions</a></div>' +
+        '</div>';
+    });
+
+    el.innerHTML = html;
   }
 
   // The script runs at the end of <body>, so the map container already exists.
@@ -394,6 +544,8 @@
         liveFitDone = true;
         if (window.__fitNearbyPlaces) { window.__fitNearbyPlaces(latlng); }
       }
+      // Always refresh the "safe places near you" list for the new position.
+      renderNearby(latlng);
     }
 
     if (sharingStatusEl) {
@@ -429,6 +581,8 @@
       if (!navigator.geolocation) { return; }
       navigator.geolocation.getCurrentPosition(function (pos) {
         showLivePosition(pos);
+        var marker = window.__myLocationMarker;
+        if (marker) { marker.openPopup(); }
         var latlng = [pos.coords.latitude, pos.coords.longitude];
         if (window.__fitNearbyPlaces) {
           window.__fitNearbyPlaces(latlng);
