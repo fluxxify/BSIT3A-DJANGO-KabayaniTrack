@@ -1605,8 +1605,10 @@ def location_tracker_live(request):
         agency = agency_for_user(request.user)
         if agency is not None:
             latest_qs = latest_qs.filter(ofw__agency_org=agency)
-        else:
-            latest_qs = latest_qs.none()
+        # Agency-less staff are already covered by _management_scope (all OFWs).
+
+    if request.GET.get('emergency') == '1':
+        latest_qs = latest_qs.filter(is_emergency=True)
 
     # Keep only the latest ping per OFW (Django doesn't have distinct on ofw_id easily,
     # so do it in Python from the ordered queryset).
@@ -1625,12 +1627,16 @@ def location_tracker_live(request):
         age_seconds = max(0, int((now - ping.recorded_at).total_seconds()))
         if age_seconds <= 600:
             freshness = 'live'
+            freshness_label = 'Live now'
         elif age_seconds <= 3600:
             freshness = 'recent'
+            freshness_label = f'{age_seconds // 60} min ago'
         elif age_seconds <= 86400:
             freshness = 'stale'
+            freshness_label = f'{age_seconds // 3600} hr ago'
         else:
             freshness = 'old'
+            freshness_label = f'{age_seconds // 86400} day(s) ago'
         results.append({
             'ofw_id': ping.ofw_id,
             'name': ping.ofw.full_name,
@@ -1645,11 +1651,19 @@ def location_tracker_live(request):
             'recorded_at': ping.recorded_at.isoformat(),
             'age_seconds': age_seconds,
             'freshness': freshness,
+            'freshness_label': freshness_label,
             'is_emergency': bool(ping.is_emergency),
             'sharing_enabled': ping.ofw_id in sharing,
         })
 
-    return JsonResponse({'ofws': results})
+    live_count = sum(1 for row in results if row['freshness'] == 'live')
+    waiting_count = len(sharing - seen)
+    return JsonResponse({
+        'ofws': results,
+        'live_count': live_count,
+        'sharing_count': len(sharing),
+        'waiting_count': waiting_count,
+    })
 
 
 @login_required(login_url='login')

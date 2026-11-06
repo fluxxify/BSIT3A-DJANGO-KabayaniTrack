@@ -29,6 +29,7 @@ from apps.ofw.models import (
     MonitoringReport,
     Notification,
     OFWActivity,
+    OFWLocationSharing,
     OFWProfile,
     PoliceReport,
     SafeLocation,
@@ -1688,6 +1689,16 @@ class LocationTrackerPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         # The JS builds this URL at runtime, so the placeholder id must reverse.
         self.assertContains(response, '/location-tracker/history/0/')
+        # The map should always render so live polling can fill it in.
+        self.assertContains(response, 'id="locationTrackerMap"')
+        self.assertContains(response, 'Live OFW Map')
+
+    def test_map_renders_even_before_any_ping(self):
+        LocationTracker.objects.filter(ofw=self.profile).delete()
+        response = self.client.get(reverse('ofw:location_tracker'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="locationTrackerMap"')
+        self.assertContains(response, 'Waiting for OFW locations')
 
     def test_history_endpoint_returns_pings(self):
         response = self.client.get(
@@ -1704,6 +1715,27 @@ class LocationTrackerPageTests(TestCase):
             reverse('ofw:ofw_location_history', args=[self.profile.pk])
         )
         self.assertEqual(response.status_code, 403)
+
+    def test_live_endpoint_reports_sharing_and_waiting_counts(self):
+        # A second OFW who enabled sharing but has not sent a ping yet.
+        waiting_user = User.objects.create_user(
+            username='mapwait', password='Passw0rd!23'
+        )
+        mark_as_ofw(waiting_user)
+        waiting_profile = OFWProfile.objects.create(
+            user=waiting_user, first_name='Wait', last_name='OFW',
+            country='Qatar',
+        )
+        OFWLocationSharing.objects.create(ofw=waiting_profile, is_enabled=True)
+
+        response = self.client.get(reverse('ofw:location_tracker_live'))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertGreaterEqual(data['sharing_count'], 1)
+        self.assertGreaterEqual(data['waiting_count'], 1)
+        self.assertEqual(len(data['ofws']), 1)
+        self.assertEqual(data['ofws'][0]['ofw_id'], self.profile.pk)
+        self.assertIn('freshness_label', data['ofws'][0])
 
 
 class LocationRetentionCommandTests(TestCase):

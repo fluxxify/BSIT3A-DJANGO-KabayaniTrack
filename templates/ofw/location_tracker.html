@@ -9,7 +9,7 @@
           <h2 class="page-title mb-0">{{ page_title }}</h2>
         </div>
         <div class="col-12 col-md-auto text-start text-md-end d-flex flex-wrap gap-2">
-          <span class="badge bg-success-lt text-success align-self-center">
+          <span class="badge bg-success-lt text-success align-self-center" id="liveCountBadge">
             {{ live_count }} live now
           </span>
           {% if no_location_count %}
@@ -37,21 +37,31 @@
       <strong>Live now</strong> means the ping is under 10 minutes old. Older pings
       are labelled so nobody mistakes them for a current position.
       <strong>No location</strong> means the OFW has not shared one yet — call or
-      request their location from this page. The page refreshes every 30 seconds.
+      request their location from this page. The map updates automatically every 10 seconds.
     </div>
   </div>
 
   {% if rows %}
-  {% if located_rows %}
   <div class="card mb-3">
     <div class="card-header">
-      <h5 class="card-title mb-0"><i class="fas fa-map-location-dot me-2"></i>Latest OFW Locations</h5>
+      <h5 class="card-title mb-0">
+        <i class="fas fa-map-location-dot me-2"></i>Live OFW Map
+        <span class="badge bg-secondary-lt text-secondary ms-2" id="mapStatusBadge">Loading…</span>
+      </h5>
+      <div class="card-actions text-muted small">
+        <span id="mapUpdatedAt"></span>
+        <span class="ms-2"><i class="fas fa-circle text-success" style="font-size:.55rem;vertical-align:middle;"></i> Live · auto-updates every 10s</span>
+      </div>
     </div>
-    <div class="card-body p-0">
-      <div id="locationTrackerMap" style="height: 420px; width: 100%;"></div>
+    <div class="card-body p-0 position-relative">
+      <div id="locationTrackerMap" style="height: 460px; width: 100%;"></div>
+      <div id="mapEmpty" class="position-absolute top-50 start-50 translate-middle text-center text-muted px-3" style="pointer-events:none;">
+        <i class="fas fa-satellite-dish fa-2x mb-2"></i>
+        <div class="fw-medium">Waiting for OFW locations…</div>
+        <div class="small">Markers appear automatically once an OFW turns on location sharing.</div>
+      </div>
     </div>
   </div>
-  {% endif %}
 
   <!-- Phones: card layout so names and actions are not squeezed -->
   <div class="card mb-3 d-md-none">
@@ -83,6 +93,11 @@
           {% if row.ping %}Last seen {{ row.ping.recorded_at|date:"M d, H:i" }}{% else %}Has not shared a location yet{% endif %}
         </span>
       </div>
+      {% if row.ping.location_label %}
+      <div class="text-muted small mt-1">
+        <i class="fas fa-map-marker-alt me-1"></i>{{ row.ping.location_label }}
+      </div>
+      {% endif %}
       <div class="d-flex flex-wrap gap-1 mt-2 action-buttons">
         <form method="post" action="{% url 'ofw:request_ofw_location' row.profile.pk %}">
           {% csrf_token %}
@@ -146,6 +161,7 @@
               {% if row.ping %}
               {{ row.ping.latitude }}, {{ row.ping.longitude }}
               {% if row.ping.accuracy_meters %}<span class="text-muted">(±{{ row.ping.accuracy_meters }} m)</span>{% endif %}
+              {% if row.ping.location_label %}<div class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>{{ row.ping.location_label }}</div>{% endif %}
               {% else %}
               <span class="text-muted">Not shared yet</span>
               {% endif %}
@@ -237,7 +253,7 @@
   var mapEl = document.getElementById('locationTrackerMap');
   if (!mapEl) return;
 
-  var map = L.map('locationTrackerMap', { scrollWheelZoom: false });
+  var map = L.map('locationTrackerMap', { scrollWheelZoom: false }).setView([20, 0], 2);
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 19,
@@ -248,7 +264,7 @@
   var circles = {};
   var historyLines = {};
   var historyPoints = {};
-  var first = true;
+  var hasFit = false;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -323,10 +339,6 @@
         }).addTo(map);
       }
     }
-
-    if (first) {
-      first = false;
-    }
   }
 
   // Reverse once with a placeholder id, then swap in the clicked OFW's id.
@@ -400,7 +412,7 @@
   window.loadHistory = loadHistory;
 
   function loadLive() {
-    fetch('{% url "ofw:location_tracker_live" %}', {
+    fetch('{% url "ofw:location_tracker_live" %}{% if emergency_only %}?emergency=1{% endif %}', {
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
       .then(function (resp) { return resp.json(); })
@@ -424,15 +436,44 @@
           }
         });
 
-        if (bounds.length && first) {
+        // Empty-state hint and live counters.
+        var emptyEl = document.getElementById('mapEmpty');
+        if (emptyEl) {
+          emptyEl.style.display = ofws.length ? 'none' : '';
+        }
+        var statusBadge = document.getElementById('mapStatusBadge');
+        if (statusBadge) {
+          var live = data.live_count || 0;
+          var sharing = data.sharing_count || 0;
+          var waiting = data.waiting_count || 0;
+          statusBadge.textContent = live + ' live · ' + sharing + ' sharing' +
+            (waiting ? ' · ' + waiting + ' waiting for GPS' : '');
+          statusBadge.className = 'badge ms-2 ' + (live ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary');
+        }
+        var liveBadge = document.getElementById('liveCountBadge');
+        if (liveBadge) {
+          liveBadge.textContent = (data.live_count || 0) + ' live now';
+        }
+        var updatedEl = document.getElementById('mapUpdatedAt');
+        if (updatedEl) {
+          updatedEl.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        if (bounds.length && !hasFit) {
           var group = L.featureGroup(Object.values(markers));
           if (group.getLayers().length) {
-            map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 14 });
+            map.fitBounds(group.getBounds().pad(0.2), { maxZoom: 14 });
+            hasFit = true;
           }
         }
       })
-      .catch(function () {
-        // Silently fail; next poll will retry
+      .catch(function (error) {
+        console.error('Live map update failed:', error);
+        var statusBadge = document.getElementById('mapStatusBadge');
+        if (statusBadge) {
+          statusBadge.textContent = 'Update error — retrying…';
+          statusBadge.className = 'badge ms-2 bg-danger-lt text-danger';
+        }
       });
   }
 
