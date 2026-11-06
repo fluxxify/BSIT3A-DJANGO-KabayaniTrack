@@ -50,8 +50,7 @@
         <span class="badge bg-secondary-lt text-secondary ms-2" id="mapStatusBadge">Loading…</span>
       </h5>
       <div class="card-actions text-muted small">
-        <span id="mapUpdatedAt"></span>
-        <span class="ms-2"><i class="fas fa-circle text-success" style="font-size:.55rem;vertical-align:middle;"></i> Live · updates every 5s</span>
+        <span id="mapUpdatedAt" title="Live clock — the map refreshes every 5 seconds"></span>
       </div>
     </div>
     <div class="card-body p-0 position-relative">
@@ -283,7 +282,6 @@
   var historyLines = {};
   var historyPoints = {};
   var hasFit = false;
-  var lastUpdatedAt = null;
   var POLL_MS = 5000;
 
   function esc(s) {
@@ -512,7 +510,6 @@
         }
         var updatedEl = document.getElementById('mapUpdatedAt');
         if (updatedEl) {
-          lastUpdatedAt = Date.now();
           updateAgeLabel();
         }
 
@@ -534,16 +531,15 @@
       });
   }
 
-  // Tick "Updated Xs ago" every second so the live clock is visibly moving.
+  // A simple live clock that ticks every second. This is the only element
+  // that animates — it shows the page is alive without extra labels.
   function updateAgeLabel() {
     var updatedEl = document.getElementById('mapUpdatedAt');
-    if (!updatedEl || !lastUpdatedAt) { return; }
-    var secs = Math.max(0, Math.round((Date.now() - lastUpdatedAt) / 1000));
-    var clock = new Date(lastUpdatedAt).toLocaleTimeString(
+    if (!updatedEl) { return; }
+    var clock = new Date().toLocaleTimeString(
       [], { hour: '2-digit', minute: '2-digit', second: '2-digit' }
     );
-    updatedEl.innerHTML = '<span class="badge bg-success-lt text-success me-1">' +
-      secs + 's ago</span>' + clock;
+    updatedEl.innerHTML = '<i class="far fa-clock me-1"></i>' + clock;
   }
 
   loadLive();
