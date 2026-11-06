@@ -1692,6 +1692,9 @@ class LocationTrackerPageTests(TestCase):
         # The map should always render so live polling can fill it in.
         self.assertContains(response, 'id="locationTrackerMap"')
         self.assertContains(response, 'Live OFW Map')
+        # Self-hosted Leaflet avoids the production CSP blocking unpkg.com.
+        self.assertContains(response, 'libs/leaflet/leaflet.js')
+        self.assertNotContains(response, 'unpkg.com')
 
     def test_map_renders_even_before_any_ping(self):
         LocationTracker.objects.filter(ofw=self.profile).delete()
@@ -1855,6 +1858,9 @@ class OFWConnectedSafetyPagesTests(TestCase):
         self.assertContains(response, 'id="live-map-places"')
         self.assertContains(response, 'Dubai Police Station')
         self.assertContains(response, 'data-own-lat="25.204800"')
+        # Leaflet must be self-hosted so CSP does not block it in production.
+        self.assertContains(response, 'libs/leaflet/leaflet.js')
+        self.assertNotContains(response, 'unpkg.com')
 
     def test_login_warnings_page_shows_inactive_days(self):
         old_login = timezone.now() - timedelta(days=4)

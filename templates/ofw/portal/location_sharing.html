@@ -1,6 +1,7 @@
 {% extends "theme/base.html" %}
+{% load static %}
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="{% static 'libs/leaflet/leaflet.css' %}" />
 <style>
   #myLocationMap {
     height: 340px;
@@ -203,7 +204,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
 <script>
 (function () {
   // --- Map: my last known position + safe places -------------------------
@@ -216,10 +217,22 @@
       [center.lat || 12.8797, center.lng || 121.7740],
       center.zoom || 5
     );
-    L.tileLayer(
+    // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
+    var esri = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
       { maxZoom: 19, attribution: 'Tiles &copy; Esri' }
-    ).addTo(map);
+    );
+    var switched = false;
+    esri.on('tileerror', function () {
+      if (switched) { return; }
+      switched = true;
+      map.removeLayer(esri);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+    });
+    esri.addTo(map);
 
     var bounds = [];
     var ownLat = mapEl.getAttribute('data-own-lat');

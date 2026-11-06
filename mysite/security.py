@@ -8,8 +8,9 @@ class SecurityHeadersMiddleware:
 
     CSP is deliberately conservative: it allows the project's own static
     assets, FontAwesome, Tabler CDN resources, and inline styles/scripts
-    that the Tabler theme requires.  Adjust as needed when new external
-    providers are added.
+    that the Tabler theme requires.  Leaflet is self-hosted under
+    static/libs/leaflet, and map tiles are images (allowed by img-src https:).
+    Adjust as needed when new external providers are added.
     """
 
     def __init__(self, get_response):

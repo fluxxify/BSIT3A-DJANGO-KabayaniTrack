@@ -310,7 +310,7 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="{% static 'libs/leaflet/leaflet.css' %}" />
 <link rel="stylesheet" href="{% static 'css/emergency.css' %}?v=20261101c" />
 <style>
   #locationTrackerMap { height: 420px; width: 100%; border-radius: 0.5rem; }
@@ -318,7 +318,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
 <script src="{% static 'js/kabayani-location.js' %}?v=20261101c"></script>
 <script>
 (function () {

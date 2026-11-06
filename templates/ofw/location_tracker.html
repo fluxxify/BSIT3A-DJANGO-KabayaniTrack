@@ -1,4 +1,5 @@
 {% extends "theme/base.html" %}
+{% load static %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -243,11 +244,11 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="{% static 'libs/leaflet/leaflet.css' %}" />
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
 <script>
 (function () {
   var mapEl = document.getElementById('locationTrackerMap');
@@ -255,10 +256,27 @@
 
   var map = L.map('locationTrackerMap', { scrollWheelZoom: false }).setView([20, 0], 2);
 
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>'
-  }).addTo(map);
+  // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
+  function addBaseLayer(targetMap) {
+    var esri = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>' }
+    );
+    var switched = false;
+    esri.on('tileerror', function () {
+      if (switched) { return; }
+      switched = true;
+      targetMap.removeLayer(esri);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(targetMap);
+    });
+    esri.addTo(targetMap);
+    return esri;
+  }
+
+  addBaseLayer(map);
 
   var markers = {};
   var circles = {};
