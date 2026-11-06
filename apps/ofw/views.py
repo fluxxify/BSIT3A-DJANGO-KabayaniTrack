@@ -1574,11 +1574,32 @@ def location_tracker_page(request):
 
     located_rows = [row for row in rows if row['ping'] is not None]
 
+    # Map setup: show every safe place (the dataset is small) and start at a
+    # useful view instead of an empty world map. If any OFW has a ping the map
+    # fits them; otherwise it opens on the first deployment country in scope.
+    map_center = {'lat': 12.8797, 'lng': 121.7740, 'zoom': 4}
+    if located_rows:
+        first_ping = located_rows[0]['ping']
+        map_center = {
+            'lat': float(first_ping.latitude),
+            'lng': float(first_ping.longitude),
+            'zoom': 8,
+        }
+    else:
+        for profile in profiles:
+            country = canonical_country(profile.country or '')
+            if country in COUNTRY_GEO:
+                _iso2, lat, lng = COUNTRY_GEO[country]
+                map_center = {'lat': float(lat), 'lng': float(lng), 'zoom': 6}
+                break
+
     return render(request, 'ofw/location_tracker.html', {
         'rows': rows,
         'pings': history[:50],
         'located_rows': located_rows,
         'emergency_only': emergency_only,
+        'map_places': safe_place_markers(),
+        'map_center': map_center,
         'live_count': sum(1 for row in rows if row['freshness'] == 'live'),
         'no_location_count': sum(1 for row in rows if row['ping'] is None),
         'page_title': 'Live Location Map',
@@ -1780,6 +1801,39 @@ _EMERGENCY_NUMBERS = {
     'United Arab Emirates': '999',
     'Switzerland': '112',
 }
+
+
+def safe_place_markers(locations=None, limit=300):
+    """Serialize active safe places into the compact dicts Leaflet maps use.
+
+    Kept small so the admin map and the OFW's own map can draw every place
+    (the dataset is tiny) and then zoom to whichever ones are near the user.
+    """
+    if locations is None:
+        locations = SafeLocation.objects.filter(is_active=True)
+
+    markers = []
+    for place in locations:
+        if not place.has_coords:
+            continue
+        markers.append({
+            'name': place.name,
+            'type': place.get_location_type_display(),
+            'type_key': place.location_type,
+            'lat': float(place.latitude),
+            'lng': float(place.longitude),
+            'phone': place.phone,
+            'address': place.address,
+            'city': place.city,
+            'country': place.country,
+            'maps_url': (
+                'https://www.google.com/maps/dir/?api=1&destination='
+                f'{place.latitude},{place.longitude}'
+            ),
+        })
+        if len(markers) >= limit:
+            break
+    return markers
 
 
 def nearest_safe_places(lat, lng, limit=6, locations=None):

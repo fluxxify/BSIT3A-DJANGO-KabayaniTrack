@@ -1703,6 +1703,24 @@ class LocationTrackerPageTests(TestCase):
         self.assertContains(response, 'id="locationTrackerMap"')
         self.assertContains(response, 'Waiting for OFW locations')
 
+    def test_map_shows_safe_places_and_near_me_button(self):
+        SafeLocation.objects.create(
+            name='Test Safe Hospital',
+            location_type=SafeLocation.LocationType.HOSPITAL,
+            country='Philippines',
+            city='Manila',
+            latitude='14.599500',
+            longitude='120.984200',
+        )
+        response = self.client.get(reverse('ofw:location_tracker'))
+        self.assertEqual(response.status_code, 200)
+        # Place markers are shipped to the page as JSON for Leaflet.
+        self.assertContains(response, 'id="admin-map-places"')
+        self.assertContains(response, 'Test Safe Hospital')
+        self.assertContains(response, 'id="adminMapNearMe"')
+        # A back button is available at the top of the page.
+        self.assertContains(response, 'fa-arrow-left')
+
     def test_live_endpoint_returns_json_401_when_anonymous(self):
         self.client.logout()
         response = self.client.get(reverse('ofw:location_tracker_live'))
@@ -1857,12 +1875,23 @@ class OFWConnectedSafetyPagesTests(TestCase):
         self.assertContains(response, 'Dubai Central Hospital')
 
     def test_live_location_page_has_map_and_nearest_places(self):
+        # A safe place outside the deployment country must still reach the map,
+        # so an OFW can see safe places near wherever they physically are.
+        SafeLocation.objects.create(
+            name='Manila Safe Hospital',
+            location_type=SafeLocation.LocationType.HOSPITAL,
+            country='Philippines',
+            city='Manila',
+            latitude='14.599500',
+            longitude='120.984200',
+        )
         response = self.client.get(reverse('ofw:portal_location_sharing'))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'ofw/portal/location_sharing.html')
         self.assertContains(response, 'id="myLocationMap"')
         self.assertContains(response, 'id="live-map-places"')
         self.assertContains(response, 'Dubai Police Station')
+        self.assertContains(response, 'Manila Safe Hospital')
         self.assertContains(response, 'data-own-lat="25.204800"')
         # Leaflet must be self-hosted so CSP does not block it in production.
         self.assertContains(response, 'libs/leaflet/leaflet.js')

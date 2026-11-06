@@ -10,6 +10,13 @@
           <h2 class="page-title mb-0">{{ page_title }}</h2>
         </div>
         <div class="col-12 col-md-auto text-start text-md-end d-flex flex-wrap gap-2">
+          <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary"
+             onclick="if (window.history.length > 1) { window.history.back(); return false; }">
+            <i class="fas fa-arrow-left me-1"></i>Back
+          </a>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="adminMapNearMe">
+            <i class="fas fa-location-crosshairs me-1"></i>My location
+          </button>
           <span class="badge bg-success-lt text-success align-self-center" id="liveCountBadge">
             {{ live_count }} live now
           </span>
@@ -39,6 +46,8 @@
       are labelled so nobody mistakes them for a current position.
       <strong>No location</strong> means the OFW has not shared one yet — call or
       request their location from this page. The map updates automatically every 5 seconds.
+      Use <strong>My location</strong> to jump to your own area and see the safe
+      places saved near you.
     </div>
   </div>
 
@@ -50,6 +59,12 @@
         <span class="badge bg-secondary-lt text-secondary ms-2" id="mapStatusBadge">Loading…</span>
       </h5>
       <div class="card-actions text-muted small">
+        <span class="me-2 d-none d-sm-inline">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2fb344;"></span> Live OFW
+        </span>
+        <span class="me-2">
+          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#206bc4;"></span> Safe place
+        </span>
         <span id="mapUpdatedAt" title="Live clock — the map refreshes every 5 seconds"></span>
       </div>
     </div>
@@ -240,6 +255,8 @@
   </div>
   {% endif %}
 </div>
+{{ map_places|json_script:"admin-map-places" }}
+{{ map_center|json_script:"admin-map-center" }}
 {% endblock %}
 
 {% block extra_css %}
@@ -253,7 +270,12 @@
   var mapEl = document.getElementById('locationTrackerMap');
   if (!mapEl) return;
 
-  var map = L.map('locationTrackerMap', { scrollWheelZoom: false }).setView([20, 0], 2);
+  var mapCenterEl = document.getElementById('admin-map-center');
+  var mapCenter = mapCenterEl ? JSON.parse(mapCenterEl.textContent || '{}') : {};
+  var map = L.map('locationTrackerMap', { scrollWheelZoom: false }).setView(
+    [mapCenter.lat || 12.8797, mapCenter.lng || 121.7740],
+    mapCenter.zoom || 4
+  );
 
   // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
   function addBaseLayer(targetMap) {
@@ -283,6 +305,58 @@
   var historyPoints = {};
   var hasFit = false;
   var POLL_MS = 5000;
+
+  // Every active safe place is drawn once. The map zooms to the ones near the
+  // OFWs (or near the viewer after pressing "My location").
+  var placeMarkers = [];
+  var places = [];
+  (function loadPlaces() {
+    var el = document.getElementById('admin-map-places');
+    if (!el) { return; }
+    try {
+      places = JSON.parse(el.textContent || '[]') || [];
+    } catch (err) {
+      places = [];
+    }
+    places.forEach(function (place) {
+      if (!place || place.lat == null || place.lng == null) { return; }
+      var marker = L.circleMarker([place.lat, place.lng], {
+        radius: 6,
+        color: '#206bc4',
+        fillColor: '#206bc4',
+        fillOpacity: 0.8,
+        weight: 2
+      }).addTo(map);
+      var parts = ['<strong>' + escapeHtml(place.name) + '</strong>'];
+      if (place.type) { parts.push('<span style="color:#6c757d;">' + escapeHtml(place.type) + '</span>'); }
+      if (place.address) { parts.push(escapeHtml(place.address)); }
+      if (place.city || place.country) {
+        parts.push(escapeHtml([place.city, place.country].filter(Boolean).join(', ')));
+      }
+      if (place.phone) { parts.push('Phone: ' + escapeHtml(place.phone)); }
+      if (place.maps_url) {
+        parts.push('<a href="' + escapeHtml(place.maps_url) + '" target="_blank" rel="noopener">Directions</a>');
+      }
+      marker.bindPopup(parts.join('<br>'));
+      placeMarkers.push(marker);
+    });
+  })();
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function distanceKm(a, b) {
+    var toRad = Math.PI / 180;
+    var dLat = (b[0] - a[0]) * toRad;
+    var dLng = (b[1] - a[1]) * toRad;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a[0] * toRad) * Math.cos(b[0] * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -514,11 +588,17 @@
         }
 
         if (bounds.length && !hasFit) {
-          var group = L.featureGroup(Object.values(markers));
-          if (group.getLayers().length) {
-            map.fitBounds(group.getBounds().pad(0.2), { maxZoom: 14 });
-            hasFit = true;
-          }
+          // Include safe places close to the OFW markers so they are visible
+          // in the first view, not left far outside the viewport.
+          var fitPoints = bounds.slice();
+          places.forEach(function (place) {
+            var near = bounds.some(function (point) {
+              return distanceKm(point, [place.lat, place.lng]) <= 100;
+            });
+            if (near) { fitPoints.push([place.lat, place.lng]); }
+          });
+          map.fitBounds(L.latLngBounds(fitPoints).pad(0.2), { maxZoom: 13 });
+          hasFit = true;
         }
       })
       .catch(function (error) {
@@ -540,6 +620,52 @@
       [], { hour: '2-digit', minute: '2-digit', second: '2-digit' }
     );
     updatedEl.innerHTML = '<i class="far fa-clock me-1"></i>' + clock;
+  }
+
+  // Center on the viewer's own browser location and show a green "you" dot.
+  var nearMeBtn = document.getElementById('adminMapNearMe');
+  if (nearMeBtn) {
+    nearMeBtn.addEventListener('click', function () {
+      if (!navigator.geolocation) {
+        alert('This browser does not support location.');
+        return;
+      }
+      nearMeBtn.disabled = true;
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        nearMeBtn.disabled = false;
+        var latlng = [pos.coords.latitude, pos.coords.longitude];
+        map.setView(latlng, 14);
+        var me = window.__adminMeMarker;
+        if (me) {
+          me.setLatLng(latlng);
+        } else {
+          me = L.circleMarker(latlng, {
+            radius: 9,
+            color: '#0ca678',
+            fillColor: '#0ca678',
+            fillOpacity: 0.9,
+            weight: 3
+          }).addTo(map);
+          me.bindPopup('Your location (this browser)');
+          window.__adminMeMarker = me;
+        }
+        me.openPopup();
+        // Let the viewer know whether any safe place is close by.
+        var nearby = places.filter(function (place) {
+          return distanceKm(latlng, [place.lat, place.lng]) <= 25;
+        }).length;
+        var statusBadge = document.getElementById('mapStatusBadge');
+        if (statusBadge) {
+          statusBadge.textContent = nearby
+            ? nearby + ' safe place' + (nearby === 1 ? '' : 's') + ' within 25 km'
+            : 'No saved safe place within 25 km';
+          statusBadge.className = 'badge ms-2 ' + (nearby ? 'bg-primary-lt text-primary' : 'bg-secondary-lt text-secondary');
+        }
+      }, function (error) {
+        nearMeBtn.disabled = false;
+        alert('Could not get your location: ' + (error && error.message ? error.message : 'permission denied'));
+      }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    });
   }
 
   loadLive();

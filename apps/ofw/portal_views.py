@@ -55,6 +55,7 @@ from .views import (
     _welfare_badge,
     location_tracker_ping,
     nearest_safe_places,
+    safe_place_markers,
 )
 
 
@@ -153,9 +154,14 @@ def _safety_places(profile, latest_ping=None, limit=6):
 
 
 def _map_places(profile, latest_ping=None):
-    """Safe-place markers for the OFW's own map, nearest first when known."""
+    """Safe-place markers for the OFW's own map, nearest first when known.
+
+    Every active place is included (the dataset is small) so the map can show
+    the safe places near wherever the OFW actually is, not only the ones saved
+    for their deployment country.
+    """
     latest_ping = latest_ping if latest_ping is not None else _latest_ping(profile)
-    places = list(_country_places(profile))
+    places = list(SafeLocation.objects.filter(is_active=True))
     if latest_ping is not None:
         ordered = nearest_safe_places(
             latest_ping.latitude,
@@ -165,25 +171,7 @@ def _map_places(profile, latest_ping=None):
         )
         by_id = {place.pk: place for place in places}
         places = [by_id[row['id']] for row in ordered if row['id'] in by_id]
-
-    markers = []
-    for place in places:
-        if not place.has_coords:
-            continue
-        markers.append({
-            'name': place.name,
-            'type': place.get_location_type_display(),
-            'type_key': place.location_type,
-            'lat': float(place.latitude),
-            'lng': float(place.longitude),
-            'phone': place.phone,
-            'address': place.address,
-            'maps_url': (
-                'https://www.google.com/maps/dir/?api=1&destination='
-                f'{place.latitude},{place.longitude}'
-            ),
-        })
-    return markers[:80]
+    return safe_place_markers(places)
 
 
 def _map_center(profile, latest_ping=None):

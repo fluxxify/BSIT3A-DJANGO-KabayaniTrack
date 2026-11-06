@@ -235,12 +235,13 @@
     });
     esri.addTo(map);
 
-    var bounds = [];
     var ownLat = mapEl.getAttribute('data-own-lat');
     var ownLng = mapEl.getAttribute('data-own-lng');
     var ownMarker = null;
+    var ownLatLng = null;
     if (ownLat && ownLng) {
-      ownMarker = L.circleMarker([parseFloat(ownLat), parseFloat(ownLng)], {
+      ownLatLng = [parseFloat(ownLat), parseFloat(ownLng)];
+      ownMarker = L.circleMarker(ownLatLng, {
         radius: 9,
         color: '#d63939',
         fillColor: '#d63939',
@@ -249,10 +250,12 @@
       }).addTo(map);
       ownMarker.bindPopup('Your last shared location<br><span class="text-muted">' +
         (mapEl.getAttribute('data-own-time') || '') + '</span>');
-      bounds.push([parseFloat(ownLat), parseFloat(ownLng)]);
     }
 
+    var placePoints = [];
     places.forEach(function (place) {
+      if (!place || place.lat == null || place.lng == null) { return; }
+      placePoints.push([place.lat, place.lng]);
       var marker = L.circleMarker([place.lat, place.lng], {
         radius: 7,
         color: '#206bc4',
@@ -268,16 +271,39 @@
         parts.push('<a href="' + escapeHtml(place.maps_url) + '" target="_blank" rel="noopener">Directions</a>');
       }
       marker.bindPopup(parts.join('<br>'));
-      bounds.push([place.lat, place.lng]);
     });
 
-    if (bounds.length > 1) {
-      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+    function distanceKm(a, b) {
+      var toRad = Math.PI / 180;
+      var dLat = (b[0] - a[0]) * toRad;
+      var dLng = (b[1] - a[1]) * toRad;
+      var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(a[0] * toRad) * Math.cos(b[0] * toRad) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      return 6371 * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
     }
 
-    // Expose map and ownMarker for live updates
+    // Zoom to the viewer plus only the safe places near them. Fitting every
+    // place would zoom out to the whole world and hide the local markers.
+    function fitNearby(anchor) {
+      if (!anchor) { return; }
+      var nearby = placePoints.filter(function (point) {
+        return distanceKm(anchor, point) <= 120;
+      });
+      if (nearby.length) {
+        var points = [anchor].concat(nearby);
+        map.fitBounds(L.latLngBounds(points).pad(0.2), { maxZoom: 14 });
+      } else {
+        map.setView(anchor, 13);
+      }
+    }
+
+    fitNearby(ownLatLng);
+
+    // Expose map, ownMarker and the fit helper for live updates.
     window.__myLocationMap = map;
     window.__myLocationMarker = ownMarker;
+    window.__fitNearbyPlaces = fitNearby;
   }
 
   function escapeHtml(value) {
@@ -300,6 +326,7 @@
   var ageEl = document.getElementById('liveAge');
   var sharingStatusEl = document.getElementById('sharingStatus');
   var lastLiveAt = null;
+  var liveFitDone = false;
 
   function updateLiveAge() {
     if (!ageEl || !lastLiveAt) { return; }
@@ -344,7 +371,12 @@
           timeEl.textContent + ' · ±' + Math.round(c.accuracy || 0) + ' m</span>');
         window.__myLocationMarker = ownMarker;
       }
-      map.setView(latlng, map.getZoom() > 13 ? map.getZoom() : 13);
+      // Only auto-fit once with the real GPS fix. After that the marker moves
+      // on its own and the viewer can pan or press "Center on me" freely.
+      if (!liveFitDone) {
+        liveFitDone = true;
+        if (window.__fitNearbyPlaces) { window.__fitNearbyPlaces(latlng); }
+      }
     }
 
     if (sharingStatusEl) {
@@ -380,9 +412,12 @@
       if (!navigator.geolocation) { return; }
       navigator.geolocation.getCurrentPosition(function (pos) {
         showLivePosition(pos);
-        var map = window.__myLocationMap;
-        if (map) {
-          map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+        var latlng = [pos.coords.latitude, pos.coords.longitude];
+        if (window.__fitNearbyPlaces) {
+          window.__fitNearbyPlaces(latlng);
+        } else {
+          var map = window.__myLocationMap;
+          if (map) { map.setView(latlng, 15); }
         }
       }, showLiveError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
     });
