@@ -70,12 +70,18 @@
       </div>
     </div>
     <div class="card-body">
-      <div id="myLocationMap"
-           {% if latest_ping %}data-own-lat="{{ latest_ping.latitude }}" data-own-lng="{{ latest_ping.longitude }}" data-own-time="{{ latest_ping.recorded_at|date:'M d, H:i' }}"{% endif %}></div>
+      <div class="position-relative">
+        <div id="myLocationMap"
+             {% if latest_ping %}data-own-lat="{{ latest_ping.latitude }}" data-own-lng="{{ latest_ping.longitude }}" data-own-time="{{ latest_ping.recorded_at|date:'M d, H:i' }}"{% endif %}></div>
+        <div id="mapZoomHint" class="position-absolute bottom-0 start-0 m-2 badge bg-dark d-none d-md-block"
+             style="pointer-events:none;opacity:.75;">
+          <i class="fas fa-mouse me-1"></i>Click the map, then scroll to zoom
+        </div>
+      </div>
       <div class="d-flex flex-wrap gap-3 mt-2 text-muted small">
         <span><span class="badge bg-danger">&nbsp;</span> Your location</span>
         <span><span class="badge bg-primary">&nbsp;</span> Safe place</span>
-        {% if location_country %}<span>Showing places in {{ location_country }}.</span>{% endif %}
+        <span>Map zooms to the safe places near you.</span>
       </div>
     </div>
   </div>
@@ -218,6 +224,17 @@
       [center.lat || 12.8797, center.lng || 121.7740],
       center.zoom || 5
     );
+
+    // Wheel zoom is opt-in: click the map first so the page keeps scrolling
+    // normally while the cursor passes over it.
+    map.on('click', function () {
+      map.scrollWheelZoom.enable();
+      var hint = document.getElementById('mapZoomHint');
+      if (hint) { hint.style.display = 'none'; }
+    });
+    mapEl.addEventListener('mouseleave', function () {
+      map.scrollWheelZoom.disable();
+    });
     // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
     var esri = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',

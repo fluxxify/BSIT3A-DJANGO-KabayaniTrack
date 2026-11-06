@@ -70,6 +70,10 @@
     </div>
     <div class="card-body p-0 position-relative">
       <div id="locationTrackerMap" style="height: 460px; width: 100%;"></div>
+      <div id="mapZoomHint" class="position-absolute bottom-0 start-0 m-2 badge bg-dark d-none d-md-block"
+           style="pointer-events:none;opacity:.75;">
+        <i class="fas fa-mouse me-1"></i>Click the map, then scroll to zoom
+      </div>
       <div id="mapEmpty" class="position-absolute top-50 start-50 translate-middle text-center text-muted px-3" style="pointer-events:none;">
         <i class="fas fa-satellite-dish fa-2x mb-2"></i>
         <div class="fw-medium">Waiting for OFW locations…</div>
@@ -276,6 +280,17 @@
     [mapCenter.lat || 12.8797, mapCenter.lng || 121.7740],
     mapCenter.zoom || 4
   );
+
+  // Wheel zoom is opt-in: click the map first so scrolling the page normally
+  // does not get hijacked while the cursor passes over the map.
+  map.on('click', function () {
+    map.scrollWheelZoom.enable();
+    var hint = document.getElementById('mapZoomHint');
+    if (hint) { hint.style.display = 'none'; }
+  });
+  mapEl.addEventListener('mouseleave', function () {
+    map.scrollWheelZoom.disable();
+  });
 
   // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
   function addBaseLayer(targetMap) {
