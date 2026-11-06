@@ -12,6 +12,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from . import crud
@@ -1585,9 +1586,13 @@ def location_tracker_page(request):
     })
 
 
-@login_required(login_url='login')
+@never_cache
 def location_tracker_live(request):
     """JSON of latest location per OFW for the admin live map to poll."""
+    # Always answer JSON (never a login redirect/HTML), so the map's fetch()
+    # can show a useful message instead of a JSON parse failure.
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Login required.'}, status=401)
     if not (request.user.is_superuser or request.user.is_staff):
         return JsonResponse({'error': 'Management accounts only.'}, status=403)
 

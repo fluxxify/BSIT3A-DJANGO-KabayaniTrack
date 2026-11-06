@@ -1703,6 +1703,12 @@ class LocationTrackerPageTests(TestCase):
         self.assertContains(response, 'id="locationTrackerMap"')
         self.assertContains(response, 'Waiting for OFW locations')
 
+    def test_live_endpoint_returns_json_401_when_anonymous(self):
+        self.client.logout()
+        response = self.client.get(reverse('ofw:location_tracker_live'))
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['error'], 'Login required.')
+
     def test_history_endpoint_returns_pings(self):
         response = self.client.get(
             reverse('ofw:ofw_location_history', args=[self.profile.pk])

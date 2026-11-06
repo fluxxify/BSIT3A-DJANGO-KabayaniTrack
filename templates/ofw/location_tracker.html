@@ -433,7 +433,14 @@
     fetch('{% url "ofw:location_tracker_live" %}{% if emergency_only %}?emergency=1{% endif %}', {
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
-      .then(function (resp) { return resp.json(); })
+      .then(function (resp) {
+        if (!resp.ok) { throw new Error('HTTP ' + resp.status); }
+        var ct = resp.headers.get('content-type') || '';
+        if (ct.indexOf('application/json') === -1) {
+          throw new Error('Unexpected response (not JSON)');
+        }
+        return resp.json();
+      })
       .then(function (data) {
         var ofws = data.ofws || [];
         var bounds = [];
@@ -489,7 +496,7 @@
         console.error('Live map update failed:', error);
         var statusBadge = document.getElementById('mapStatusBadge');
         if (statusBadge) {
-          statusBadge.textContent = 'Update error — retrying…';
+          statusBadge.textContent = 'Update error (' + error.message + ') — retrying…';
           statusBadge.className = 'badge ms-2 bg-danger-lt text-danger';
         }
       });
