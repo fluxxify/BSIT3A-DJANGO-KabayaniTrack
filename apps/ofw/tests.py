@@ -1663,6 +1663,49 @@ class LocationContextApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class LocationTrackerPageTests(TestCase):
+    """The Live OFW Map page must render (no loop-scoped {% url %} errors)."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='mapstaff', password='Passw0rd!23', is_staff=True
+        )
+        self.ofw_user = User.objects.create_user(
+            username='mapofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw_user)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Map', last_name='OFW',
+            country='United Arab Emirates', city_abroad='Dubai',
+        )
+        LocationTracker.objects.create(
+            ofw=self.profile, latitude='25.204800', longitude='55.270800',
+        )
+        self.client.force_login(self.staff)
+
+    def test_page_renders_with_reversible_history_url(self):
+        response = self.client.get(reverse('ofw:location_tracker'))
+        self.assertEqual(response.status_code, 200)
+        # The JS builds this URL at runtime, so the placeholder id must reverse.
+        self.assertContains(response, '/location-tracker/history/0/')
+
+    def test_history_endpoint_returns_pings(self):
+        response = self.client.get(
+            reverse('ofw:ofw_location_history', args=[self.profile.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['ofw_id'], self.profile.pk)
+        self.assertEqual(len(data['pings']), 1)
+
+    def test_history_endpoint_requires_management(self):
+        self.client.force_login(self.ofw_user)
+        response = self.client.get(
+            reverse('ofw:ofw_location_history', args=[self.profile.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+
+
 class LocationRetentionCommandTests(TestCase):
     def test_command_previews_then_deletes_only_when_requested(self):
         from datetime import timedelta

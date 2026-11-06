@@ -329,6 +329,13 @@
     }
   }
 
+  // Reverse once with a placeholder id, then swap in the clicked OFW's id.
+  var HISTORY_URL_TEMPLATE = '{% url "ofw:ofw_location_history" 0 %}';
+
+  function historyUrl(ofwId) {
+    return HISTORY_URL_TEMPLATE.replace(/0\/$/, ofwId + '/');
+  }
+
   function loadHistory(ofwId, ofwName) {
     if (historyLines[ofwId]) {
       // Toggle off
@@ -337,10 +344,13 @@
       delete historyPoints[ofwId];
       return;
     }
-    fetch('{% url "ofw:ofw_location_history" row.profile.pk %}', {
+    fetch(historyUrl(ofwId), {
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
-      .then(function (resp) { return resp.json(); })
+      .then(function (resp) {
+        if (!resp.ok) { throw new Error('HTTP ' + resp.status); }
+        return resp.json();
+      })
       .then(function (data) {
         var pings = data.pings || [];
         if (pings.length === 0) {
@@ -380,10 +390,14 @@
 
         map.fitBounds(line.getBounds().pad(0.2), { maxZoom: 14 });
       })
-      .catch(function () {
-        alert('Could not load location history.');
+      .catch(function (error) {
+        console.error('Location history error:', error);
+        alert('Could not load location history: ' + error.message);
       });
   }
+
+  // Inline onclick handlers (table button + map popups) need a global reference.
+  window.loadHistory = loadHistory;
 
   function loadLive() {
     fetch('{% url "ofw:location_tracker_live" %}', {
