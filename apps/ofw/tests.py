@@ -1718,9 +1718,8 @@ class LocationTrackerPageTests(TestCase):
         self.assertContains(response, 'id="admin-map-places"')
         self.assertContains(response, 'Test Safe Hospital')
         self.assertContains(response, 'id="adminMapNearMe"')
-        # Pan buttons let the viewer move the map in every direction.
-        self.assertContains(response, 'Pan left')
-        self.assertContains(response, 'Pan right')
+        # The mouse wheel pans the map; a hint explains the controls.
+        self.assertContains(response, 'Scroll = move')
         # A back button is available at the top of the page.
         self.assertContains(response, 'fa-arrow-left')
 
