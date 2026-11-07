@@ -402,6 +402,7 @@ class AuthMessageTests(TestCase):
         response = self.client.get(reverse('logout'), follow=True)
         self.assertContains(response, 'Logged out successfully.')
         self.assertContains(response, 'Sign in to start your session')
+        self.assertContains(response, 'dh-auth-bg')
 
 
 class PasswordResetTests(TestCase):

@@ -151,6 +151,7 @@ class OFWPortalTests(TestCase):
         response = self.client.get(reverse('ofw:portal'))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'ofw/portal/home.html')
+        self.assertContains(response, 'dh-dashboard-hero')
 
     def test_portal_pages_render(self):
         for name in ['portal', 'portal_profile', 'portal_checkins',

@@ -118,6 +118,7 @@ class AgencyWorkspaceTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.agency_a.name)
+        self.assertContains(response, 'dh-auth-bg')
         self.assertContains(
             response, reverse('agency_register', args=[self.agency_a.slug])
         )

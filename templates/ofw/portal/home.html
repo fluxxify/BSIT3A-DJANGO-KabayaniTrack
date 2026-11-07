@@ -1,20 +1,18 @@
 {% extends "theme/base.html" %}
 {% block content %}
 <div class="container-xl">
-  <div class="page-header d-print-none" aria-label="Page header">
-    <div class="row align-items-center">
-      <div class="col">
-        <div class="page-pretitle">OFW Portal</div>
-        <h2 class="page-title mb-0">Welcome back, {{ user.first_name|default:user.username }}</h2>
-      </div>
+  <div class="dh-dashboard-hero mb-4">
+    <div class="dh-dashboard-hero__eyebrow">OFW Portal</div>
+    <h2 class="dh-dashboard-hero__title">
+      Welcome back, {{ user.first_name|default:user.username }}
+    </h2>
+    <div class="dh-dashboard-hero__meta">
+      <span><i class="far fa-calendar-days me-1"></i>{% now "F j, Y" %}</span>
       {% if profile %}
-      <div class="col-auto ms-auto d-print-none">
-        <span class="badge {{ welfare_badge }} fs-5 px-3 py-2">{{ profile.get_welfare_status_display }}</span>
-      </div>
+      <span class="badge {{ welfare_badge }}">{{ profile.get_welfare_status_display }}</span>
       {% endif %}
     </div>
   </div>
-  <br>
 
   <div class="card mb-3">
     <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
