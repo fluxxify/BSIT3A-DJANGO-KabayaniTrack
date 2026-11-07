@@ -676,6 +676,12 @@ class OFWLocationSharing(models.Model):
 class MonitoringReport(models.Model):
     """A consolidated monitoring report covering a reporting period."""
 
+    ATTACHMENT_EXTENSIONS = (
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt', '.rtf',
+        '.jpg', '.jpeg', '.png', '.webp', '.gif',
+    )
+    ATTACHMENT_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+
     class ReportType(models.TextChoices):
         MONTHLY = 'monthly', 'Monthly'
         QUARTERLY = 'quarterly', 'Quarterly'

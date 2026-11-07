@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from apps.ofw.forms import CheckInForm
+from apps.ofw.forms import CheckInForm, MonitoringReportForm
 from apps.ofw.hotlines import (
     COUNTRY_HOTLINES,
     PHILIPPINE_HOTLINES,
@@ -2409,3 +2409,42 @@ class CheckDeployTests(TestCase):
         SafeLocation.objects.all().delete()
         with self.assertRaises(CommandError):
             call_command('check_deploy', stdout=self.stdout)
+
+
+class MonitoringReportAttachmentTests(TestCase):
+    """Report attachments only accept document and image file types."""
+
+    def _form(self, name, size=4):
+        return MonitoringReportForm(
+            data={
+                'title': 'Monthly report',
+                'report_type': MonitoringReport.ReportType.MONTHLY,
+                'period_start': '2026-01-01',
+                'period_end': '2026-01-31',
+                'country': 'Qatar',
+                'summary': '',
+                'status': MonitoringReport.Status.DRAFT,
+            },
+            files={'attachment': SimpleUploadedFile(name, b'x' * size)},
+        )
+
+    def test_rejects_html_attachment(self):
+        form = self._form('evil.html')
+        self.assertFalse(form.is_valid())
+        self.assertIn('attachment', form.errors)
+
+    def test_rejects_svg_attachment(self):
+        form = self._form('evil.svg')
+        self.assertFalse(form.is_valid())
+        self.assertIn('attachment', form.errors)
+
+    def test_accepts_pdf_attachment(self):
+        form = self._form('report.pdf')
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rejects_oversized_attachment(self):
+        form = self._form(
+            'report.pdf', size=MonitoringReport.ATTACHMENT_MAX_SIZE + 1
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('attachment', form.errors)

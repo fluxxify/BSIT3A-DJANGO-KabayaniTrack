@@ -223,6 +223,21 @@ class MonitoringReportForm(StyledModelForm):
             raise ValidationError('Period end must not be earlier than period start.')
         return cleaned
 
+    def clean_attachment(self):
+        attachment = self.cleaned_data.get('attachment')
+        if not attachment or attachment is False:
+            return attachment
+
+        name = getattr(attachment, 'name', '') or ''
+        extension = os.path.splitext(name)[1].lower()
+        if extension not in MonitoringReport.ATTACHMENT_EXTENSIONS:
+            raise ValidationError(
+                'Upload a PDF, Word, Excel, CSV, TXT or image file.'
+            )
+        if attachment.size > MonitoringReport.ATTACHMENT_MAX_SIZE:
+            raise ValidationError('The attachment must be 10 MB or smaller.')
+        return attachment
+
 
 class OFWPortalProfileForm(StyledModelForm):
     """Fields an OFW may maintain on their own profile.
