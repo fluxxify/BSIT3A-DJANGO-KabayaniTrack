@@ -133,6 +133,7 @@ class HomeViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'home.html')
+        self.assertContains(response, 'dh-dashboard-hero')
 
     def test_home_requires_login(self):
         response = self.client.get(reverse('dashboard'))
