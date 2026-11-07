@@ -990,6 +990,22 @@ class FamilyContactTests(TestCase):
             'notes': '',
         })
 
+    def test_post_without_profile_redirects_instead_of_500(self):
+        self.profile.delete()
+        self.client.force_login(self.ofw)
+        response = self.client.post(reverse('ofw:portal_contacts'), {
+            'name': 'No Profile Contact',
+            'relationship': 'Parent',
+            'phone': '+63 917 000 1111',
+            'email': '',
+            'address': '',
+            'notes': '',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            EmergencyContact.objects.filter(user=self.ofw).exists()
+        )
+
     def test_ofw_adds_family_contact_directly(self):
         response = self._add_contact()
         self.assertEqual(response.status_code, 302)
@@ -1004,7 +1020,6 @@ class FamilyContactTests(TestCase):
         response = self.client.get(reverse('ofw:portal_contacts'))
         self.assertContains(response, 'Liza Bautista')
         self.assertContains(response, 'Spouse')
-
     def test_ofw_can_edit_own_contact(self):
         self._add_contact()
         contact = EmergencyContact.objects.get(user=self.ofw)

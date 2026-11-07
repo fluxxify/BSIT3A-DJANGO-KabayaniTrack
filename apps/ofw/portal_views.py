@@ -759,6 +759,12 @@ def portal_contacts(request):
     location_city = profile.city_abroad.strip() if profile and profile.city_abroad else ''
 
     if request.method == 'POST':
+        if profile is None:
+            messages.info(
+                request,
+                'Please complete your profile before adding emergency contacts.',
+            )
+            return redirect('ofw:portal_profile')
         form = FamilyContactForm(request.POST)
         if form.is_valid():
             contact = form.save(commit=False)
