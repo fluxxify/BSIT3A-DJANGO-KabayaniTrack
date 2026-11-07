@@ -89,6 +89,48 @@ class MediaServingTests(TestCase):
         self.assertEqual(response.status_code, 416)
         self.assertEqual(response['Content-Range'], 'bytes */10')
 
+    def _add_proof(self, name):
+        with open(os.path.join(TEMP_MEDIA_DIR, name), 'wb') as handle:
+            handle.write(b'<script>alert(1)</script>')
+        concern = Concern.objects.create(
+            ofw=self.profile, user=self.user, title='Uploaded file',
+            reported_date='2026-01-02',
+        )
+        ConcernProof.objects.create(concern=concern, file=name)
+
+    @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+    def test_media_responses_are_nosniff(self):
+        response = self.client.get(reverse('media', args=['proof.mp4']))
+        self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+        b''.join(response.streaming_content)
+
+    @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+    def test_media_serves_video_inline(self):
+        response = self.client.get(reverse('media', args=['proof.mp4']))
+        self.assertTrue(response['Content-Disposition'].startswith('inline;'))
+        self.assertEqual(response['Content-Type'], 'video/mp4')
+        b''.join(response.streaming_content)
+
+    @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+    def test_html_upload_is_forced_as_attachment(self):
+        self._add_proof('evil.html')
+        response = self.client.get(reverse('media', args=['evil.html']))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response['Content-Disposition'].startswith('attachment;')
+        )
+        self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+        b''.join(response.streaming_content)
+
+    @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
+    def test_svg_upload_is_forced_as_attachment(self):
+        self._add_proof('evil.svg')
+        response = self.client.get(reverse('media', args=['evil.svg']))
+        self.assertTrue(
+            response['Content-Disposition'].startswith('attachment;')
+        )
+        b''.join(response.streaming_content)
+
     @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
     def test_missing_file_returns_404(self):
         response = self.client.get(reverse('media', args=['nope.mp4']))

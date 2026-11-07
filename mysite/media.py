@@ -12,6 +12,7 @@ inline on phones.
 import mimetypes
 import os
 import re
+from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -20,6 +21,19 @@ from django.utils.http import http_date
 
 RANGE_HEADER_RE = re.compile(r'^bytes=(?P<start>\d*)-(?P<end>\d*)$')
 FILE_CHUNK_SIZE = 64 * 1024
+
+# Only these types may render inline.  Everything else (HTML, SVG, XML,
+# scripts, unknown extensions) is served as a download so an uploaded file can
+# never execute inside the site's origin.
+INLINE_MEDIA_TYPES = frozenset({
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'image/bmp', 'image/heic', 'image/heif',
+    'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
+    'video/x-m4v', 'video/3gpp', 'video/3gpp2',
+    'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/mp4',
+    'audio/aac',
+    'application/pdf',
+})
 
 
 def _safe_media_path(path):
@@ -39,6 +53,16 @@ def _safe_media_path(path):
 def _content_type(fullpath):
     guessed, _ = mimetypes.guess_type(fullpath)
     return guessed or 'application/octet-stream'
+
+
+def _content_disposition(filename, inline):
+    """Build a disposition header that cannot break out of the filename."""
+    safe = re.sub(r'[^A-Za-z0-9._-]', '_', filename) or 'download'
+    disposition = 'inline' if inline else 'attachment'
+    return (
+        f'{disposition}; filename="{safe}"; '
+        f"filename*=UTF-8''{quote(filename, safe='')}"
+    )
 
 
 def _file_stream(fileobj, length):
@@ -81,6 +105,7 @@ def serve_media(request, path):
     stat = os.stat(fullpath)
     file_size = stat.st_size
     content_type = _content_type(fullpath)
+    inline = content_type in INLINE_MEDIA_TYPES
 
     range_header = request.META.get('HTTP_RANGE', '').strip()
     match = RANGE_HEADER_RE.match(range_header) if range_header else None
@@ -108,6 +133,7 @@ def serve_media(request, path):
             response = HttpResponse(status=416)
             response['Content-Range'] = 'bytes */%d' % file_size
             response['Accept-Ranges'] = 'bytes'
+            response['X-Content-Type-Options'] = 'nosniff'
             return response
         end = min(end, file_size - 1)
 
@@ -117,7 +143,8 @@ def serve_media(request, path):
     common_headers = {
         'Accept-Ranges': 'bytes',
         'Last-Modified': http_date(stat.st_mtime),
-        'Content-Disposition': 'inline; filename="%s"' % filename,
+        'Content-Disposition': _content_disposition(filename, inline),
+        'X-Content-Type-Options': 'nosniff',
     }
 
     if request.method == 'HEAD':
