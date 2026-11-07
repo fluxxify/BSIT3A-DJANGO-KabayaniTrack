@@ -11,6 +11,9 @@ env/
 # Django
 db.sqlite3
 db.sqlite3.bak
+*.bak
+*.sql
+seed_*.py
 media/
 staticfiles/
 deploy/pythonanywhere_wsgi.generated.py
