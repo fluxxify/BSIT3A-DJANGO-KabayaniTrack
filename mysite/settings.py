@@ -199,13 +199,57 @@ CSRF_COOKIE_SECURE = not DEBUG
 # Production defaults to HTTPS redirects. The proxy header above lets Django
 # recognize HTTPS terminated by PythonAnywhere or another trusted proxy.
 SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
-SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_SECONDS = int(os.environ.get(
+    'DJANGO_SECURE_HSTS_SECONDS', '0' if DEBUG else '3600'
+))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
     'DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', False
 )
 SECURE_HSTS_PRELOAD = _env_bool('DJANGO_SECURE_HSTS_PRELOAD', False)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Logging: surface application errors in the host's console/log file. Without
+# this Django falls back to a default config where loggers such as
+# ``apps.core.password_reset`` are easy to miss (a failed reset email only
+# shows up there).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {name}:{lineno} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 # Concern proof uploads (photos/videos from the OFW portal)
 # DATA_UPLOAD_MAX_MEMORY_SIZE caps the whole request body; without raising it
