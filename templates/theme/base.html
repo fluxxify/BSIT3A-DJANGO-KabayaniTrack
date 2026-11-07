@@ -70,6 +70,12 @@
     <script src="{% static 'libs/jsvectormap/dist/maps/world-merc.js' %}" defer></script>
     <script src="{% static 'libs/list.js/dist/list.min.js' %}" defer></script>
     <script src="{% static 'js/tabler.js' %}"></script>
+    <script>
+      // Tabler's bundle exposes Bootstrap as window.tabler.bootstrap. Expose
+      // the familiar window.bootstrap name so page scripts can keep using
+      // new bootstrap.Modal(...) without loading Bootstrap twice.
+      window.bootstrap = window.bootstrap || (window.tabler && window.tabler.bootstrap);
+    </script>
     <script src="{% static 'js/flash-messages.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
 

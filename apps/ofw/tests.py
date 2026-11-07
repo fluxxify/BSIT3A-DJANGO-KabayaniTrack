@@ -347,7 +347,12 @@ class ConcernProofUploadTests(TestCase):
         self.assertContains(response, 'id="concern-gallery-btn"')
         self.assertContains(response, 'id="concern-camera-input"')
         self.assertContains(response, 'capture="environment"')
+        # The fallback device camera must allow both photos and videos.
+        self.assertContains(response, 'accept="image/*,video/*"')
         self.assertContains(response, 'id="concernCameraModal"')
+        # Tabler's bundled Bootstrap must be reachable as window.bootstrap
+        # so the camera modal can actually open.
+        self.assertContains(response, 'window.bootstrap = window.bootstrap')
         self.assertContains(response, 'id="concern-camera-video"')
         self.assertContains(response, 'id="concern-camera-shutter"')
         self.assertContains(response, 'id="concern-camera-record"')

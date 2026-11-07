@@ -53,7 +53,7 @@
                 </button>
               </div>
               <input type="file" id="concern-camera-input" name="proof_files"
-                     accept="image/*" capture="environment" class="visually-hidden" tabindex="-1">
+                     accept="image/*,video/*" capture="environment" class="visually-hidden" tabindex="-1">
               {{ field }}
               <div id="concern-proof-preview" class="d-flex flex-wrap gap-2 mt-2"></div>
               <div id="concern-proof-status" class="form-hint mt-1" role="status" aria-live="polite"></div>
@@ -373,14 +373,22 @@
       if (video) video.srcObject = null;
     }
 
-    function pickRecordingMime() {
-      var types = [
+    function pickRecordingMime(hasAudio) {
+      // Include an audio codec only when the stream actually has audio;
+      // some browsers reject an audio codec for a video-only stream.
+      var types = hasAudio ? [
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
         'video/webm',
         'video/mp4'
+      ] : [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+        'video/mp4'
       ];
       if (!window.MediaRecorder || typeof MediaRecorder.isTypeSupported !== 'function') {
+        // Let the browser choose its default recording format.
         return '';
       }
       for (var i = 0; i < types.length; i += 1) {
@@ -422,19 +430,38 @@
       recordBtn.removeAttribute('aria-pressed');
     }
 
-    async function ensureAudioStream() {
+    async function ensureRecordingStream() {
       if (cameraStream && cameraStream.getAudioTracks().length) {
         return cameraStream;
       }
-      var stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: videoConstraints(true)
-      });
+
+      // Capture the current camera choice before stopping the preview. Some
+      // phones report the camera as busy if a second stream is opened while
+      // the first one is still active.
+      var constraints = { video: videoConstraints(true) };
       stopCamera();
-      cameraStream = stream;
-      video.srcObject = stream;
-      try { await video.play(); } catch (error) { /* autoplay can be blocked */ }
-      return stream;
+
+      // First try camera + microphone so the video has sound.
+      try {
+        var stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: constraints.video
+        });
+        cameraStream = stream;
+        video.srcObject = stream;
+        try { await video.play(); } catch (error) { /* autoplay can be blocked */ }
+        return stream;
+      } catch (error) {
+        // No microphone, or microphone permission denied: record video only.
+        var fallback = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: constraints.video
+        });
+        cameraStream = fallback;
+        video.srcObject = fallback;
+        try { await video.play(); } catch (fallbackError) { /* ignore */ }
+        return fallback;
+      }
     }
 
     async function startRecording() {
@@ -443,31 +470,29 @@
         showCameraError('This browser cannot record video. Please use Upload from Gallery / Files instead.');
         return;
       }
-      var mime = pickRecordingMime();
-      if (!mime) {
-        showCameraError('Video recording is not supported in this browser. Please upload a video instead.');
-        return;
-      }
 
       errorBox.classList.add('d-none');
       fallbackBtn.classList.add('d-none');
-      hint.textContent = 'Starting the microphone...';
+      hint.textContent = 'Preparing the camera and microphone...';
 
       var stream;
       try {
-        stream = await ensureAudioStream();
+        stream = await ensureRecordingStream();
       } catch (error) {
-        showCameraError('Camera and microphone access are needed to record a video. ' + cameraErrorMessage(error));
+        showCameraError('Could not start the camera for recording. ' + cameraErrorMessage(error));
         return;
       }
       if (video.classList.contains('d-none')) return;
 
+      var hasAudio = stream.getAudioTracks().length > 0;
+      var mime = pickRecordingMime(hasAudio);
+
       try {
-        recorder = new MediaRecorder(stream, { mimeType: mime });
+        recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       } catch (error) {
         try {
           recorder = new MediaRecorder(stream);
-          mime = recorder.mimeType || 'video/webm';
+          mime = recorder.mimeType || '';
         } catch (fallbackError) {
           recorder = null;
           showCameraError('This browser cannot record video. Please upload a video instead.');
@@ -475,7 +500,7 @@
         }
       }
 
-      recordingMime = mime;
+      recordingMime = recorder.mimeType || mime || 'video/webm';
       recordedChunks = [];
       discardRecording = false;
       recorder.addEventListener('dataavailable', function (event) {
@@ -502,7 +527,9 @@
       switchBtn.classList.add('d-none');
       retakeBtn.classList.add('d-none');
       useBtn.classList.add('d-none');
-      hint.textContent = 'Recording... Tap Stop when you are done.';
+      hint.textContent = hasAudio
+        ? 'Recording... Tap Stop when you are done.'
+        : 'Recording (no sound)... Tap Stop when you are done.';
       recordingTimer = window.setInterval(function () {
         timerEl.textContent = formatDuration(Date.now() - startedAt);
       }, 500);
@@ -530,9 +557,13 @@
     }
 
     function finishRecording() {
-      var mime = recordingMime || 'video/webm';
-      var type = mime.split(';')[0];
-      var extension = type === 'video/mp4' ? 'mp4' : 'webm';
+      var type = (recordingMime || 'video/webm').split(';')[0];
+      var extension = 'webm';
+      if (type === 'video/mp4' || type === 'video/quicktime') {
+        extension = 'mp4';
+      } else if (type === 'video/ogg') {
+        extension = 'ogv';
+      }
       var blob = new Blob(recordedChunks, { type: type });
       recordedChunks = [];
       recorder = null;
@@ -762,7 +793,8 @@
     }
 
     cameraBtn.addEventListener('click', function () {
-      var canUseModal = hasCameraUi && window.bootstrap && bootstrap.Modal;
+      var bs = window.bootstrap || (window.tabler && window.tabler.bootstrap);
+      var canUseModal = hasCameraUi && bs && bs.Modal;
       if (!canUseModal || !supportsLiveCamera()) {
         status.textContent = supportsLiveCamera()
           ? 'The live camera is not available. Opening your device camera/file picker instead.'
@@ -770,7 +802,7 @@
         cameraInput.click();
         return;
       }
-      cameraModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      cameraModal = bs.Modal.getOrCreateInstance(modalEl);
       cameraModal.show();
     });
   })();
