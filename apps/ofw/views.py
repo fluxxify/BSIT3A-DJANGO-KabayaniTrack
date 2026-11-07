@@ -1725,6 +1725,16 @@ def location_tracker_ping(request):
     if accuracy_value is not None and accuracy_value < 0:
         return JsonResponse({'error': 'Accuracy cannot be negative.'}, status=400)
 
+    # Non-emergency (background) pings are only allowed while the OFW has
+    # explicitly enabled live location sharing. Emergency SOS pings are
+    # user-initiated taps, so they keep working even when sharing is off.
+    if not is_emergency and not OFWLocationSharing.objects.filter(
+        ofw=profile, is_enabled=True
+    ).exists():
+        return JsonResponse(
+            {'error': 'Live location sharing is not enabled.'}, status=403
+        )
+
     ping = LocationTracker.objects.create(
         ofw=profile,
         latitude=latitude_value,

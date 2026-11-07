@@ -1684,6 +1684,29 @@ class LocationContextApiTests(TestCase):
         })
         self.assertEqual(response.status_code, 400)
 
+    def test_non_emergency_ping_requires_location_sharing(self):
+        response = self.client.post(reverse('ofw:location_tracker_ping'), {
+            'latitude': '14.5800', 'longitude': '120.9800',
+            'accuracy': '12', 'is_emergency': '0',
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            LocationTracker.objects.filter(ofw__user=self.user).exists()
+        )
+
+    def test_non_emergency_ping_allowed_when_sharing_enabled(self):
+        OFWLocationSharing.objects.create(
+            ofw=OFWProfile.objects.get(user=self.user), is_enabled=True,
+        )
+        response = self.client.post(reverse('ofw:location_tracker_ping'), {
+            'latitude': '14.5800', 'longitude': '120.9800',
+            'accuracy': '10', 'is_emergency': '0',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            LocationTracker.objects.filter(ofw__user=self.user).exists()
+        )
+
 
 class LocationTrackerPageTests(TestCase):
     """The Live OFW Map page must render (no loop-scoped {% url %} errors)."""
