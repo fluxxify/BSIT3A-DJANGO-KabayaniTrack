@@ -51,6 +51,10 @@
     </form>
 
     <div class="d-flex gap-2 mt-n4">
+      <a href="{{ request.path }}ajax/export/{% if querystring %}?{{ querystring }}{% endif %}"
+         class="btn btn-outline-success">
+        <i class="fas fa-file-excel me-2"></i> Export Excel
+      </a>
       {% if user.is_staff or user.is_superuser %}
       <button type="button" class="btn btn-outline-danger" id="deleteAllCrudBtn">
         <i class="fas fa-trash-alt me-2"></i> Delete All Records

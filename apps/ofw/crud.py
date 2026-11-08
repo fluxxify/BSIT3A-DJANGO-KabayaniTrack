@@ -16,8 +16,12 @@ from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape
 from django.views.decorators.http import require_POST
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 from apps.users.agencies import agency_for_user, has_agency_assignment, is_global_staff
 
@@ -175,6 +179,58 @@ def _serialize(value):
     if value is None:
         return ''
     return str(value)
+
+
+def _excel_value(value):
+    """Convert a model value to something openpyxl can safely store."""
+    if value is None:
+        return ''
+    if isinstance(value, datetime):
+        if timezone.is_aware(value):
+            value = timezone.localtime(value)
+        return value.replace(tzinfo=None)
+    if isinstance(value, date):
+        return value
+    if isinstance(value, bool):
+        return 'Yes' if value else 'No'
+    if isinstance(value, Decimal):
+        return float(value)
+    if hasattr(value, 'pk'):
+        return str(value.pk)
+    return str(value)
+
+
+def _xlsx_response(queryset, field_names, field_labels, entity):
+    """Stream an .xlsx workbook for the current (filtered) queryset."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = (entity or 'Records')[:31]
+
+    sheet.append([field_labels.get(name, name.replace('_', ' ').title()) for name in field_names])
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='1F3A5F')
+        cell.alignment = Alignment(vertical='center')
+
+    for obj in queryset.iterator():
+        sheet.append([_excel_value(getattr(obj, name, '')) for name in field_names])
+
+    sheet.freeze_panes = 'A2'
+    for index, _name in enumerate(field_names, start=1):
+        longest = max(
+            (len(str(sheet.cell(row=row, column=index).value or ''))
+             for row in range(1, sheet.max_row + 1)),
+            default=0,
+        )
+        sheet.column_dimensions[get_column_letter(index)].width = min(max(12, longest + 2), 50)
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f'{entity.lower().replace(" ", "_")}_export.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    workbook.save(response)
+    return response
 
 
 def describe_fields(form):
@@ -423,35 +479,55 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
     @login_required(login_url='login')
     def export_ajax(request):
-        """Export the current filtered queryset as CSV."""
-        queryset = _base_queryset(request)
+        """Export the current filtered queryset as Excel.
+
+        CSV remains available for compatibility via ``?format=csv``.
+        """
+        query = request.GET.get('q', '').strip()
+        queryset = _base_queryset(request, query)
 
         # Build header from form field names, excluding relational/file fields
-        # that don't serialize well to CSV.
+        # that don't serialize well to a spreadsheet.
         field_names = [name for name in form_field_names if name not in ('profile_picture', 'attachment')]
 
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{entity.lower()}_export.csv"'
+        export_format = request.GET.get('format', 'xlsx').lower()
+        if export_format == 'csv':
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="{entity.lower()}_export.csv"'
 
-        writer = csv.writer(response)
-        writer.writerow(field_names)
+            writer = csv.writer(response)
+            writer.writerow(field_names)
 
-        for obj in queryset:
-            row = []
-            for name in field_names:
-                value = getattr(obj, name, '')
-                if callable(value):
-                    value = value()
-                if isinstance(value, (date, datetime)):
-                    value = value.isoformat()
-                elif hasattr(value, 'pk'):
-                    value = str(value.pk)
-                elif value is None:
-                    value = ''
-                row.append(str(value))
-            writer.writerow(row)
+            for obj in queryset:
+                row = []
+                for name in field_names:
+                    value = getattr(obj, name, '')
+                    if callable(value):
+                        value = value()
+                    if isinstance(value, (date, datetime)):
+                        value = value.isoformat()
+                    elif hasattr(value, 'pk'):
+                        value = str(value.pk)
+                    elif value is None:
+                        value = ''
+                    row.append(str(value))
+                writer.writerow(row)
+            export_label = 'CSV'
+        else:
+            form = form_class()
+            field_labels = {
+                name: (form.fields[name].label or name.replace('_', ' ').title())
+                for name in field_names
+            }
+            response = _xlsx_response(queryset, field_names, field_labels, entity)
+            export_label = 'Excel'
 
-        messages.success(request, f'Exported {queryset.count()} {entity.lower() if entity.endswith("s") else entity + "s"} records to CSV.')
+        messages.success(
+            request,
+            f'Exported {queryset.count()} '
+            f'{entity.lower() if entity.endswith("s") else entity + "s"} '
+            f'records to {export_label}.',
+        )
         return response
 
     return {

@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 from datetime import timedelta
+from io import BytesIO
 from types import SimpleNamespace
 from unittest import mock
 
@@ -14,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from openpyxl import load_workbook
 
 from apps.ofw.forms import CheckInForm, MonitoringReportForm
 from apps.ofw.hotlines import (
@@ -141,6 +143,59 @@ class OFWCrudTests(TestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.json())
+
+    def test_excel_export_returns_xlsx_workbook(self):
+        response = self.client.get(reverse('ofw:profile_export'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        self.assertIn('.xlsx', response['Content-Disposition'])
+
+        workbook = load_workbook(BytesIO(response.content))
+        sheet = workbook.active
+        values = [str(cell.value) for row in sheet.iter_rows() for cell in row if cell.value is not None]
+        self.assertTrue(any('Juan' in value for value in values))
+        self.assertEqual(sheet.max_row, 2)
+
+    def test_excel_export_respects_search(self):
+        response = self.client.get(reverse('ofw:profile_export'), {'q': 'does-not-exist'})
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook.active.max_row, 1)
+
+    def test_csv_export_still_available(self):
+        response = self.client.get(reverse('ofw:profile_export'), {'format': 'csv'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv')
+        self.assertIn(b'Juan', response.content)
+
+    def test_list_page_has_excel_export_button(self):
+        response = self.client.get(reverse('ofw:profile_list'))
+        self.assertContains(response, 'Export Excel')
+        self.assertContains(response, reverse('ofw:profile_export'))
+
+    def test_all_export_endpoints_return_workbooks(self):
+        for name in (
+            'profile_export', 'assessment_export', 'checkin_export',
+            'concern_export', 'contact_export', 'report_export',
+        ):
+            with self.subTest(name=name):
+                response = self.client.get(reverse(f'ofw:{name}'))
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('.xlsx', response['Content-Disposition'])
+
+    def test_checkin_export_handles_datetime_values(self):
+        CheckIn.objects.create(
+            ofw=self.ofw,
+            user=self.user,
+            checkin_date=timezone.now(),
+            condition=CheckIn.Condition.SAFE,
+        )
+        response = self.client.get(reverse('ofw:checkin_export'))
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook.active.max_row, 2)
 
 
 class OFWPortalTests(TestCase):
