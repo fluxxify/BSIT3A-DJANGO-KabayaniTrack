@@ -260,17 +260,31 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 DATA_UPLOAD_MAX_NUMBER_FILES = 20
 # Email configuration.  Development uses the console backend; production must
 # deliver real mail so a reset link is never printed on a public page.
+#
+# PythonAnywhere does NOT run an SMTP server (smtp.pythonanywhere.com does not
+# exist) and its free tier only allows outbound SMTP to Gmail.  Gmail is
+# therefore the default transport: set EMAIL_HOST_USER to the full Gmail
+# address and EMAIL_HOST_PASSWORD to a 16-character App Password.
+# See docs/EMAIL_SETUP.md for the full checklist.
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
     'django.core.mail.backends.console.EmailBackend'
     if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
 )
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@kabayani-track.local')
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.pythonanywhere.com')
+# Gmail refuses messages whose From address is not the authenticated account,
+# so fall back to EMAIL_HOST_USER when no explicit sender is configured.
+DEFAULT_FROM_EMAIL = (
+    os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
+    or EMAIL_HOST_USER
+    or 'no-reply@kabayani-track.local'
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+# Never let an unreachable mail server hang a request for a full minute.
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 
 # Password reset tokens expire after one hour by default.
 PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', '3600'))
