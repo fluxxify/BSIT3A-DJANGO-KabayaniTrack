@@ -387,6 +387,47 @@ class LoginRoutingTests(TestCase):
             self.client.logout()
 
 
+class AccessibilityTests(TestCase):
+    """Keyboard and screen-reader friendly markup on key pages."""
+
+    def setUp(self):
+        self.staff = get_user_model().objects.create_user(
+            username='a11ystaff', password='Str0ngPassw0rd!', is_staff=True
+        )
+
+    def test_skip_link_and_main_landmark_on_app_pages(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="skip-link" href="#main-content"')
+        self.assertContains(response, 'id="main-content"')
+        self.assertContains(response, '<main class="page-body"')
+
+    def test_sidebar_has_navigation_landmark_and_logout_label(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, 'role="navigation" aria-label="Main navigation"')
+        self.assertContains(response, 'aria-label="Log out"')
+
+    def test_login_form_labels_are_associated(self):
+        response = self.client.get(reverse('login'))
+        for field in ('id_username', 'id_password'):
+            with self.subTest(field=field):
+                self.assertContains(response, f'for="{field}"')
+                self.assertContains(response, f'id="{field}"')
+
+    def test_register_form_labels_are_associated(self):
+        response = self.client.get(reverse('register'))
+        self.assertEqual(response.status_code, 200)
+        for field in (
+            'id_first_name', 'id_last_name', 'id_username',
+            'id_email', 'password', 'confirm_password',
+        ):
+            with self.subTest(field=field):
+                self.assertContains(response, f'for="{field}"')
+                self.assertContains(response, f'id="{field}"')
+
+
 class ManagementSidebarTests(TestCase):
     """Administrators see account/directory links; staff only sees OFW monitoring."""
 

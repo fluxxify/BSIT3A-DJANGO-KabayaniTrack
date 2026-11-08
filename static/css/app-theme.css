@@ -207,6 +207,45 @@ html {
   box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), 0.12);
 }
 
+/* Keyboard accessibility */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 1080;
+  padding: 0.5rem 1rem;
+  border-radius: var(--tblr-border-radius);
+  background: #12142c;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 0.75rem;
+  color: #fff;
+  outline: 3px solid rgba(var(--tblr-primary-rgb), 0.6);
+  outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.nav-link:focus-visible,
+.page-link:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid rgba(var(--tblr-primary-rgb), 0.6);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
+}
+
 .form-selectgroup-label {
   border-radius: var(--tblr-border-radius);
 }

@@ -5,7 +5,7 @@
      data-bs-auto-close="outside"
      aria-expanded="false"
      aria-label="Notifications">
-    <i class="far fa-bell"></i>
+    <i class="far fa-bell" aria-hidden="true"></i>
     {% if unread_notifications_count %}
     <span class="dh-notif-badge">
       {% if unread_notifications_count > 99 %}99+{% else %}{{ unread_notifications_count }}{% endif %}

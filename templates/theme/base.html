@@ -26,6 +26,7 @@
   </head>
 
   <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="page">
 
         {% if request.user.is_authenticated %}
@@ -43,19 +44,19 @@
             <div class="dh-topbar d-print-none">
                 <div class="container-xl d-flex align-items-center justify-content-end gap-2">
                     <span class="dh-topbar-user d-none d-sm-inline">
-                        <i class="far fa-user-circle me-1"></i>{{ request.user.get_full_name|default:request.user.username }}
+                        <i class="far fa-user-circle me-1" aria-hidden="true"></i>{{ request.user.get_full_name|default:request.user.username }}
                     </span>
                     {% include 'theme/notifications_bell.html' %}
                 </div>
             </div>
             {% endif %}
-            <div class="page-body">
+            <main class="page-body" id="main-content" tabindex="-1">
                 <div class="container-xl">
                     {% include 'theme/messages.html' %}
                     {% block content %}
                     {% endblock %}
                 </div>
-            </div>
+            </main>
             {% include 'theme/footer.html' %}
         </div>
     </div>

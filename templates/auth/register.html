@@ -42,7 +42,7 @@
 
             {% if agency %}
             <div class="alert alert-azure d-flex align-items-start gap-2" role="alert">
-                <i class="fas fa-building mt-1"></i>
+                <i class="fas fa-building mt-1" aria-hidden="true"></i>
                 <div>
                     <div class="fw-bold">{{ agency.name }}</div>
                     <div class="text-muted small">
@@ -60,9 +60,9 @@
 
                 {% if errors %}
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <i class="fas fa-exclamation-circle me-2" aria-hidden="true"></i>
                     Please fix the errors below.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
                 </div>
                 {% endif %}
 
@@ -72,10 +72,12 @@
                     <!-- First Name & Last Name -->
                     <div class="row g-3 mb-3">
                         <div class="col-6">
-                            <label class="form-label required mb-1">First Name</label>
+                            <label class="form-label required mb-1" for="id_first_name">First Name</label>
                             <input
                             type="text"
+                            id="id_first_name"
                             name="first_name"
+                            autocomplete="given-name"
                             class="form-control {% if errors.first_name %}is-invalid{% endif %}"
                             value="{{ form_data.first_name|default:'' }}">
                             {% if errors.first_name %}
@@ -83,10 +85,12 @@
                             {% endif %}
                         </div>
                         <div class="col-6">
-                            <label class="form-label required mb-1">Last Name</label>
+                            <label class="form-label required mb-1" for="id_last_name">Last Name</label>
                             <input
                             type="text"
+                            id="id_last_name"
                             name="last_name"
+                            autocomplete="family-name"
                             class="form-control {% if errors.last_name %}is-invalid{% endif %}"
                             value="{{ form_data.last_name|default:'' }}">
                             {% if errors.last_name %}
@@ -98,18 +102,22 @@
                     <!-- Middle Name & Suffix -->
                     <div class="row g-3 mb-3 align-items-end">
                         <div class="col-6 d-flex flex-column">
-                            <label class="form-label mb-1" style="min-height: 2.6rem; display: flex; align-items: flex-end; flex-wrap: wrap;">Middle Name&nbsp;<span class="text-secondary fw-normal">(Optional)</span></label>
+                            <label class="form-label mb-1" for="id_middle_name" style="min-height: 2.6rem; display: flex; align-items: flex-end; flex-wrap: wrap;">Middle Name&nbsp;<span class="text-secondary fw-normal">(Optional)</span></label>
                             <input
                             type="text"
+                            id="id_middle_name"
                             name="middle_name"
+                            autocomplete="additional-name"
                             class="form-control mt-auto"
                             value="{{ form_data.middle_name|default:'' }}">
                         </div>
                         <div class="col-6 d-flex flex-column">
-                            <label class="form-label mb-1" style="min-height: 2.6rem; display: flex; align-items: flex-end; flex-wrap: wrap;">Suffix&nbsp;<span class="text-secondary fw-normal">(Optional)</span></label>
+                            <label class="form-label mb-1" for="id_suffix" style="min-height: 2.6rem; display: flex; align-items: flex-end; flex-wrap: wrap;">Suffix&nbsp;<span class="text-secondary fw-normal">(Optional)</span></label>
                             <input
                             type="text"
+                            id="id_suffix"
                             name="suffix"
+                            autocomplete="honorific-suffix"
                             class="form-control mt-auto"
                             placeholder="e.g. Jr., III"
                             value="{{ form_data.suffix|default:'' }}">
@@ -117,14 +125,16 @@
                     </div>
                     <!-- Username -->
                     <div class="mb-3">
-                        <label class="form-label required">Username</label>
+                        <label class="form-label required" for="id_username">Username</label>
                         <div class="input-group">
                             <span class="input-group-text">
-                                <i class="fas fa-user text-secondary"></i>
+                                <i class="fas fa-user text-secondary" aria-hidden="true"></i>
                             </span>
                             <input
                             type="text"
+                            id="id_username"
                             name="username"
+                            autocomplete="username"
                             class="form-control {% if errors.username %}is-invalid{% endif %}"
                             placeholder=""
                             value="{{ form_data.username|default:'' }}">
@@ -136,14 +146,16 @@
 
                     <!-- Email -->
                     <div class="mb-3">
-                        <label class="form-label required">Email</label>
+                        <label class="form-label required" for="id_email">Email</label>
                         <div class="input-group">
                             <span class="input-group-text">
-                                <i class="fas fa-envelope text-secondary"></i>
+                                <i class="fas fa-envelope text-secondary" aria-hidden="true"></i>
                             </span>
                             <input
                             type="email"
+                            id="id_email"
                             name="email"
+                            autocomplete="email"
                             class="form-control {% if errors.email %}is-invalid{% endif %}"
                             placeholder=""
                             value="{{ form_data.email|default:'' }}">
@@ -155,19 +167,20 @@
 
                     <!-- Password -->
                     <div class="mb-3">
-                        <label class="form-label required">Password</label>
+                        <label class="form-label required" for="password">Password</label>
                         <div class="input-group">
                             <span class="input-group-text">
-                                <i class="fas fa-lock text-secondary"></i>
+                                <i class="fas fa-lock text-secondary" aria-hidden="true"></i>
                             </span>
                             <input
                             type="password"
                             name="password"
                             id="password"
+                            autocomplete="new-password"
                             class="form-control {% if errors.password %}is-invalid{% endif %}"
                             placeholder="Min. 8 characters">
-                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                                <i class="fas fa-eye" id="eyeIcon"></i>
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword" aria-label="Show password" aria-pressed="false">
+                                <i class="fas fa-eye" id="eyeIcon" aria-hidden="true"></i>
                             </button>
                             {% if errors.password %}
                             <div class="invalid-feedback">{{ errors.password }}</div>
@@ -177,19 +190,20 @@
 
                     <!-- Confirm Password -->
                     <div class="mb-3">
-                        <label class="form-label required">Confirm Password</label>
+                        <label class="form-label required" for="confirm_password">Confirm Password</label>
                         <div class="input-group">
                             <span class="input-group-text">
-                                <i class="fas fa-lock text-secondary"></i>
+                                <i class="fas fa-lock text-secondary" aria-hidden="true"></i>
                             </span>
                             <input
                             type="password"
                             name="confirm_password"
                             id="confirm_password"
+                            autocomplete="new-password"
                             class="form-control {% if errors.confirm_password %}is-invalid{% endif %}"
                             placeholder="Repeat your password">
-                            <button class="btn btn-outline-secondary" type="button" id="toggleConfirm">
-                                <i class="fas fa-eye" id="eyeIconConfirm"></i>
+                            <button class="btn btn-outline-secondary" type="button" id="toggleConfirm" aria-label="Show password confirmation" aria-pressed="false">
+                                <i class="fas fa-eye" id="eyeIconConfirm" aria-hidden="true"></i>
                             </button>
                             {% if errors.confirm_password %}
                             <div class="invalid-feedback">{{ errors.confirm_password }}</div>
@@ -200,7 +214,7 @@
                     <!-- Submit -->
                     <div class="form-footer">
                         <button type="submit" class="btn btn-primary w-100">
-                            <i class="fas fa-user-plus me-2"></i>Create Account
+                            <i class="fas fa-user-plus me-2" aria-hidden="true"></i>Create Account
                         </button>
                     </div>
 
@@ -220,29 +234,24 @@
 
 <script src="{% static 'js/tabler.js' %}" defer></script>
 <script>
-    document.getElementById('togglePassword').addEventListener('click', function() {
-        const input = document.getElementById('password');
-        const icon = document.getElementById('eyeIcon');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.replace('fa-eye', 'fa-eye-slash');
-        } else {
-            input.type = 'password';
-            icon.classList.replace('fa-eye-slash', 'fa-eye');
+    function bindPasswordToggle(buttonId, inputId, iconId, label) {
+        var button = document.getElementById(buttonId);
+        var input = document.getElementById(inputId);
+        var icon = document.getElementById(iconId);
+        if (!button || !input || !icon) {
+            return;
         }
-    });
+        button.addEventListener('click', function() {
+            var showing = input.type === 'password';
+            input.type = showing ? 'text' : 'password';
+            icon.classList.replace(showing ? 'fa-eye' : 'fa-eye-slash', showing ? 'fa-eye-slash' : 'fa-eye');
+            button.setAttribute('aria-pressed', showing ? 'true' : 'false');
+            button.setAttribute('aria-label', showing ? 'Hide ' + label : 'Show ' + label);
+        });
+    }
 
-    document.getElementById('toggleConfirm').addEventListener('click', function() {
-        const input = document.getElementById('confirm_password');
-        const icon = document.getElementById('eyeIconConfirm');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.classList.replace('fa-eye', 'fa-eye-slash');
-        } else {
-            input.type = 'password';
-            icon.classList.replace('fa-eye-slash', 'fa-eye');
-        }
-    });
+    bindPasswordToggle('togglePassword', 'password', 'eyeIcon', 'password');
+    bindPasswordToggle('toggleConfirm', 'confirm_password', 'eyeIconConfirm', 'password confirmation');
 </script>
 </body>
 </html>

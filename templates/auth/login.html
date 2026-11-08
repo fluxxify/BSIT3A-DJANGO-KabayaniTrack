@@ -39,7 +39,7 @@
 
         {% if agency %}
         <div class="alert alert-azure d-flex align-items-center gap-2" role="alert">
-          <i class="fas fa-building"></i>
+          <i class="fas fa-building" aria-hidden="true"></i>
           <div class="fw-bold">{{ agency.name }}</div>
         </div>
         {% endif %}
@@ -52,21 +52,21 @@
           {% csrf_token %}
 
           <div class="mb-3">
-            <label class="form-label">Username</label>
-            <input type="text" class="form-control" name="username" autocomplete="off" value="{{ username|default:'' }}" {% if locked %}disabled{% endif %}>
+            <label class="form-label" for="id_username">Username</label>
+            <input type="text" class="form-control" id="id_username" name="username" autocomplete="username" value="{{ username|default:'' }}" {% if locked %}disabled{% endif %}>
           </div>
           <div class="mb-2">
             <div class="d-flex align-items-center justify-content-between mb-1">
-              <label class="form-label mb-0">Password</label>
+              <label class="form-label mb-0" for="id_password">Password</label>
               <a href="{% url 'password_reset' %}" class="form-label-description">Forgot password?</a>
             </div>
             <div class="input-group input-group-flat">
-              <input type="password" class="form-control" name="password" autocomplete="off" {% if locked %}disabled{% endif %}>
+              <input type="password" class="form-control" id="id_password" name="password" autocomplete="current-password" {% if locked %}disabled{% endif %}>
             </div>
           </div>
           <div class="form-footer">
             <button type="submit" class="btn btn-primary w-100">
-              <i class="fas fa-sign-in-alt me-1"></i> Sign in
+              <i class="fas fa-sign-in-alt me-1" aria-hidden="true"></i> Sign in
             </button>
             <div class="text-center text-secondary mt-3">
               Don't have an account?

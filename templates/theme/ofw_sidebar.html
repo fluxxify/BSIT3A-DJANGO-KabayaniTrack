@@ -23,7 +23,7 @@
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    <div class="collapse navbar-collapse" id="sidebar-menu">
+    <div class="collapse navbar-collapse" id="sidebar-menu" role="navigation" aria-label="Main navigation">
       <ul class="navbar-nav pt-lg-2 py-lg-2">
 
         <li class="nav-item">
@@ -118,8 +118,8 @@
                 <span class="dh-user-role">OFW</span>
               </span>
             </span>
-            <a href="{% url 'logout' %}" class="dh-user-logout" title="Logout" onclick="return confirm('Are you sure you want to log out?');">
-              <i class="fas fa-sign-out-alt"></i>
+            <a href="{% url 'logout' %}" class="dh-user-logout" aria-label="Log out" title="Logout" onclick="return confirm('Are you sure you want to log out?');">
+              <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
             </a>
           </div>
         </li>
