@@ -794,6 +794,42 @@ class DashboardDrilldownTests(TestCase):
         )
         self.assertContains(response, 'name="welfare_status"')
 
+    def test_dashboard_renders_monitoring_charts(self):
+        response = self.client.get(reverse('dashboard'))
+        for chart_id in ('welfareChart', 'concernChart', 'checkinTrendChart'):
+            with self.subTest(chart_id=chart_id):
+                self.assertContains(response, f'id="{chart_id}"')
+        self.assertContains(response, 'apexcharts.min.js')
+        self.assertContains(response, 'welfare-chart-data')
+        self.assertContains(response, 'concern-chart-data')
+        self.assertContains(response, 'trend-chart-data')
+
+    def test_dashboard_chart_data_matches_welfare_and_concerns(self):
+        import json
+        import re
+
+        response = self.client.get(reverse('dashboard'))
+        html = response.content.decode()
+
+        welfare = json.loads(
+            re.search(
+                r'<script id="welfare-chart-data" type="application/json">(.*?)</script>',
+                html,
+            ).group(1)
+        )
+        labels = {item['label']: item['value'] for item in welfare}
+        self.assertEqual(labels['Okay / Working'], 1)
+        self.assertEqual(labels['At Risk / In Danger'], 1)
+
+        concerns = json.loads(
+            re.search(
+                r'<script id="concern-chart-data" type="application/json">(.*?)</script>',
+                html,
+            ).group(1)
+        )
+        concern_labels = {item['label']: item['value'] for item in concerns}
+        self.assertEqual(concern_labels['Salary / Compensation'], 1)
+
 
 class CheckInDetailTests(TestCase):
     def setUp(self):

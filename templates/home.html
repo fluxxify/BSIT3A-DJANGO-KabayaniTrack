@@ -195,6 +195,54 @@
   </div>
 
   <div class="row row-deck row-cards mt-3">
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-heart-pulse me-2 text-primary"></i>Welfare Status</h3>
+        </div>
+        <div class="card-body">
+          <div id="welfareChart" role="img" aria-label="Donut chart showing the welfare status of monitored OFWs"></div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.welfare_status }}" class="text-decoration-none">
+            View OFW profiles <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-circle-exclamation me-2 text-danger"></i>Concerns by Category</h3>
+        </div>
+        <div class="card-body">
+          <div id="concernChart" role="img" aria-label="Bar chart of reported concerns grouped by category"></div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.open_concerns }}" class="text-decoration-none">
+            View reported concerns <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-clipboard-check me-2 text-success"></i>Check-ins (Last 6 Months)</h3>
+        </div>
+        <div class="card-body">
+          <div id="checkinTrendChart" role="img" aria-label="Line chart of monthly OFW check-in activity over the last six months"></div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.checkins_month }}" class="text-decoration-none">
+            View check-ins <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-deck row-cards mt-3">
     <div class="col-12">
       <div class="card">
         <div class="card-header">
@@ -384,9 +432,108 @@
   </div>
 
 </div>
+
+{{ stats.welfare_chart|json_script:"welfare-chart-data" }}
+{{ stats.concern_chart|json_script:"concern-chart-data" }}
+{{ stats.trend_chart|json_script:"trend-chart-data" }}
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'libs/apexcharts/dist/apexcharts.min.js' %}"></script>
+<script>
+  (function () {
+    function readChartData(id) {
+      var node = document.getElementById(id);
+      if (!node) {
+        return [];
+      }
+      try {
+        return JSON.parse(node.textContent) || [];
+      } catch (error) {
+        console.error('Unable to read chart data for ' + id, error);
+        return [];
+      }
+    }
+
+    if (typeof ApexCharts === 'undefined') {
+      return;
+    }
+
+    var welfare = readChartData('welfare-chart-data');
+    var concerns = readChartData('concern-chart-data');
+    var trend = readChartData('trend-chart-data');
+
+    var welfareColors = {
+      active: '#2fb344',
+      needs_support: '#f59f00',
+      distressed: '#d63939',
+      repatriated: '#4299e1',
+      missing: '#6c7a91'
+    };
+    var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function monthLabel(value) {
+      var match = /^(\d{4})-(\d{2})$/.exec(String(value));
+      if (!match) {
+        return value;
+      }
+      return monthNames[parseInt(match[2], 10) - 1] + ' ' + match[1].slice(2);
+    }
+
+    var welfareEl = document.getElementById('welfareChart');
+    if (welfareEl) {
+      new ApexCharts(welfareEl, {
+        chart: { type: 'donut', height: 260, animations: { enabled: false }, fontFamily: 'inherit' },
+        series: welfare.map(function (item) { return item.value; }),
+        labels: welfare.map(function (item) { return item.label; }),
+        colors: welfare.map(function (item) { return welfareColors[item.key] || '#6c7a91'; }),
+        legend: { position: 'bottom' },
+        dataLabels: { enabled: true },
+        stroke: { width: 2 },
+        tooltip: {
+          y: { formatter: function (value) { return value + ' OFW' + (value === 1 ? '' : 's'); } }
+        },
+        noData: { text: 'No OFW data yet' }
+      }).render();
+    }
+
+    var concernEl = document.getElementById('concernChart');
+    if (concernEl) {
+      new ApexCharts(concernEl, {
+        chart: { type: 'bar', height: 260, animations: { enabled: false }, toolbar: { show: false }, fontFamily: 'inherit' },
+        series: [{ name: 'Concerns', data: concerns.map(function (item) { return item.value; }) }],
+        xaxis: { categories: concerns.map(function (item) { return item.label; }) },
+        plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '55%' } },
+        colors: ['#d63939'],
+        dataLabels: { enabled: false },
+        grid: { padding: { left: 8, right: 12 } },
+        tooltip: {
+          y: { formatter: function (value) { return value + ' concern' + (value === 1 ? '' : 's'); } }
+        },
+        noData: { text: 'No concerns reported yet' }
+      }).render();
+    }
+
+    var trendEl = document.getElementById('checkinTrendChart');
+    if (trendEl) {
+      new ApexCharts(trendEl, {
+        chart: { type: 'area', height: 260, animations: { enabled: false }, toolbar: { show: false }, fontFamily: 'inherit' },
+        series: [{ name: 'Check-ins', data: trend.map(function (item) { return item.value; }) }],
+        xaxis: { categories: trend.map(function (item) { return monthLabel(item.label); }) },
+        colors: ['#206bc4'],
+        stroke: { curve: 'smooth', width: 2 },
+        fill: { type: 'gradient', gradient: { shadeIntensity: 0.4, opacityFrom: 0.35, opacityTo: 0.05 } },
+        dataLabels: { enabled: false },
+        yaxis: { labels: { formatter: function (value) { return Math.round(value); } } },
+        tooltip: {
+          y: { formatter: function (value) { return value + ' check-in' + (value === 1 ? '' : 's'); } }
+        },
+        noData: { text: 'No check-ins recorded yet' }
+      }).render();
+    }
+  })();
+</script>
 {% if stats.map_markers %}
 <script src="{% static 'libs/globe.gl/globe.gl.min.js' %}"></script>
 <script>
