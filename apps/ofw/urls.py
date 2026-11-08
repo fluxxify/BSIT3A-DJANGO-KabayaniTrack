@@ -139,4 +139,7 @@ urlpatterns = [
 
     # OFW activity log
     path('ofw-activity/', views.ofw_activity_page, name='ofw_activity'),
+
+    # Administrator audit trail
+    path('audit-log/', views.audit_log_page, name='audit_log'),
 ]

@@ -8,17 +8,17 @@
   <nav aria-label="Pagination" class="ms-auto">
     <ul class="pagination m-0">
       <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-        <a class="page-link" href="?page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}" aria-label="Previous page">
+        <a class="page-link" href="?page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}{% if querystring %}&{{ querystring }}{% endif %}" aria-label="Previous page">
           <i class="ti ti-chevron-left" aria-hidden="true"></i> prev
         </a>
       </li>
       {% for num in page_obj.paginator.page_range %}
       <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-        <a class="page-link" href="?page={{ num }}"{% if page_obj.number == num %} aria-current="page"{% endif %}>{{ num }}</a>
+        <a class="page-link" href="?page={{ num }}{% if querystring %}&{{ querystring }}{% endif %}"{% if page_obj.number == num %} aria-current="page"{% endif %}>{{ num }}</a>
       </li>
       {% endfor %}
       <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-        <a class="page-link" href="?page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}" aria-label="Next page">
+        <a class="page-link" href="?page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}{% if querystring %}&{{ querystring }}{% endif %}" aria-label="Next page">
           next <i class="ti ti-chevron-right" aria-hidden="true"></i>
         </a>
       </li>

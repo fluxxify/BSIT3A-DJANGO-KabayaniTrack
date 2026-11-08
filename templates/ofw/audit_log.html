@@ -1,0 +1,104 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-5">
+      <label class="form-label" for="audit-search">Search</label>
+      <input type="text" id="audit-search" name="q" value="{{ query }}"
+             class="form-control" placeholder="User, record, or record type...">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="audit-action">Action</label>
+      <select id="audit-action" name="action" class="form-select">
+        <option value="">All actions</option>
+        {% for value, label in action_choices %}
+        <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-filter me-1"></i> Filter
+      </button>
+      <a href="{% url 'ofw:audit_log' %}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Recorded actions</h3>
+      <div class="card-actions text-muted small">
+        {{ page_obj.paginator.count }} entr{{ page_obj.paginator.count|pluralize:"y,ies" }}
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">User</th>
+            <th scope="col">Action</th>
+            <th scope="col">Record</th>
+            <th scope="col">Details</th>
+            <th scope="col">IP address</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in page_obj.object_list %}
+          <tr>
+            <td class="text-muted text-nowrap">
+              <time datetime="{{ log.created_at|date:'c' }}">{{ log.created_at|date:"M d, Y H:i" }}</time>
+            </td>
+            <td>
+              {% if log.user %}
+              {{ log.user.get_full_name|default:log.user.username }}
+              {% else %}
+              <span class="text-muted">System</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge
+                {% if log.action == 'create' %}bg-success-lt text-success
+                {% elif log.action == 'update' %}bg-blue-lt text-blue
+                {% elif log.action == 'delete' or log.action == 'delete_all' %}bg-danger-lt text-danger
+                {% else %}bg-secondary-lt text-secondary{% endif %}">
+                {{ log.get_action_display }}
+              </span>
+            </td>
+            <td>
+              <div class="fw-medium">{{ log.object_repr|default:"—" }}</div>
+              <div class="text-muted small">{{ log.model_name }}</div>
+            </td>
+            <td class="text-muted small">
+              {{ log.change_summary|default:"—" }}
+              {% if log.changes and log.changes != '{}' %}
+              <details class="mt-1">
+                <summary class="text-primary">Show changes</summary>
+                <pre class="mt-1 mb-0 small text-wrap">{{ log.changes }}</pre>
+              </details>
+              {% endif %}
+            </td>
+            <td class="text-muted text-nowrap">{{ log.ip_address|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-muted text-center py-4">No audit entries match this filter.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'theme/pagination.html' %}
+  </div>
+</div>
+{% endblock %}

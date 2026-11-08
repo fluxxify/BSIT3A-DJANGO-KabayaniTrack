@@ -7,7 +7,8 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.core.paginator import Paginator
+from django.db.models import Count, Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -29,6 +30,7 @@ from .geo import reverse_geocode
 from .hotlines import hotlines_for_country
 from .locations import COUNTRY_GEO, canonical_country
 from .models import (
+    AuditLog,
     CheckIn,
     Concern,
     ConcernProof,
@@ -2497,4 +2499,42 @@ def ofw_activity_page(request):
         'inactive_only': inactive_only,
         'page_title': 'OFW Activity Log',
         'page_pretitle': 'OFW login and profile activity',
+    })
+
+
+@login_required(login_url='login')
+def audit_log_page(request):
+    """Administrator view of management actions recorded by the system."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Administrators only.')
+
+    query = request.GET.get('q', '').strip()
+    action = request.GET.get('action', '').strip()
+
+    logs = AuditLog.objects.select_related('user')
+    if action in AuditLog.Action.values:
+        logs = logs.filter(action=action)
+    if query:
+        logs = logs.filter(
+            Q(object_repr__icontains=query)
+            | Q(model_name__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__first_name__icontains=query)
+            | Q(user__last_name__icontains=query)
+        )
+
+    paginator = Paginator(logs, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    params = request.GET.copy()
+    params.pop('page', None)
+
+    return render(request, 'ofw/audit_log.html', {
+        'page_obj': page_obj,
+        'query': query,
+        'action': action,
+        'action_choices': AuditLog.Action.choices,
+        'querystring': params.urlencode(),
+        'page_title': 'Audit Log',
+        'page_pretitle': 'Administration',
     })

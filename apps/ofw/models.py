@@ -9,6 +9,7 @@ The system tracks five key areas:
   * monitoring reports
 """
 
+import json
 import os
 import re
 
@@ -797,3 +798,58 @@ class SafeLocationSuggestion(models.Model):
 
     def __str__(self):
         return f'{self.name} — {self.get_status_display()}'
+
+
+class AuditLog(models.Model):
+    """A record of a management action performed inside KabayaniTrack.
+
+    Entries are written whenever a monitoring record is created, updated,
+    deleted, or exported so administrators can see who changed what and when.
+    """
+
+    class Action(models.TextChoices):
+        CREATE = 'create', 'Created'
+        UPDATE = 'update', 'Updated'
+        DELETE = 'delete', 'Deleted'
+        DELETE_ALL = 'delete_all', 'Deleted all'
+        EXPORT = 'export', 'Exported'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='audit_logs',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    action = models.CharField(max_length=20, choices=Action.choices, db_index=True)
+    model_name = models.CharField(max_length=80, blank=True)
+    object_id = models.CharField(max_length=40, blank=True)
+    object_repr = models.CharField(max_length=255, blank=True)
+    changes = models.TextField(blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'tblauditlog'
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(
+                fields=['model_name', '-created_at'],
+                name='audit_model_date_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.get_action_display()} {self.model_name} {self.object_repr}'.strip()
+
+    def change_summary(self):
+        """Return a short comma-separated list of the fields that changed."""
+        try:
+            data = json.loads(self.changes or '{}')
+        except (TypeError, ValueError):
+            return ''
+        if isinstance(data, dict):
+            if 'changed' in data and isinstance(data['changed'], dict):
+                data = data['changed']
+            return ', '.join(str(key) for key in data.keys())[:160]
+        return ''

@@ -6,6 +6,7 @@ those views so the entity modules stay small and consistent.
 """
 
 import csv
+import json
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -25,9 +26,33 @@ from openpyxl.utils import get_column_letter
 
 from apps.users.agencies import agency_for_user, has_agency_assignment, is_global_staff
 
-from .models import EmergencyContact, MonitoringReport, OFWProfile
+from .models import AuditLog, EmergencyContact, MonitoringReport, OFWProfile
 
 PER_PAGE = 10
+
+
+def _client_ip(request):
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR') or None
+
+
+def _write_audit(request, action, model, *, obj=None, changes=None, object_id='', object_repr=''):
+    """Record a management action without blocking the main request."""
+    try:
+        AuditLog.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            action=action,
+            model_name=model._meta.verbose_name.title(),
+            object_id=str(obj.pk) if obj is not None else object_id,
+            object_repr=(str(obj) if obj is not None else object_repr)[:255],
+            changes=json.dumps(changes or {}, default=str),
+            ip_address=_client_ip(request),
+        )
+    except Exception:
+        # Auditing must never break the action the user requested.
+        pass
 
 
 def _scoped(user, model):
@@ -427,6 +452,22 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
                 obj.user = request.user
         obj.save()
 
+        if is_update:
+            changed = {}
+            for name in form.changed_data:
+                before = _serialize(previous.get(name, ''))
+                after = _serialize(getattr(obj, name, ''))
+                if before != after:
+                    changed[name] = {'from': before, 'to': after}
+            _write_audit(request, AuditLog.Action.UPDATE, model, obj=obj, changes=changed)
+        else:
+            created = {
+                name: _serialize(getattr(obj, name, ''))
+                for name in form_field_names
+                if name not in ('profile_picture', 'attachment')
+            }
+            _write_audit(request, AuditLog.Action.CREATE, model, obj=obj, changes=created)
+
         if on_save:
             on_save(obj, not is_update, request.user, previous)
 
@@ -443,6 +484,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             return JsonResponse({'error': 'Management accounts only.'}, status=403)
         obj = get_object_or_404(_scoped(request.user, model), pk=pk)
         label = str(obj)
+        _write_audit(request, AuditLog.Action.DELETE, model, obj=obj)
         if on_delete:
             on_delete(obj, request.user)
         obj.delete()
@@ -474,6 +516,13 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
                     pass
 
         queryset.delete()
+        _write_audit(
+            request,
+            AuditLog.Action.DELETE_ALL,
+            model,
+            object_repr=f'{count} {entity.lower()} records',
+            changes={'count': count},
+        )
         messages.success(request, f'All {entity.lower()} records ({count}) have been deleted successfully.')
         return JsonResponse({'status': 'deleted_all', 'count': count})
 
@@ -522,9 +571,17 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             response = _xlsx_response(queryset, field_names, field_labels, entity)
             export_label = 'Excel'
 
+        export_count = queryset.count()
+        _write_audit(
+            request,
+            AuditLog.Action.EXPORT,
+            model,
+            object_repr=f'{export_count} {entity.lower()} records',
+            changes={'count': export_count, 'format': export_label},
+        )
         messages.success(
             request,
-            f'Exported {queryset.count()} '
+            f'Exported {export_count} '
             f'{entity.lower() if entity.endswith("s") else entity + "s"} '
             f'records to {export_label}.',
         )

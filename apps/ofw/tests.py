@@ -25,6 +25,7 @@ from apps.ofw.hotlines import (
 )
 from apps.ofw.locations import COUNTRY_ALIASES, COUNTRY_CHOICES, canonical_country
 from apps.ofw.models import (
+    AuditLog,
     CheckIn,
     Concern,
     ConcernProof,
@@ -829,6 +830,99 @@ class DashboardDrilldownTests(TestCase):
         )
         concern_labels = {item['label']: item['value'] for item in concerns}
         self.assertEqual(concern_labels['Salary / Compensation'], 1)
+
+
+class AuditLogTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='auditadmin', email='audit@example.com', password='Passw0rd!23'
+        )
+        self.staff = User.objects.create_user(
+            username='auditstaff', password='Passw0rd!23', is_staff=True
+        )
+        self.ofw = OFWProfile.objects.create(
+            user=self.staff, first_name='Lina', last_name='Reyes', country='Dubai',
+        )
+        self.client.force_login(self.staff)
+
+    def test_creating_a_record_is_audited(self):
+        response = self.client.post(reverse('ofw:profile_save_ajax'), {
+            'first_name': 'Maria',
+            'last_name': 'Santos',
+            'country': 'Qatar',
+            'welfare_status': 'active',
+        })
+        self.assertEqual(response.status_code, 200)
+        log = AuditLog.objects.get(action=AuditLog.Action.CREATE)
+        self.assertEqual(log.user, self.staff)
+        self.assertIn('Profile', log.model_name)
+        self.assertIn('Maria', log.object_repr)
+        self.assertIn('first_name', log.changes)
+
+    def test_updating_a_record_records_changed_fields(self):
+        response = self.client.post(reverse('ofw:profile_save_ajax'), {
+            'id': self.ofw.pk,
+            'first_name': 'Lina',
+            'last_name': 'Reyes',
+            'country': 'Qatar',
+            'welfare_status': 'active',
+        })
+        self.assertEqual(response.status_code, 200)
+        log = AuditLog.objects.get(action=AuditLog.Action.UPDATE)
+        self.assertEqual(log.object_id, str(self.ofw.pk))
+        self.assertIn('country', log.changes)
+        self.assertIn('country', log.change_summary())
+
+    def test_deleting_a_record_is_audited(self):
+        profile_id = self.ofw.pk
+        response = self.client.post(reverse('ofw:profile_delete_ajax', args=[profile_id]))
+        self.assertEqual(response.status_code, 200)
+        log = AuditLog.objects.get(action=AuditLog.Action.DELETE)
+        self.assertEqual(log.object_id, str(profile_id))
+        self.assertFalse(OFWProfile.objects.filter(pk=profile_id).exists())
+
+    def test_export_is_audited(self):
+        response = self.client.get(reverse('ofw:profile_export'))
+        self.assertEqual(response.status_code, 200)
+        log = AuditLog.objects.get(action=AuditLog.Action.EXPORT)
+        self.assertIn('count', log.changes)
+        self.assertIn('Excel', log.changes)
+
+    def test_superuser_can_open_audit_log_page(self):
+        AuditLog.objects.create(
+            user=self.staff,
+            action=AuditLog.Action.UPDATE,
+            model_name='OFW profile',
+            object_repr='Lina Reyes',
+            changes='{"country": {"from": "Dubai", "to": "Qatar"}}',
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('ofw:audit_log'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Lina Reyes')
+        self.assertContains(response, 'Audit Log')
+        self.assertContains(response, 'country')
+
+    def test_staff_cannot_open_audit_log_page(self):
+        response = self.client.get(reverse('ofw:audit_log'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_audit_log_filters_by_action(self):
+        AuditLog.objects.create(user=self.staff, action=AuditLog.Action.CREATE, object_repr='Created record')
+        AuditLog.objects.create(user=self.staff, action=AuditLog.Action.DELETE, object_repr='Deleted record')
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('ofw:audit_log'), {'action': 'delete'})
+        self.assertContains(response, 'Deleted record')
+        self.assertNotContains(response, 'Created record')
+
+    def test_audit_log_link_only_for_superusers(self):
+        self.client.force_login(self.staff)
+        staff_response = self.client.get(reverse('dashboard'))
+        self.assertNotContains(staff_response, reverse('ofw:audit_log'))
+
+        self.client.force_login(self.admin)
+        admin_response = self.client.get(reverse('dashboard'))
+        self.assertContains(admin_response, reverse('ofw:audit_log'))
 
 
 class CheckInDetailTests(TestCase):
