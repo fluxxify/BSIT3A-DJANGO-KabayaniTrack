@@ -52,6 +52,7 @@ from .notifications import (
     notify,
     notify_managers,
 )
+from .ratelimit import rate_limit
 
 _welfare_badge = {
     'active': 'bg-success-lt text-success',
@@ -411,6 +412,7 @@ def profile_delete_all_ajax(request):
     return _profiles['delete_all_ajax'](request)
 
 
+@rate_limit('export', 30, 60, methods=('GET',), as_json=False)
 def profile_export_ajax(request):
     return _profiles['export_ajax'](request)
 
@@ -616,6 +618,7 @@ def assessment_delete_all_ajax(request):
     return _assessments['delete_all_ajax'](request)
 
 
+@rate_limit('export', 30, 60, methods=('GET',), as_json=False)
 def assessment_export_ajax(request):
     return _assessments['export_ajax'](request)
 
@@ -645,6 +648,7 @@ def checkin_delete_all_ajax(request):
     return _checkins['delete_all_ajax'](request)
 
 
+@rate_limit('export', 30, 60, methods=('GET',), as_json=False)
 def checkin_export_ajax(request):
     return _checkins['export_ajax'](request)
 
@@ -676,6 +680,7 @@ def concern_delete_all_ajax(request):
     return _concerns['delete_all_ajax'](request)
 
 
+@rate_limit('export', 30, 60, methods=('GET',), as_json=False)
 def concern_export_ajax(request):
     return _concerns['export_ajax'](request)
 
@@ -705,6 +710,7 @@ def contact_delete_all_ajax(request):
     return _contacts['delete_all_ajax'](request)
 
 
+@rate_limit('export', 30, 60, methods=('GET',), as_json=False)
 def contact_export_ajax(request):
     return _contacts['export_ajax'](request)
 
@@ -734,6 +740,7 @@ def report_delete_all_ajax(request):
     return _reports['delete_all_ajax'](request)
 
 
+@rate_limit('export', 30, 60, methods=('GET',), as_json=False)
 def report_export_ajax(request):
     return _reports['export_ajax'](request)
 
@@ -1694,6 +1701,7 @@ def location_tracker_live(request):
 
 @login_required(login_url='login')
 @require_POST
+@rate_limit('location-ping', 40, 60)
 def location_tracker_ping(request):
     """OFW or management submits a location ping during an emergency."""
     profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()

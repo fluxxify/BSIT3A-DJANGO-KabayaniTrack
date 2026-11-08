@@ -2,11 +2,14 @@ import os
 import shutil
 import tempfile
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.http import JsonResponse
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.core.management import call_command
@@ -35,6 +38,7 @@ from apps.ofw.models import (
     SafeLocation,
 )
 from apps.ofw.roles import mark_as_ofw
+from apps.ofw.ratelimit import rate_limit
 
 User = get_user_model()
 
@@ -2448,3 +2452,41 @@ class MonitoringReportAttachmentTests(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn('attachment', form.errors)
+
+
+class RateLimitTests(SimpleTestCase):
+    """The cache-backed limiter blocks bursts from a single client."""
+
+    def setUp(self):
+        cache.clear()
+
+    def _limited_view(self):
+        @rate_limit('unit-test', 2, 60)
+        def view(request):
+            return JsonResponse({'ok': True})
+        return view
+
+    def _request(self, method='post', pk=1):
+        request = getattr(RequestFactory(), method)('/test/')
+        request.user = SimpleNamespace(pk=pk, is_authenticated=True)
+        return request
+
+    def test_blocks_requests_after_limit(self):
+        view = self._limited_view()
+        self.assertEqual(view(self._request()).status_code, 200)
+        self.assertEqual(view(self._request()).status_code, 200)
+        response = view(self._request())
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response['Retry-After'], '60')
+
+    def test_other_methods_pass_through(self):
+        view = self._limited_view()
+        for _ in range(3):
+            self.assertEqual(view(self._request('get')).status_code, 200)
+
+    def test_buckets_are_per_user(self):
+        view = self._limited_view()
+        view(self._request(pk=1))
+        view(self._request(pk=1))
+        self.assertEqual(view(self._request(pk=1)).status_code, 429)
+        self.assertEqual(view(self._request(pk=2)).status_code, 200)

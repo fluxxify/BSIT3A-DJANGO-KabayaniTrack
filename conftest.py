@@ -26,3 +26,13 @@ def _patch_context_copy():
         _base_context_copy._kabayan_patched = True
         BaseContext.__copy__ = _base_context_copy
     yield
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache_between_tests():
+    """Rate-limit counters live in the cache; isolate every test."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()

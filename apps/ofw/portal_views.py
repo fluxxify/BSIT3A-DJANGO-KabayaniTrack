@@ -47,6 +47,7 @@ from .models import (
     WelfareAssessment,
 )
 from .notifications import notify, notify_managers
+from .ratelimit import rate_limit
 from .roles import is_ofw
 from .views import (
     _concern_status_badge,
@@ -365,6 +366,7 @@ def portal_location_sharing(request):
 
 @login_required(login_url='login')
 @require_POST
+@rate_limit('sharing-ping', 40, 60)
 def portal_location_sharing_ping(request):
     """Accept a non-emergency location ping only while the OFW opted in."""
     if not is_ofw(request.user):
@@ -573,6 +575,7 @@ def portal_cities(request):
 
 
 @login_required(login_url='login')
+@rate_limit('checkin-create', 20, 60)
 def portal_checkins(request):
     guard = _guard(request)
     if guard:
@@ -670,6 +673,7 @@ def portal_checkins(request):
 
 
 @login_required(login_url='login')
+@rate_limit('concern-create', 20, 60)
 def portal_concerns(request):
     guard = _guard(request)
     if guard:
