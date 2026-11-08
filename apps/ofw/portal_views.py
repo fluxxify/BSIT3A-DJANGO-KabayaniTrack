@@ -9,6 +9,7 @@ profile are surfaced back here because they are linked through the profile.
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -661,14 +662,16 @@ def portal_checkins(request):
         form = OFWSelfCheckInForm(initial={'method': CheckIn.Method.APP, 'condition': CheckIn.Condition.SAFE})
 
     checkins = CheckIn.objects.filter(ofw__user=request.user).order_by('-checkin_date')
+    page_obj = Paginator(checkins, 10).get_page(request.GET.get('page'))
     checkin_rows = [
         {'obj': c, 'badge': _condition_badge.get(c.condition, 'bg-secondary-lt text-secondary')}
-        for c in checkins
+        for c in page_obj.object_list
     ]
     return render(request, 'ofw/portal/checkins.html', {
         'form': form,
         'profile': profile,
         'checkin_rows': checkin_rows,
+        'page_obj': page_obj,
     })
 
 
@@ -737,18 +740,20 @@ def portal_concerns(request):
         .prefetch_related('proofs')
         .order_by('-reported_date', '-id')
     )
+    page_obj = Paginator(concerns, 10).get_page(request.GET.get('page'))
     concern_rows = [
         {
             'obj': c,
             'status_badge': _concern_status_badge.get(c.status, 'bg-secondary-lt text-secondary'),
             'severity_badge': _severity_badge.get(c.severity, 'bg-secondary-lt text-secondary'),
         }
-        for c in concerns
+        for c in page_obj.object_list
     ]
     return render(request, 'ofw/portal/concerns.html', {
         'form': form,
         'profile': profile,
         'concern_rows': concern_rows,
+        'page_obj': page_obj,
     })
 
 

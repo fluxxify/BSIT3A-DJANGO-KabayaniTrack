@@ -226,6 +226,48 @@ class OFWPortalTests(TestCase):
         self.assertEqual(concern.title, 'Two months unpaid')
         self.assertEqual(concern.status, Concern.Status.OPEN)
 
+    def test_checkins_are_paginated(self):
+        for index in range(12):
+            CheckIn.objects.create(
+                ofw=self.profile,
+                user=self.user,
+                checkin_date=timezone.now(),
+                condition=CheckIn.Condition.SAFE,
+                notes=f'Entry {index}',
+            )
+
+        first = self.client.get(reverse('ofw:portal_checkins'))
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.context['page_obj'].paginator.num_pages, 2)
+        self.assertEqual(len(first.context['checkin_rows']), 10)
+        self.assertContains(first, 'Showing')
+        self.assertContains(first, 'next')
+
+        second = self.client.get(reverse('ofw:portal_checkins'), {'page': 2})
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(len(second.context['checkin_rows']), 2)
+
+    def test_concerns_are_paginated(self):
+        for index in range(12):
+            Concern.objects.create(
+                ofw=self.profile,
+                user=self.user,
+                title=f'Concern {index}',
+                category=Concern.Category.OTHER,
+                severity=Concern.Severity.MEDIUM,
+                reported_date=timezone.localdate(),
+            )
+
+        first = self.client.get(reverse('ofw:portal_concerns'))
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.context['page_obj'].paginator.num_pages, 2)
+        self.assertEqual(len(first.context['concern_rows']), 10)
+        self.assertContains(first, 'Showing')
+
+        second = self.client.get(reverse('ofw:portal_concerns'), {'page': 2})
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(len(second.context['concern_rows']), 2)
+
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_DIR)
 class OFWProfilePictureTests(TestCase):
