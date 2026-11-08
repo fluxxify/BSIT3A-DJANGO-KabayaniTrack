@@ -100,6 +100,7 @@ class OFWProfile(models.Model):
         max_length=20,
         choices=WelfareStatus.choices,
         default=WelfareStatus.ACTIVE,
+        db_index=True,
     )
     remarks = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -142,7 +143,7 @@ class WelfareAssessment(models.Model):
         null=True,
         blank=True,
     )
-    status = models.CharField(max_length=20, choices=WelfareStatus.choices)
+    status = models.CharField(max_length=20, choices=WelfareStatus.choices, db_index=True)
     risk_level = models.CharField(
         max_length=10,
         choices=RiskLevel.choices,
@@ -197,6 +198,7 @@ class CheckIn(models.Model):
         max_length=20,
         choices=Condition.choices,
         default=Condition.SAFE,
+        db_index=True,
     )
     contact_person = models.CharField(
         max_length=200,
@@ -211,6 +213,12 @@ class CheckIn(models.Model):
     class Meta:
         db_table = 'tblcheckin'
         ordering = ['-checkin_date', '-id']
+        indexes = [
+            models.Index(
+                fields=['ofw', '-checkin_date'],
+                name='checkin_ofw_date_idx',
+            ),
+        ]
 
     def __str__(self):
         return f'Check-in for {self.ofw} on {self.checkin_date:%b %d, %Y}'
@@ -257,7 +265,7 @@ class Concern(models.Model):
     title = models.CharField(max_length=200)
     category = models.CharField(max_length=30, choices=Category.choices, default=Category.OTHER)
     severity = models.CharField(max_length=10, choices=Severity.choices, default=Severity.MEDIUM)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN, db_index=True)
     reported_date = models.DateField()
     description = models.TextField(blank=True)
     resolved_date = models.DateField(null=True, blank=True)
@@ -461,7 +469,7 @@ class OFWActivity(models.Model):
         on_delete=models.CASCADE,
     )
     last_login_at = models.DateTimeField(null=True, blank=True)
-    last_activity_at = models.DateTimeField(null=True, blank=True,
+    last_activity_at = models.DateTimeField(null=True, blank=True, db_index=True,
         help_text='Most recent recorded login or profile update.')
     is_account_active = models.BooleanField(default=True)
     days_inactive = models.PositiveIntegerField(default=0)
@@ -523,7 +531,7 @@ class EmergencyAlert(models.Model):
     title = models.CharField(max_length=200)
     message = models.TextField(blank=True)
     level = models.CharField(max_length=10, choices=Level.choices, default=Level.WARNING)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN, db_index=True)
     acknowledged_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name='acknowledged_alerts',
@@ -568,7 +576,7 @@ class PoliceReport(models.Model):
     police_station = models.CharField(max_length=200, blank=True,
         help_text='Name of the police station near the OFW location.')
     police_contact = models.CharField(max_length=60, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
     reported_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name='police_reports',
@@ -648,6 +656,12 @@ class LocationTracker(models.Model):
     class Meta:
         db_table = 'tbllocationtracker'
         ordering = ['-recorded_at']
+        indexes = [
+            models.Index(
+                fields=['ofw', '-recorded_at'],
+                name='loctrack_ofw_recorded_idx',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.ofw.full_name} @ {self.latitude},{self.longitude}'
@@ -711,7 +725,7 @@ class MonitoringReport(models.Model):
     period_end = models.DateField()
     country = models.CharField(max_length=120, blank=True)
     summary = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
     agency = models.ForeignKey(
         'users.Agency',
         related_name='reports',
@@ -766,7 +780,7 @@ class SafeLocationSuggestion(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     notes = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name='reviewed_safe_location_suggestions',
