@@ -44,6 +44,8 @@ from apps.ofw.models import (
     OFWProfile,
     PoliceReport,
     SafeLocation,
+    WelfareAssessment,
+    WelfareStatus,
 )
 from apps.ofw.roles import mark_as_ofw
 from apps.ofw.ratelimit import rate_limit
@@ -824,8 +826,8 @@ class DashboardDrilldownTests(TestCase):
             ).group(1)
         )
         labels = {item['label']: item['value'] for item in welfare}
-        self.assertEqual(labels['Okay / Working'], 1)
-        self.assertEqual(labels['At Risk / In Danger'], 1)
+        self.assertEqual(labels['Stable'], 1)
+        self.assertEqual(labels['In Danger'], 1)
 
         concerns = json.loads(
             re.search(
@@ -835,6 +837,62 @@ class DashboardDrilldownTests(TestCase):
         )
         concern_labels = {item['label']: item['value'] for item in concerns}
         self.assertEqual(concern_labels['Salary / Compensation'], 1)
+
+
+class WelfareStatusClarityTests(TestCase):
+    """Welfare labels are plain-English and stale profile data is flagged."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='welfarestaff', password='Passw0rd!23', is_staff=True
+        )
+        self.client.force_login(self.staff)
+        self.profile = OFWProfile.objects.create(
+            user=self.staff, first_name='Mila', last_name='Santos',
+            country='Qatar', welfare_status='active',
+        )
+
+    def test_welfare_status_labels_are_plain_english(self):
+        labels = dict(WelfareStatus.choices)
+        self.assertEqual(labels['active'], 'Stable')
+        self.assertEqual(labels['needs_support'], 'Needs Assistance')
+        self.assertEqual(labels['distressed'], 'In Danger')
+        self.assertEqual(labels['repatriated'], 'Repatriated')
+        self.assertEqual(labels['missing'], 'Unreachable')
+
+    def test_profile_detail_warns_when_latest_assessment_disagrees(self):
+        WelfareAssessment.objects.create(
+            ofw=self.profile, user=self.staff, status='distressed',
+            risk_level='high', assessment_date=timezone.localdate(),
+        )
+        response = self.client.get(
+            reverse('ofw:profile_detail', args=[self.profile.pk])
+        )
+        self.assertContains(response, 'Welfare status may be out of date')
+        self.assertContains(response, 'In Danger')
+
+    def test_profile_detail_stays_quiet_when_assessment_matches(self):
+        WelfareAssessment.objects.create(
+            ofw=self.profile, user=self.staff, status='active',
+            risk_level='low', assessment_date=timezone.localdate(),
+        )
+        response = self.client.get(
+            reverse('ofw:profile_detail', args=[self.profile.pk])
+        )
+        self.assertNotContains(response, 'Welfare status may be out of date')
+
+    def test_dashboard_groups_unreachable_with_needs_attention(self):
+        for status in ('needs_support', 'distressed', 'missing'):
+            OFWProfile.objects.create(
+                user=self.staff, first_name=status, last_name='Case',
+                country='Qatar', welfare_status=status,
+            )
+        response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, 'Needs attention')
+        self.assertContains(
+            response,
+            '?welfare_status=needs_support,distressed,missing',
+        )
 
 
 class AuditLogTests(TestCase):

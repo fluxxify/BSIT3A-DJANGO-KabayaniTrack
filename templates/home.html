@@ -33,7 +33,7 @@
       <span><i class="far fa-calendar-days me-1"></i>{% now "F j, Y" %}</span>
       <span><i class="fas fa-users me-1"></i>{{ stats.kpi.ofw_total }} OFWs monitored</span>
       {% if stats.kpi.ofw_at_risk %}
-      <span class="badge bg-danger">{{ stats.kpi.ofw_at_risk }} at risk</span>
+      <span class="badge bg-danger">{{ stats.kpi.ofw_at_risk }} need attention</span>
       {% endif %}
     </div>
   </div>
@@ -61,7 +61,7 @@
       <div class="card">
         <div class="card-body">
           <div class="d-flex align-items-center">
-            <div class="subheader">OFWs At Risk</div>
+            <div class="subheader">Needs Attention</div>
           </div>
           <div class="d-flex align-items-baseline">
             <div class="h1 mb-0 me-2 text-danger">{{ stats.kpi.ofw_at_risk }}</div>
@@ -70,7 +70,7 @@
         </div>
         <div class="card-footer">
           <a href="{{ stats.links.ofw_at_risk }}" class="text-decoration-none">
-            View at-risk OFWs <i class="ti ti-arrow-right ms-1"></i>
+            View OFWs needing attention <i class="ti ti-arrow-right ms-1"></i>
           </a>
         </div>
       </div>
@@ -173,16 +173,21 @@
     <div class="col-sm-6 col-lg-3">
       <div class="card">
         <div class="card-body">
-          <div class="subheader mb-2">Welfare Distribution</div>
-          {% for item in stats.welfare_chart %}
-          <div class="d-flex justify-content-between">
-            {% if item.key %}
-            <a href="{{ stats.links.welfare_status }}?welfare_status={{ item.key }}" class="text-muted text-decoration-none">{{ item.label }}</a>
-            {% else %}
-            <span class="text-muted">{{ item.label }}</span>
-            {% endif %}
-            <span class="fw-medium">{{ item.value }}</span>
+          <div class="subheader mb-2">Welfare Overview</div>
+          {% for group in stats.welfare_groups %}
+          <div class="d-flex justify-content-between align-items-center{% if not forloop.last %} mb-1{% endif %}">
+            <a href="{{ stats.links.welfare_status }}?welfare_status={{ group.filter }}"
+               class="text-decoration-none {% if group.key == 'attention' %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+              {{ group.label }}
+            </a>
+            <span class="fw-medium">{{ group.value }}</span>
           </div>
+          {% for item in group.items %}
+          <div class="d-flex justify-content-between ps-3 small text-muted">
+            <a href="{{ stats.links.welfare_status }}?welfare_status={{ item.key }}" class="text-muted text-decoration-none">{{ item.label }}</a>
+            <span>{{ item.value }}</span>
+          </div>
+          {% endfor %}
           {% endfor %}
         </div>
         <div class="card-footer d-flex">

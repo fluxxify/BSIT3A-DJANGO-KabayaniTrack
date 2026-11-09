@@ -48,6 +48,7 @@ from .models import (
     SafeLocationSuggestion,
     WelfareAssessment,
     WelfareStatus,
+    WELFARE_ATTENTION_STATUSES,
 )
 from .notifications import (
     mark_concern_read_by_management,
@@ -260,7 +261,7 @@ _assessments = crud.make_crud(
         {'field': 'assessor', 'label': 'Assessor'},
     ],
     search_fields=['ofw__first_name', 'ofw__last_name', 'assessor'],
-    title='Welfare Status',
+    title='Welfare Assessments',
     entity='Welfare assessment',
     add_label='Add Assessment',
     search_placeholder='Search by OFW or assessor...',
@@ -448,10 +449,18 @@ def profile_export_ajax(request):
 @login_required(login_url='login')
 def profile_detail(request, pk):
     profile = get_object_or_404(crud._scoped(request.user, OFWProfile), pk=pk)
+    assessments = profile.assessments.all()
+    latest_assessment = assessments.first()
+    welfare_mismatch = bool(
+        latest_assessment is not None
+        and latest_assessment.status != profile.welfare_status
+    )
     context = {
         'profile': profile,
         'welfare_badge': _welfare_badge.get(profile.welfare_status, 'bg-secondary-lt text-secondary'),
-        'assessments': profile.assessments.all(),
+        'assessments': assessments,
+        'latest_assessment': latest_assessment,
+        'welfare_mismatch': welfare_mismatch,
         'checkins': profile.checkins.all(),
         'concerns': profile.concerns.all(),
     }
@@ -790,9 +799,7 @@ def dashboard_stats(user):
     reports = crud._scoped(user, MonitoringReport)
 
     month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    at_risk = profiles.filter(
-        welfare_status__in=[WelfareStatus.DISTRESSED, WelfareStatus.NEEDS_SUPPORT]
-    )
+    at_risk = profiles.filter(welfare_status__in=WELFARE_ATTENTION_STATUSES)
     open_concerns = concerns.filter(status__in=['open', 'in_progress', 'escalated'])
     recent_ofws = profiles.select_related('user').order_by('-created_at', '-id')[:5]
     new_ofws_month = profiles.filter(created_at__gte=month_start).count()
@@ -821,6 +828,7 @@ def dashboard_stats(user):
 
     welfare_rows = profiles.values('welfare_status').annotate(total=Count('id'))
     welfare_labels = dict(WelfareStatus.choices)
+    welfare_counts = {row['welfare_status']: row['total'] for row in welfare_rows}
     welfare_chart = [
         {
             'key': row['welfare_status'],
@@ -829,6 +837,39 @@ def dashboard_stats(user):
         }
         for row in welfare_rows
     ] or [{'key': '', 'label': 'No data', 'value': 0}]
+
+    # The dashboard groups the five stored values into three readable buckets so
+    # managers do not compare a welfare level with a location or contact state.
+    welfare_groups = [
+        {
+            'key': 'attention',
+            'label': 'Needs attention',
+            'value': sum(welfare_counts.get(k, 0) for k in WELFARE_ATTENTION_STATUSES),
+            'filter': ','.join(WELFARE_ATTENTION_STATUSES),
+            'items': [
+                {
+                    'key': key,
+                    'label': welfare_labels[key],
+                    'value': welfare_counts.get(key, 0),
+                }
+                for key in WELFARE_ATTENTION_STATUSES
+            ],
+        },
+        {
+            'key': WelfareStatus.ACTIVE,
+            'label': welfare_labels[WelfareStatus.ACTIVE],
+            'value': welfare_counts.get(WelfareStatus.ACTIVE, 0),
+            'filter': WelfareStatus.ACTIVE,
+            'items': [],
+        },
+        {
+            'key': WelfareStatus.REPATRIATED,
+            'label': welfare_labels[WelfareStatus.REPATRIATED],
+            'value': welfare_counts.get(WelfareStatus.REPATRIATED, 0),
+            'filter': WelfareStatus.REPATRIATED,
+            'items': [],
+        },
+    ]
 
     category_labels = dict(Concern.Category.choices)
     category_rows = concerns.values('category').annotate(total=Count('id')).order_by('-total')[:6]
@@ -914,6 +955,7 @@ def dashboard_stats(user):
     country_links = {row['country']: row['link'] for row in deployment_countries}
 
     return {
+        'welfare_groups': welfare_groups,
         'kpi': {
             'ofw_total': profiles.count(),
             'ofw_at_risk': at_risk.count(),
@@ -930,7 +972,7 @@ def dashboard_stats(user):
             'ofw_total': reverse('ofw:profile_list'),
             'ofw_at_risk': (
                 reverse('ofw:profile_list')
-                + f'?welfare_status={WelfareStatus.DISTRESSED},{WelfareStatus.NEEDS_SUPPORT}'
+                + '?welfare_status=' + ','.join(WELFARE_ATTENTION_STATUSES)
             ),
             'checkins_month': (
                 reverse('ofw:checkin_list')

@@ -7,7 +7,9 @@
         <div class="page-pretitle">OFW Profiles</div>
         <h2 class="page-title mb-0">
           {{ profile.full_name }}
-          <span class="badge {{ welfare_badge }} ms-2">{{ profile.get_welfare_status_display }}</span>
+          <span class="badge {{ welfare_badge }} ms-2">
+            <i class="{{ profile.welfare_status_icon }} me-1"></i>{{ profile.get_welfare_status_display }}
+          </span>
         </h2>
       </div>
       <div class="col-auto ms-auto d-print-none">
@@ -18,6 +20,19 @@
     </div>
   </div>
   <br>
+
+  {% if welfare_mismatch %}
+  <div class="alert alert-warning d-flex align-items-start" role="alert">
+    <i class="fas fa-triangle-exclamation me-2 mt-1"></i>
+    <div>
+      <div class="fw-semibold">Welfare status may be out of date</div>
+      This profile says <strong>{{ profile.get_welfare_status_display }}</strong>, but the
+      latest assessment on {{ latest_assessment.assessment_date|date:"M d, Y" }} says
+      <strong>{{ latest_assessment.get_status_display }}</strong>.
+      Update the profile status so the dashboard and reports stay consistent.
+    </div>
+  </div>
+  {% endif %}
 
   <div class="row row-deck row-cards">
     <div class="col-lg-6">
@@ -80,7 +95,7 @@
             <dt class="col-5 text-muted">Contract End</dt>
             <dd class="col-7">{{ profile.contract_end_date|date:"M d, Y"|default:"—" }}</dd>
             <dt class="col-5 text-muted">Welfare Status</dt>
-            <dd class="col-7"><span class="badge {{ welfare_badge }}">{{ profile.get_welfare_status_display }}</span></dd>
+            <dd class="col-7"><span class="badge {{ welfare_badge }}"><i class="{{ profile.welfare_status_icon }} me-1"></i>{{ profile.get_welfare_status_display }}</span></dd>
           </dl>
         </div>
       </div>

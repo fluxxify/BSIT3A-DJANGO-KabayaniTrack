@@ -19,11 +19,18 @@ from django.db import models
 
 
 class WelfareStatus(models.TextChoices):
-    ACTIVE = 'active', 'Okay / Working'
-    NEEDS_SUPPORT = 'needs_support', 'Needs Help'
-    DISTRESSED = 'distressed', 'At Risk / In Danger'
-    REPATRIATED = 'repatriated', 'Back in the Philippines'
-    MISSING = 'missing', 'Cannot Be Reached'
+    """Current welfare condition of an OFW.
+
+    Only the first three values are welfare levels.  ``REPATRIATED`` describes
+    where the worker is, and ``MISSING`` describes whether the team can reach
+    them, so both are shown separately from the condition on the dashboard.
+    """
+
+    ACTIVE = 'active', 'Stable'
+    NEEDS_SUPPORT = 'needs_support', 'Needs Assistance'
+    DISTRESSED = 'distressed', 'In Danger'
+    REPATRIATED = 'repatriated', 'Repatriated'
+    MISSING = 'missing', 'Unreachable'
 
 
 class RiskLevel(models.TextChoices):
@@ -31,6 +38,15 @@ class RiskLevel(models.TextChoices):
     MEDIUM = 'medium', 'Medium'
     HIGH = 'high', 'High'
     CRITICAL = 'critical', 'Critical'
+
+
+# Welfare levels that need a follow-up from the management team.  Kept in one
+# place so the dashboard and the profile filters never disagree.
+WELFARE_ATTENTION_STATUSES = (
+    WelfareStatus.NEEDS_SUPPORT,
+    WelfareStatus.DISTRESSED,
+    WelfareStatus.MISSING,
+)
 
 
 class OFWProfile(models.Model):
@@ -125,6 +141,17 @@ class OFWProfile(models.Model):
     def full_name(self):
         parts = [self.first_name, self.middle_name, self.last_name, self.suffix]
         return ' '.join(p for p in parts if p).strip()
+
+    @property
+    def welfare_status_icon(self):
+        """Small icon so the status is readable without relying on colour."""
+        return {
+            WelfareStatus.ACTIVE: 'fas fa-circle-check',
+            WelfareStatus.NEEDS_SUPPORT: 'fas fa-circle-exclamation',
+            WelfareStatus.DISTRESSED: 'fas fa-triangle-exclamation',
+            WelfareStatus.REPATRIATED: 'fas fa-house',
+            WelfareStatus.MISSING: 'fas fa-phone-slash',
+        }.get(self.welfare_status, 'fas fa-circle-question')
 
 
 class WelfareAssessment(models.Model):

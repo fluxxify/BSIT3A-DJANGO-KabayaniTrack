@@ -131,12 +131,31 @@ class OFWProfileForm(StyledModelForm):
             # generic endpoint, but case-management fields stay staff-only.
             for name in ('agency_org', 'welfare_status', 'remarks'):
                 self.fields.pop(name, None)
+        if 'welfare_status' in self.fields:
+            self.fields['welfare_status'].help_text = (
+                'Current welfare condition. Stable: no action needed. '
+                'Needs Assistance: follow up within 3 days. '
+                'In Danger: act immediately. Repatriated: no longer abroad. '
+                'Unreachable: no contact yet, please verify.'
+            )
 
 
 class WelfareAssessmentForm(StyledModelForm):
     class Meta:
         model = WelfareAssessment
         fields = ['ofw', 'status', 'risk_level', 'assessment_date', 'assessor', 'notes']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['status'].help_text = (
+            'Observed condition at this assessment. Stable: no action needed. '
+            'Needs Assistance: follow up within 3 days. '
+            'In Danger: act immediately. Repatriated: no longer abroad. '
+            'Unreachable: no contact yet, please verify.'
+        )
+        self.fields['risk_level'].help_text = (
+            'Urgency of this assessment: Low, Medium, High, or Critical.'
+        )
 
     def clean(self):
         cleaned = super().clean()
