@@ -294,8 +294,26 @@ class Concern(models.Model):
         """
         text = ' '.join((self.description or '').split())
         if text:
-            return text[:200]
+            first_sentence = re.split(r'(?<=[.!?])\s+', text, maxsplit=1)[0]
+            if len(first_sentence) > 90:
+                first_sentence = f'{first_sentence[:87].rstrip()}…'
+            return first_sentence[:200]
         return f'{self.get_category_display()} concern'
+
+    @property
+    def display_title(self):
+        """Short, readable heading without repeating a long description."""
+        text = ' '.join((self.title or '').split())
+        if len(text) > 90:
+            return f'{text[:87].rstrip()}…'
+        return text
+
+    @property
+    def has_extra_description(self):
+        """True when the description adds something beyond the heading."""
+        description = ' '.join((self.description or '').split())
+        title = ' '.join((self.title or '').split())
+        return bool(description) and description != title
 
 
 class ConcernProof(models.Model):

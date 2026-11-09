@@ -990,6 +990,50 @@ class ConcernDetailTests(TestCase):
         self.assertContains(response, 'Unpaid overtime')
         self.assertContains(response, 'Overtime hours were not paid')
 
+    def test_detail_page_shows_identical_description_only_once(self):
+        concern = Concern.objects.create(
+            ofw=self.profile, user=self.staff,
+            title='Wages not paid', description='Wages not paid',
+            category='salary', severity='medium', status='open',
+            reported_date=timezone.localdate(),
+        )
+        response = self.client.get(
+            reverse('ofw:concern_detail', args=[concern.pk])
+        )
+        self.assertContains(response, 'Wages not paid')
+        self.assertNotContains(response, '>Description</h3>')
+
+    def test_detail_page_keeps_description_when_it_adds_detail(self):
+        response = self.client.get(
+            reverse('ofw:concern_detail', args=[self.concern.pk])
+        )
+        self.assertContains(response, '>Description</h3>')
+        self.assertContains(response, 'Overtime hours were not paid')
+
+    def test_detail_heading_truncates_a_long_title(self):
+        long_title = (
+            'Pang lampusan ko ni guro pala akon mga ka trabaho ay '
+            'isa ka malawig nga istorya nga indi dapat maulohan '
+            'sing bug-os nga teksto'
+        )
+        concern = Concern.objects.create(
+            ofw=self.profile, user=self.staff,
+            title=long_title, description=f'{long_title} plus more details.',
+            category='work_environment', severity='medium', status='open',
+            reported_date=timezone.localdate(),
+        )
+        response = self.client.get(
+            reverse('ofw:concern_detail', args=[concern.pk])
+        )
+        self.assertContains(response, '…')
+        self.assertContains(response, '>Description</h3>')
+
+    def test_build_title_uses_the_first_sentence(self):
+        concern = Concern(
+            description='Wages are missing. The employer stopped paying.',
+        )
+        self.assertEqual(concern.build_title(), 'Wages are missing.')
+
     def test_list_shows_view_action(self):
         response = self.client.get(reverse('ofw:concern_list'))
         self.assertContains(

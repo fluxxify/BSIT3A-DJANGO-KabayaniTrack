@@ -6,7 +6,7 @@
       <div class="col">
         <div class="page-pretitle">Reported Concerns</div>
         <h2 class="page-title mb-0">
-          {{ concern.title }}
+          {{ concern.display_title }}
           <span class="badge {{ severity_badge }} ms-2">{{ concern.get_severity_display }}</span>
           <span class="badge {{ status_badge }} ms-1">{{ concern.get_status_display }}</span>
         </h2>
@@ -150,6 +150,7 @@
       </div>
     </div>
 
+    {% if concern.has_extra_description %}
     <div class="col-12">
       <div class="card">
         <div class="card-header"><h3 class="card-title">Description</h3></div>
@@ -158,6 +159,7 @@
         </div>
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 
