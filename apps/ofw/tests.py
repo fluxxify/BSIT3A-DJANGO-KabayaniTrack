@@ -1262,6 +1262,26 @@ class ConcernDetailTests(TestCase):
         self.assertNotContains(response, '<th>Category</th>')
         self.assertContains(response, 'text-nowrap')
 
+    def test_list_column_order_matches_the_ofw_portal(self):
+        response = self.client.get(reverse('ofw:concern_list'))
+        body = response.content.decode()
+        headers = ['Concern', 'OFW', 'Severity', 'Status', 'Proof', 'Reported']
+        positions = [body.index(f'<th>{label}</th>') for label in headers]
+        self.assertEqual(positions, sorted(positions))
+        # The decorative row number is dropped to keep the table narrow.
+        self.assertNotContains(response, '<th>#</th>')
+
+    def test_list_shows_a_proof_count(self):
+        ConcernProof.objects.create(
+            concern=self.concern,
+            file=SimpleUploadedFile('proof.png', b'\x89PNG fakepng', 'image/png'),
+            original_name='proof.png',
+        )
+        response = self.client.get(reverse('ofw:concern_list'))
+        self.assertContains(response, '<th>Proof</th>')
+        self.assertContains(response, 'fas fa-image')
+        self.assertContains(response, '1 proof file')
+
     def test_other_user_cannot_view_detail(self):
         other = User.objects.create_user(username='other3', password='Passw0rd!23')
         self.client.force_login(other)

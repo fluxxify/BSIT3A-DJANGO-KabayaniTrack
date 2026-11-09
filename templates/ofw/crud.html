@@ -100,7 +100,7 @@
       <table class="table table-vcenter table-hover card-table table-sm" id="crudTable">
         <thead>
           <tr>
-            <th>#</th>
+            {% if show_index %}<th>#</th>{% endif %}
             {% for col in columns %}<th>{{ col.label }}</th>{% endfor %}
             <th class="w-1">Actions</th>
           </tr>
@@ -108,7 +108,7 @@
         <tbody id="crudTableBody">
         {% for row in rows %}
         <tr data-row-id="{{ row.id }}">
-            <td class="text-muted">{{ forloop.counter0|add:page_obj.start_index }}</td>
+            {% if show_index %}<td class="text-muted">{{ forloop.counter0|add:page_obj.start_index }}</td>{% endif %}
             {% for cell in row.cells %}
             <td>
               {% if cell.badge %}

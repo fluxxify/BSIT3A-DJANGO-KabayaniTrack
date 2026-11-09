@@ -309,18 +309,36 @@ _checkins = crud.make_crud(
     on_save=_notify_checkin_saved,
 )
 
+
+def _concern_proof_cell(obj):
+    """Compact photo/video indicator for the concern list."""
+    proofs = list(obj.proofs.all())
+    if not proofs:
+        return '<span class="text-muted">—</span>'
+    count = len(proofs)
+    has_video = any(proof.is_video for proof in proofs)
+    icon = 'fas fa-video' if has_video else 'fas fa-image'
+    label = f'{count} proof file' + ('' if count == 1 else 's')
+    return (
+        f'<span class="text-nowrap text-muted" title="{label}">'
+        f'<i class="{icon} me-1"></i>{count}</span>'
+    )
+
+
 _concerns = crud.make_crud(
     model=Concern,
     form_class=ConcernForm,
     columns=[
-        {'field': 'ofw', 'label': 'OFW'},
         {'field': 'title', 'label': 'Concern', 'url_name': 'ofw:concern_detail',
-         'truncate': 70, 'nowrap': True,
+         'truncate': 60, 'nowrap': True,
          'meta_fields': ['get_category_display']},
+        {'field': 'ofw', 'label': 'OFW', 'truncate': 22, 'nowrap': True},
         {'field': 'get_severity_display', 'label': 'Severity', 'badge': _severity_badge,
-         'raw_field': 'severity'},
+         'raw_field': 'severity', 'nowrap': True},
         {'field': 'get_status_display', 'label': 'Status', 'badge': _concern_status_badge,
-         'raw_field': 'status'},
+         'raw_field': 'status', 'nowrap': True},
+        {'field': 'proofs', 'label': 'Proof', 'render': _concern_proof_cell,
+         'url_name': 'ofw:concern_detail'},
         {'field': 'reported_date', 'label': 'Reported', 'type': 'date'},
     ],
     search_fields=['ofw__first_name', 'ofw__last_name', 'title', 'description'],
@@ -329,6 +347,8 @@ _concerns = crud.make_crud(
     add_label='Report Concern',
     search_placeholder='Search by OFW or description...',
     detail_url_name='ofw:concern_detail',
+    prefetch_related=['proofs'],
+    show_index=False,
     page_help=[
         'Concerns are labelled automatically from the description (or the '
         'category when the description is empty), so staff no longer type a '

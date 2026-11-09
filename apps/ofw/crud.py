@@ -183,6 +183,18 @@ def _build_rows(objects, columns, row_actions=None):
     for obj in objects:
         cells = []
         for column in columns:
+            render = column.get('render')
+            if render:
+                # Custom cells return trusted HTML so a list can show an icon
+                # or a small summary without adding a template per model.
+                cells.append({
+                    'html': render(obj),
+                    'badge': None,
+                    'meta': '',
+                    'url': reverse(column['url_name'], args=[obj.pk]) if column.get('url_name') else None,
+                })
+                continue
+
             value = getattr(obj, column['field'], '')
             if callable(value):
                 value = value()
@@ -333,7 +345,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
               title, pretitle='Overview', entity='Record', add_label='Add Record',
               search_placeholder='Search...', detail_url_name=None, filters=None,
               row_actions=None, on_save=None, on_delete=None, page_help=None,
-              allow_delete_all=True):
+              allow_delete_all=True, prefetch_related=None, show_index=True):
     """Build the page + AJAX views for a single model.
 
     Returns a dict of view callables keyed by ``page``, ``list_ajax``,
@@ -354,10 +366,12 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
     form_field_names = list(form_class().fields.keys())
 
-    def _base_queryset(request, query=''):
+    def _base_queryset(request, query='', with_prefetch=True):
         qs = _scoped(request.user, model)
         qs = _apply_filters(qs, filters, request.GET)
         qs = _filter(qs, search_fields, query)
+        if prefetch_related and with_prefetch:
+            qs = qs.prefetch_related(*prefetch_related)
         return qs.order_by(*order_by)
 
     def _row_data(objects):
@@ -388,6 +402,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'add_label': add_label,
             'entity': entity,
             'columns': columns,
+            'show_index': show_index,
             'form_fields': describe_fields(form_class(user=request.user)),
             'rows': _build_rows(page_obj.object_list, columns, row_actions),
             'rows_json': _row_data(page_obj.object_list),
@@ -396,7 +411,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'querystring': params.urlencode(),
             'filter_items': filter_items,
             'search_placeholder': search_placeholder,
-            'colspan': len(columns) + 2,
+            'colspan': len(columns) + (2 if show_index else 1),
             'search_fields': search_fields,
             'detail_url_name': detail_url_name,
             'page_help': page_help or [],
@@ -570,7 +585,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         CSV remains available for compatibility via ``?format=csv``.
         """
         query = request.GET.get('q', '').strip()
-        queryset = _base_queryset(request, query)
+        queryset = _base_queryset(request, query, with_prefetch=False)
 
         # Build header from form field names, excluding relational/file fields
         # that don't serialize well to a spreadsheet.
