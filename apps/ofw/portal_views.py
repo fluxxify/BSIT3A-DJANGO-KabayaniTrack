@@ -205,21 +205,28 @@ def _police_hotline(local_hotlines, national_hotlines):
 
 
 def _nearest_police_station(profile, latest_ping=None):
-    """Closest registered police station, with a country fallback."""
+    """Closest registered police station, with a country fallback.
+
+    The closest one is chosen from every active station, not only the OFW's
+    saved deployment country, so the answer follows the OFW's real position.
+    """
     latest_ping = latest_ping if latest_ping is not None else _latest_ping(profile)
-    places = [
-        place for place in _country_places(profile)
-        if place.location_type == SafeLocation.LocationType.POLICE_STATION
-    ]
     if latest_ping is not None:
         rows = nearest_safe_places(
             latest_ping.latitude,
             latest_ping.longitude,
             limit=1,
-            locations=places,
+            locations=SafeLocation.objects.filter(
+                is_active=True,
+                location_type=SafeLocation.LocationType.POLICE_STATION,
+            ),
         )
         if rows:
             return rows[0]
+    places = [
+        place for place in _country_places(profile)
+        if place.location_type == SafeLocation.LocationType.POLICE_STATION
+    ]
     return _place_row(places[0]) if places else None
 
 

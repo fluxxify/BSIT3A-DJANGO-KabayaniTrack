@@ -2175,6 +2175,35 @@ class OFWConnectedSafetyPagesTests(TestCase):
         self.assertContains(response, 'libs/leaflet/leaflet.js')
         self.assertNotContains(response, 'unpkg.com')
 
+    def test_live_location_page_updates_nearest_cards_from_gps(self):
+        """The main nearest list must be rebuilt from the live GPS position."""
+        response = self.client.get(reverse('ofw:portal_location_sharing'))
+        self.assertContains(response, 'id="nearbyPlacesGrid"')
+        self.assertContains(response, 'id="nearestPlacesNote"')
+        self.assertContains(response, 'renderNearestCards')
+        self.assertContains(response, 'js/kabayani-location.js')
+
+    def test_nearest_police_station_follows_live_position_not_saved_country(self):
+        """A ping outside the saved country must still find the closest station."""
+        from apps.ofw.portal_views import _latest_ping, _nearest_police_station
+
+        self.ping.latitude = '14.599500'
+        self.ping.longitude = '120.984200'
+        self.ping.save(update_fields=['latitude', 'longitude'])
+        SafeLocation.objects.create(
+            name='Manila Police Station',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='Philippines',
+            city='Manila',
+            latitude='14.600000',
+            longitude='120.985000',
+        )
+
+        row = _nearest_police_station(
+            self.profile, latest_ping=_latest_ping(self.profile)
+        )
+        self.assertEqual(row['name'], 'Manila Police Station')
+
     def test_login_warnings_page_shows_inactive_days(self):
         old_login = timezone.now() - timedelta(days=4)
         self.user.last_login = old_login

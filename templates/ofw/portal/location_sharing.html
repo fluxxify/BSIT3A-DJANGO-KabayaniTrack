@@ -151,16 +151,14 @@
 
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fas fa-shield-alt text-primary me-2"></i>Safe places near my last location</h3>
+      <h3 class="card-title"><i class="fas fa-shield-alt text-primary me-2"></i>Safe places nearest to you</h3>
       <a href="{% url 'ofw:safe_locations' %}" class="ms-auto small">All safe places</a>
     </div>
     <div class="card-body">
-      {% if not latest_ping %}
-      <div class="alert alert-warning py-2 small mb-3">
-        Turn on live location to sort these places by exact distance and walking time.
+      <div id="nearestPlacesNote" class="alert alert-info py-2 small mb-3" role="status" aria-live="polite">
+        <i class="fas fa-location-crosshairs me-1"></i>Allow location access so the closest safe places appear first automatically.
       </div>
-      {% endif %}
-      <div class="row g-2">
+      <div class="row g-2" id="nearbyPlacesGrid">
         {% for place in nearest_places %}
         <div class="col-md-6">
           <div class="card h-100">
@@ -213,6 +211,7 @@
 
 {% block extra_js %}
 <script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'js/kabayani-location.js' %}?v=20261109a"></script>
 <script>
 (function () {
   // --- Map: my last known position + safe places -------------------------
@@ -423,6 +422,68 @@
     el.innerHTML = html;
   }
 
+  // Rebuild the main "Safe places nearest to you" cards from the live GPS
+  // position. This runs on the first fix (and on every update), so turning on
+  // location immediately shows the closest places anywhere in the world
+  // instead of waiting for the OFW's saved country or a server round-trip.
+  function renderNearestCards(anchor, approximate) {
+    var grid = document.getElementById('nearbyPlacesGrid');
+    if (!grid || !anchor) { return; }
+
+    var list = (window.__mapPlaces || []).filter(function (place) {
+      return place && place.lat != null && place.lng != null;
+    }).map(function (place) {
+      var point = [place.lat, place.lng];
+      return {
+        place: place,
+        km: distanceKm(anchor, point),
+        direction: compassDirection(bearingDeg(anchor, point))
+      };
+    }).sort(function (a, b) { return a.km - b.km; }).slice(0, 6);
+
+    if (!list.length) { return; }
+
+    grid.innerHTML = list.map(function (row) {
+      var place = row.place;
+      var tel = String(place.phone || '').replace(/[^0-9+]/g, '');
+      var html = '<div class="col-md-6"><div class="card h-100"><div class="card-body">' +
+        '<div class="d-flex flex-wrap align-items-start justify-content-between gap-2">' +
+        '<div class="fw-medium">' + escapeHtml(place.name) + '</div>' +
+        '<span class="badge bg-secondary-lt text-secondary">' + escapeHtml(place.type || '') + '</span>' +
+        '</div>' +
+        '<div class="text-danger small fw-medium mt-1">' + formatKm(row.km) +
+        ' · ' + escapeHtml(row.direction) +
+        ' · ' + Math.max(1, Math.round(row.km / 4.5 * 60)) + ' min walk</div>' +
+        '<div class="text-muted small mt-1">' +
+        (place.address ? escapeHtml(place.address) + '<br>' : '') +
+        (place.city ? escapeHtml(place.city) + ', ' : '') + escapeHtml(place.country || '') +
+        '</div></div><div class="card-footer d-flex gap-2">';
+      if (tel) {
+        html += '<a href="tel:' + escapeHtml(tel) +
+          '" class="btn btn-sm btn-success flex-grow-1"><i class="fas fa-phone me-1"></i>Call</a>';
+      }
+      html += '<a href="' + escapeHtml(mapsDirectionsUrl(anchor, place)) +
+        '" target="_blank" rel="noopener" class="btn btn-sm btn-primary flex-grow-1">' +
+        '<i class="fas fa-map-marker-alt me-1"></i>Directions</a>' +
+        '</div></div></div>';
+      return html;
+    }).join('');
+
+    var note = document.getElementById('nearestPlacesNote');
+    if (note) {
+      var prefix = approximate
+        ? 'Approximate position from your internet connection. '
+        : 'Live GPS position. ';
+      if (list[0].km <= 25) {
+        note.innerHTML = '<i class="fas fa-location-dot me-1"></i>' + prefix +
+          'Showing the closest safe places to where you are right now.';
+      } else {
+        note.innerHTML = '<i class="fas fa-earth-asia me-1"></i>' + prefix +
+          'No registered safe place is nearby, so these are the closest ones worldwide.';
+      }
+    }
+  }
+
   // The script runs at the end of <body>, so the map container already exists.
   initMap();
 
@@ -445,13 +506,14 @@
     ageEl.textContent = secs + 's ago';
   }
 
-  function showLivePosition(position) {
+  function showLivePosition(position, approximate) {
     var c = position.coords;
     var now = new Date();
+    var anchor = [c.latitude, c.longitude];
     lastLiveAt = now.getTime();
     latEl.textContent = c.latitude.toFixed(6);
     lngEl.textContent = c.longitude.toFixed(6);
-    accEl.textContent = Math.round(c.accuracy || 0) + ' m';
+    accEl.textContent = (approximate ? 'approx. ' : '') + Math.round(c.accuracy || 0) + ' m';
     timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     updateLiveAge();
     infoEl.classList.add('d-none');
@@ -465,7 +527,7 @@
 
     // Update map marker for current position
     if (map && window.L) {
-      var latlng = [c.latitude, c.longitude];
+      var latlng = anchor;
       if (ownMarker) {
         ownMarker.setLatLng(latlng);
         ownMarker.bindPopup('Your location right now<br><span class="text-muted">' +
@@ -492,10 +554,38 @@
       renderNearby(latlng);
     }
 
-    if (sharingStatusEl) {
+    // Update the main nearest-place cards even if the map library failed to
+    // load, because this list is the primary answer to "what is near me?".
+    renderNearby(anchor);
+    renderNearestCards(anchor, approximate);
+
+    if (sharingStatusEl && !approximate) {
       sharingStatusEl.className = 'alert alert-success py-2';
       sharingStatusEl.textContent = 'Live location detected · ' + timeEl.textContent;
     }
+  }
+
+  var approximateTried = false;
+
+  // Browsers may deny or time out the GPS fix. The internet-connection
+  // location is still good enough to sort safe places, so the OFW sees the
+  // nearest ones instead of an empty list. Sharing pings still need GPS.
+  function useApproximateLocation() {
+    if (approximateTried || !window.KabayaniLocation ||
+        !KabayaniLocation.getApproximate) { return; }
+    approximateTried = true;
+    KabayaniLocation.getApproximate().then(function (loc) {
+      showLivePosition({
+        coords: {
+          latitude: loc.lat,
+          longitude: loc.lng,
+          accuracy: loc.accuracy || 3000
+        }
+      }, true);
+      errorEl.classList.add('d-none');
+    }).catch(function () {
+      // Keep the visible warning; there is nothing else to try.
+    });
   }
 
   function showLiveError(error) {
@@ -506,6 +596,7 @@
       sharingStatusEl.className = 'alert alert-warning py-2';
       sharingStatusEl.textContent = 'Location not available: ' + (error && error.message ? error.message : 'Allow location access in your browser.');
     }
+    useApproximateLocation();
   }
 
   // Show current position immediately if available, then keep watching

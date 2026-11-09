@@ -1912,7 +1912,7 @@ def nearest_safe_places(lat, lng, limit=6, locations=None):
             ),
         })
 
-    rows.sort(key=lambda row: row['distance_km'])
+    rows.sort(key=lambda row: (row['distance_km'], row['name'].lower()))
     if limit:
         rows = rows[:limit]
     return rows
