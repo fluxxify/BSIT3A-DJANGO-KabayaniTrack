@@ -2411,6 +2411,88 @@ class LinkOFWAgenciesCommandTests(TestCase):
         self.assertContains(response, 'Liza Reyes')
 
 
+class ResetOFWAccountsCommandTests(TestCase):
+    """The reset command clears OFWs without touching staff or agencies."""
+
+    def setUp(self):
+        from apps.users.models import Agency
+
+        self.agency = Agency.objects.create(
+            name='Overseas Workers Welfare Administration', slug='owwa',
+        )
+        self.staff = User.objects.create_user(
+            username='keep_me_staff',
+            password='Passw0rd!23',
+            is_staff=True,
+        )
+        self.ofw = User.objects.create_user(
+            username='delete_me_ofw', password='Passw0rd!23',
+        )
+        mark_as_ofw(self.ofw)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw,
+            first_name='Delete',
+            last_name='Me',
+            country='Qatar',
+            agency_org=self.agency,
+        )
+        CheckIn.objects.create(
+            ofw=self.profile,
+            user=self.ofw,
+            checkin_date=timezone.now(),
+            condition=CheckIn.Condition.SAFE,
+        )
+        Concern.objects.create(
+            ofw=self.profile,
+            user=self.ofw,
+            title='Delete this concern',
+            reported_date=timezone.localdate(),
+        )
+        LocationTracker.objects.create(
+            ofw=self.profile,
+            latitude='25.0',
+            longitude='51.0',
+        )
+
+    def _run(self, **options):
+        from io import StringIO
+
+        output = StringIO()
+        call_command('reset_ofw_accounts', stdout=output, **options)
+        return output.getvalue()
+
+    def test_preview_lists_data_without_deleting(self):
+        output = self._run()
+
+        self.assertIn('Preview only', output)
+        self.assertIn('OFW profiles: 1', output)
+        self.assertIn('Check-ins: 1', output)
+        self.assertTrue(User.objects.filter(pk=self.ofw.pk).exists())
+        self.assertTrue(OFWProfile.objects.filter(pk=self.profile.pk).exists())
+
+    def test_execute_deletes_ofw_accounts_and_related_data(self):
+        output = self._run(execute=True)
+
+        self.assertIn('Deleted 1 OFW account(s)', output)
+        self.assertFalse(User.objects.filter(pk=self.ofw.pk).exists())
+        self.assertFalse(OFWProfile.objects.filter(pk=self.profile.pk).exists())
+        self.assertFalse(CheckIn.objects.exists())
+        self.assertFalse(Concern.objects.exists())
+        self.assertFalse(LocationTracker.objects.exists())
+        self.assertTrue(User.objects.filter(pk=self.staff.pk).exists())
+        self.assertTrue(self.agency.__class__.objects.filter(
+            pk=self.agency.pk
+        ).exists())
+
+    def test_keep_users_removes_profiles_but_keeps_login(self):
+        output = self._run(execute=True, keep_users=True)
+
+        self.assertIn('Login accounts were kept', output)
+        self.assertTrue(User.objects.filter(pk=self.ofw.pk).exists())
+        self.assertFalse(OFWProfile.objects.filter(pk=self.profile.pk).exists())
+        self.assertFalse(CheckIn.objects.exists())
+
+
 class AgencyMatchingTests(SimpleTestCase):
     """Legacy free-text agency names can be matched back to an agency."""
 
