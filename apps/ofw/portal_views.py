@@ -16,6 +16,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.users.models import Agency
+
 from .activity import refresh_activity_for_user
 from .forms import (
     FamilyContactForm,
@@ -323,6 +325,11 @@ def portal_home(request):
         'nearest_police_station': nearest_police_station,
         'warning_count': warning_notifications.count(),
         'last_checkin': last_checkin,
+        'can_choose_agency': bool(
+            profile is not None
+            and profile.agency_org_id is None
+            and Agency.objects.filter(is_active=True).exists()
+        ),
     }
     return render(request, 'ofw/portal/home.html', context)
 
@@ -539,19 +546,39 @@ def portal_profile(request):
             messages.success(request, 'Profile picture removed.')
             return redirect('ofw:portal_profile')
 
+        was_linked = bool(profile and profile.agency_org_id)
+
         form = OFWPortalProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             obj = form.save(commit=False)
             obj.user = request.user
+            selected_agency = form.cleaned_data.get('agency_org')
+            newly_linked = selected_agency is not None and not was_linked
+            if newly_linked:
+                obj.agency_org = selected_agency
+                obj.agency = selected_agency.name
             obj.save()
-            notify_managers(
-                title=f'Profile updated: {obj.full_name}',
-                message='The OFW has updated their profile information.',
-                url=reverse('ofw:profile_detail', args=[obj.pk]),
-                level=Notification.Level.INFO,
-                exclude_user=request.user,
-                agency=obj.agency_org,
-            )
+            if newly_linked:
+                notify_managers(
+                    title=f'New OFW linked: {obj.full_name}',
+                    message=(
+                        f'{obj.full_name} selected {selected_agency.name} as '
+                        'their agency and is now visible in your dashboard.'
+                    ),
+                    url=reverse('ofw:profile_detail', args=[obj.pk]),
+                    level=Notification.Level.INFO,
+                    exclude_user=request.user,
+                    agency=selected_agency,
+                )
+            else:
+                notify_managers(
+                    title=f'Profile updated: {obj.full_name}',
+                    message='The OFW has updated their profile information.',
+                    url=reverse('ofw:profile_detail', args=[obj.pk]),
+                    level=Notification.Level.INFO,
+                    exclude_user=request.user,
+                    agency=obj.agency_org,
+                )
             if request.FILES.get('profile_picture'):
                 messages.success(request, 'Profile picture updated successfully.')
             else:

@@ -175,3 +175,21 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS('Agency seeding complete.'))
+
+        # Link any OFW profile that already saved an agency name as free text.
+        # This keeps agency dashboards complete after a fresh deploy without
+        # requiring a manual per-OFW command.
+        try:
+            from apps.ofw.agency_matching import link_profiles_to_agencies
+
+            linked = link_profiles_to_agencies()
+        except Exception as exc:  # pragma: no cover - defensive
+            self.stdout.write(self.style.WARNING(
+                f'Automatic OFW agency linking skipped: {exc}'
+            ))
+        else:
+            if linked:
+                self.stdout.write(self.style.SUCCESS(
+                    f'Linked {len(linked)} existing OFW profile(s) to '
+                    'their agency.'
+                ))

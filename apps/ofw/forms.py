@@ -301,6 +301,26 @@ class OFWPortalProfileForm(StyledModelForm):
             'Maximum 20 characters. Example: +63 917 000 0000.'
         )
 
+        # An OFW who registered without an agency link can pick one here so
+        # their records become visible to that agency's dashboard.  Profiles
+        # that already belong to an agency keep a fixed, read-only link and do
+        # not get this field.
+        if self.instance.agency_org_id is None:
+            agencies = Agency.objects.filter(is_active=True).order_by('name')
+            if agencies.exists():
+                self.fields['agency_org'] = forms.ModelChoiceField(
+                    queryset=agencies,
+                    required=False,
+                    label='Agency / Partner Office',
+                    empty_label="I don't know yet / not listed",
+                    help_text=(
+                        'Choose the recruitment agency or partner office that '
+                        'handles your deployment so their team can see your '
+                        'records and support you.'
+                    ),
+                    widget=forms.Select(attrs={'class': 'form-select'}),
+                )
+
     def clean_passport_number(self):
         value = (self.cleaned_data.get('passport_number') or '').strip()
         if not value:

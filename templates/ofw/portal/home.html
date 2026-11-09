@@ -42,6 +42,15 @@
     so your information reaches the management team.
   </div>
   {% else %}
+  {% if can_choose_agency %}
+  <div class="alert alert-info alert-dismissible fade show">
+    <i class="fas fa-building me-2"></i>
+    <strong>You are not linked to an agency yet.</strong>
+    Choose your recruitment agency or partner office in your profile so their team can see your records and support you.
+    <a href="{% url 'ofw:portal_profile' %}" class="alert-link">Choose my agency</a>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
   {% if is_inactive %}
   <div class="alert alert-warning alert-dismissible fade show">
     <i class="fas fa-clock text-warning me-2"></i>

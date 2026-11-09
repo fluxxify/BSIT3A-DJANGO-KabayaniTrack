@@ -192,7 +192,8 @@ class Command(BaseCommand):
         if not value:
             return None
         return Agency.objects.filter(
-            Q(name__iexact=value) | Q(slug__iexact=value)
+            Q(name__iexact=value) | Q(slug__iexact=value),
+            is_active=True,
         ).first()
 
     @staticmethod

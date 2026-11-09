@@ -24,6 +24,21 @@
   </div>
   <br>
 
+  {% if form.agency_org %}
+  <div class="alert alert-info">
+    <div class="d-flex gap-2">
+      <i class="fas fa-building mt-1"></i>
+      <div>
+        <div class="fw-bold">You are not linked to an agency yet</div>
+        <div>
+          Choose your recruitment agency or partner office below so their team
+          can see your records and support you.
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row row-deck row-cards">
     <div class="col-lg-8">
       <div class="card">
@@ -37,6 +52,22 @@
             <div class="alert alert-danger">{{ form.non_field_errors }}</div>
             {% endif %}
             <div class="row g-3">
+              {% if form.agency_org %}
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <label class="form-label" for="{{ form.agency_org.id_for_label }}">
+                    {{ form.agency_org.label }}
+                  </label>
+                  {{ form.agency_org }}
+                  {% if form.agency_org.help_text %}
+                  <small class="form-hint">{{ form.agency_org.help_text }}</small>
+                  {% endif %}
+                  {% for error in form.agency_org.errors %}
+                  <div class="text-danger small mt-1">{{ error }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
               {% for field in form %}
               {% if field.name == 'profile_picture' %}
               <div class="col-12">
@@ -70,6 +101,7 @@
                   {% endfor %}
                 </div>
               </div>
+              {% elif field.name == 'agency_org' %}
               {% else %}
               <div class="col-12 col-md-6">
                 <label class="form-label" for="{{ field.id_for_label }}">

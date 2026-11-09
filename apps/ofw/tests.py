@@ -2411,6 +2411,246 @@ class LinkOFWAgenciesCommandTests(TestCase):
         self.assertContains(response, 'Liza Reyes')
 
 
+class AgencyMatchingTests(SimpleTestCase):
+    """Legacy free-text agency names can be matched back to an agency."""
+
+    def setUp(self):
+        from apps.users.models import Agency
+
+        self.owwa = Agency(
+            name='Overseas Workers Welfare Administration', slug='owwa',
+        )
+        self.fvj = Agency(
+            name='FVJ Overseas Placement, Inc', slug='fvj',
+        )
+
+    def test_matches_full_name_slug_and_acronym(self):
+        from apps.ofw.agency_matching import match_agency
+
+        agencies = [self.owwa, self.fvj]
+        for value in [
+            'Overseas Workers Welfare Administration',
+            'OWWA',
+            'owwa',
+            'OWWA Region 6',
+        ]:
+            with self.subTest(value=value):
+                self.assertEqual(match_agency(value, agencies), self.owwa)
+
+    def test_matches_other_agency_aliases(self):
+        from apps.ofw.agency_matching import match_agency
+
+        agencies = [self.owwa, self.fvj]
+        self.assertEqual(match_agency('FVJ', agencies), self.fvj)
+        self.assertEqual(
+            match_agency('FVJ Overseas Placement, Inc', agencies), self.fvj,
+        )
+
+    def test_unknown_text_does_not_match(self):
+        from apps.ofw.agency_matching import match_agency
+
+        self.assertIsNone(
+            match_agency('Bright Future Recruitment', [self.owwa, self.fvj])
+        )
+        self.assertIsNone(match_agency('', [self.owwa, self.fvj]))
+
+    def test_short_acronyms_are_not_used_as_tokens(self):
+        from apps.ofw.agency_matching import match_agency
+
+        self.assertIsNone(match_agency('send my CV to owwa office', [self.fvj]))
+
+
+class LinkProfilesToAgenciesTests(TestCase):
+    """The shared backfill helper links unassigned profiles safely."""
+
+    def setUp(self):
+        from apps.users.models import Agency
+
+        self.owwa = Agency.objects.create(
+            name='Overseas Workers Welfare Administration', slug='owwa',
+        )
+        self.user = User.objects.create_user(username='backfill_ofw')
+        self.profile = OFWProfile.objects.create(
+            user=self.user,
+            first_name='Liza',
+            last_name='Reyes',
+            country='Qatar',
+            agency='OWWA',
+        )
+
+    def test_links_profiles_from_saved_text(self):
+        from apps.ofw.agency_matching import link_profiles_to_agencies
+
+        matched = link_profiles_to_agencies()
+
+        self.assertEqual(matched, [self.profile])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, self.owwa)
+        self.assertEqual(
+            self.profile.agency,
+            'Overseas Workers Welfare Administration',
+        )
+
+    def test_dry_run_reports_without_saving(self):
+        from apps.ofw.agency_matching import link_profiles_to_agencies
+
+        matched = link_profiles_to_agencies(dry_run=True)
+
+        self.assertEqual(matched, [self.profile])
+        self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.agency_org)
+        self.assertEqual(self.profile.agency, 'OWWA')
+
+    def test_already_linked_profiles_are_untouched(self):
+        from apps.users.models import Agency
+        from apps.ofw.agency_matching import link_profiles_to_agencies
+
+        other = Agency.objects.create(name='Another Agency', slug='another')
+        self.profile.agency_org = other
+        self.profile.agency = 'An old label'
+        self.profile.save(update_fields=['agency_org', 'agency'])
+
+        self.assertEqual(link_profiles_to_agencies(), [])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, other)
+        self.assertEqual(self.profile.agency, 'An old label')
+
+    def test_inactive_agency_is_not_used_for_backfill(self):
+        from apps.ofw.agency_matching import link_profiles_to_agencies
+
+        self.owwa.is_active = False
+        self.owwa.save(update_fields=['is_active'])
+
+        self.assertEqual(link_profiles_to_agencies(), [])
+        self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.agency_org)
+
+
+class LinkOFWAgenciesMigrationTests(TestCase):
+    """Migration 0031 backfills existing profiles on deploy."""
+
+    def test_data_migration_links_saved_agency_names(self):
+        import importlib
+
+        from django.apps import apps as django_apps
+
+        from apps.users.models import Agency
+
+        agency = Agency.objects.create(
+            name='Overseas Workers Welfare Administration', slug='owwa',
+        )
+        user = User.objects.create_user(username='migrated_ofw')
+        profile = OFWProfile.objects.create(
+            user=user,
+            first_name='Mia',
+            last_name='Cruz',
+            country='Kuwait',
+            agency='OWWA',
+        )
+
+        migration = importlib.import_module(
+            'apps.ofw.migrations.0031_link_ofw_agencies'
+        )
+        migration.link_profiles(django_apps, None)
+
+        profile.refresh_from_db()
+        self.assertEqual(profile.agency_org, agency)
+        self.assertEqual(profile.agency, agency.name)
+
+
+class OFWPortalAgencySelectionTests(TestCase):
+    """Unlinked OFWs can choose an agency from their own profile."""
+
+    def setUp(self):
+        from apps.users.models import Agency
+
+        self.owwa = Agency.objects.create(
+            name='Overseas Workers Welfare Administration', slug='owwa',
+        )
+        self.user = User.objects.create_user(
+            username='selflink_ofw', password='Passw0rd!23',
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user,
+            first_name='Ana',
+            last_name='Reyes',
+            country='Dubai',
+        )
+        self.client.force_login(self.user)
+
+    def test_unlinked_profile_shows_agency_field(self):
+        response = self.client.get(reverse('ofw:portal_profile'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agency / Partner Office')
+        self.assertIn('agency_org', response.context['form'].fields)
+
+    def test_home_prompts_unlinked_ofw_to_choose_agency(self):
+        response = self.client.get(reverse('ofw:portal'))
+
+        self.assertContains(response, 'You are not linked to an agency yet')
+        self.assertContains(response, 'Choose my agency')
+
+    def test_unlinked_ofw_can_select_an_agency(self):
+        response = self.client.post(reverse('ofw:portal_profile'), {
+            'first_name': 'Ana',
+            'last_name': 'Reyes',
+            'country': 'Dubai',
+            'agency_org': str(self.owwa.pk),
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, self.owwa)
+        self.assertEqual(self.profile.agency, self.owwa.name)
+
+    def test_selecting_agency_notifies_that_agency_staff(self):
+        from apps.users.models import AgencyStaff
+
+        staff = User.objects.create_user(
+            username='owwa_selflink_staff',
+            password='Passw0rd!23',
+            is_staff=True,
+        )
+        AgencyStaff.objects.create(user=staff, agency=self.owwa)
+
+        self.client.post(reverse('ofw:portal_profile'), {
+            'first_name': 'Ana',
+            'last_name': 'Reyes',
+            'country': 'Dubai',
+            'agency_org': str(self.owwa.pk),
+        })
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=staff,
+                title__startswith='New OFW linked',
+            ).exists()
+        )
+
+    def test_linked_profile_hides_field_and_cannot_be_reassigned(self):
+        from apps.users.models import Agency
+
+        other = Agency.objects.create(name='Another Agency', slug='another')
+        self.profile.agency_org = self.owwa
+        self.profile.agency = self.owwa.name
+        self.profile.save(update_fields=['agency_org', 'agency'])
+
+        page = self.client.get(reverse('ofw:portal_profile'))
+        self.assertNotContains(page, 'Agency / Partner Office')
+        self.assertNotIn('agency_org', page.context['form'].fields)
+
+        self.client.post(reverse('ofw:portal_profile'), {
+            'first_name': 'Ana',
+            'last_name': 'Reyes',
+            'country': 'Dubai',
+            'agency_org': str(other.pk),
+        })
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, self.owwa)
+
+
 class OFWConnectedSafetyPagesTests(TestCase):
     """OFW-side pages connected to the agency safety consoles."""
 
