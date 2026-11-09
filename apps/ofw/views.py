@@ -1410,13 +1410,10 @@ def police_report_submit(request, pk):
     report.police_contact = request.POST.get('police_contact', '').strip()
     report.save(update_fields=['status', 'police_station', 'police_contact', 'updated_at'])
 
-    notify(
-        request.user,
-        'Police contact recorded',
+    messages.success(
+        request,
         f'Contact with {report.police_station} was recorded in KabayaniTrack. '
         'This app does not transmit the report to the police.',
-        url=reverse('ofw:police_reports'),
-        level=Notification.Level.SUCCESS,
     )
     return redirect('ofw:police_reports')
 

@@ -523,14 +523,6 @@ def portal_profile(request):
                 profile.profile_picture.delete(save=False)
             profile.profile_picture = None
             profile.save(update_fields=['profile_picture'])
-            notify_managers(
-                title=f'Profile updated: {profile.full_name}',
-                message='The OFW has removed their profile picture.',
-                url=reverse('ofw:profile_detail', args=[profile.pk]),
-                level=Notification.Level.INFO,
-                exclude_user=request.user,
-                agency=profile.agency_org,
-            )
             messages.success(request, 'Profile picture removed.')
             return redirect('ofw:portal_profile')
 
@@ -557,15 +549,6 @@ def portal_profile(request):
                     level=Notification.Level.INFO,
                     exclude_user=request.user,
                     agency=selected_agency,
-                )
-            else:
-                notify_managers(
-                    title=f'Profile updated: {obj.full_name}',
-                    message='The OFW has updated their profile information.',
-                    url=reverse('ofw:profile_detail', args=[obj.pk]),
-                    level=Notification.Level.INFO,
-                    exclude_user=request.user,
-                    agency=obj.agency_org,
                 )
             if request.FILES.get('profile_picture'):
                 messages.success(request, 'Profile picture updated successfully.')
@@ -801,14 +784,6 @@ def portal_contacts(request):
             contact = form.save(commit=False)
             contact.user = request.user
             contact.save()
-            notify_managers(
-                title=f'Emergency contact added: {contact.name}',
-                message=f'{profile.full_name} added "{contact.name}" as an emergency contact.',
-                url=reverse('ofw:contact_list'),
-                level=Notification.Level.INFO,
-                exclude_user=request.user,
-                agency=profile.agency_org,
-            )
             messages.success(
                 request,
                 f'"{contact.name}" has been added to your family emergency contacts.',
@@ -896,15 +871,6 @@ def portal_contact_edit(request, pk):
         form = FamilyContactForm(request.POST, instance=contact)
         if form.is_valid():
             form.save()
-            profile = _profile_for(request.user)
-            notify_managers(
-                title=f'Emergency contact updated: {contact.name}',
-                message=f'{profile.full_name if profile else request.user.username} updated "{contact.name}".',
-                url=reverse('ofw:contact_list'),
-                level=Notification.Level.INFO,
-                exclude_user=request.user,
-                agency=profile.agency_org if profile else None,
-            )
             messages.success(request, f'"{contact.name}" has been updated.')
             return redirect('ofw:portal_contacts')
     else:
@@ -930,17 +896,7 @@ def portal_contact_delete(request, pk):
     )
 
     if request.method == 'POST':
-        name = contact.name
-        profile = _profile_for(request.user)
         contact.delete()
-        notify_managers(
-            title=f'Emergency contact removed: {name}',
-            message=f'{profile.full_name if profile else request.user.username} removed "{name}" from emergency contacts.',
-            url=reverse('ofw:contact_list'),
-            level=Notification.Level.INFO,
-            exclude_user=request.user,
-            agency=profile.agency_org if profile else None,
-        )
         return redirect('ofw:portal_contacts')
 
     return redirect('ofw:portal_contacts')
@@ -964,17 +920,6 @@ def portal_suggest_safe_place(request):
             suggestion = form.save(commit=False)
             suggestion.submitted_by = request.user
             suggestion.save()
-            notify_managers(
-                title=f'New safe place suggestion: {suggestion.name}',
-                message=(
-                    f'{profile.full_name} suggested a new safe place: {suggestion.name} '
-                    f'({suggestion.get_location_type_display()}) in {suggestion.city}, {suggestion.country}.'
-                ),
-                url=reverse('admin:kabayan_safelocationsuggestion_changelist'),
-                level=Notification.Level.INFO,
-                exclude_user=request.user,
-                agency=profile.agency_org,
-            )
             messages.success(
                 request,
                 f'Your suggestion "{suggestion.name}" has been submitted for admin approval.'

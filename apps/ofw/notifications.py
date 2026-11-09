@@ -1,8 +1,13 @@
-"""Small helpers for creating in-app notifications."""
+"""Small helpers for creating in-app notifications.
+
+Notifications are reserved for events that need action or reassurance:
+emergencies, concerns, check-ins, inactivity warnings and case status changes.
+Routine edits such as updating a profile or adding a family contact stay silent
+on purpose so the bell does not become noisy.
+"""
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.urls import reverse
 from django.utils import timezone
 
 from .models import Notification
@@ -84,11 +89,12 @@ def notify_inactivity_managers(profile, title, message, url, level):
 
 
 def mark_concern_read_by_management(concern, user):
-    """Mark a concern as seen by management and tell the OFW exactly once.
+    """Mark a concern as seen by management.
 
     Management includes both staff members and administrators.  Merely listing
     concerns does not count as "reading" one; the concern must be opened
-    (detail page) or loaded for editing.
+    (detail page) or loaded for editing.  This is silent: a read receipt is
+    routine and would only add notification noise.
     """
     if not (user.is_staff or user.is_superuser):
         return False
@@ -97,15 +103,4 @@ def mark_concern_read_by_management(concern, user):
 
     concern.read_by_management_at = timezone.now()
     concern.save(update_fields=['read_by_management_at'])
-
-    recipient = concern.ofw.user
-    if recipient is not None and recipient.pk != user.pk:
-        notify(
-            recipient,
-            'Your concern has been read',
-            f'Your concern "{concern.title}" has been read by the management '
-            'team. They will review it and keep you updated.',
-            url=reverse('ofw:portal_concerns'),
-            level=Notification.Level.INFO,
-        )
     return True

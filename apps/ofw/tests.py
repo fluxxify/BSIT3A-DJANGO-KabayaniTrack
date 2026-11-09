@@ -1427,6 +1427,13 @@ class FamilyContactTests(TestCase):
             'notes': '',
         })
 
+    def test_adding_a_family_contact_does_not_notify_managers(self):
+        staff = User.objects.create_user(
+            username='contactstaff', password='Passw0rd!23', is_staff=True
+        )
+        self._add_contact()
+        self.assertFalse(Notification.objects.filter(recipient=staff).exists())
+
     def test_post_without_profile_redirects_instead_of_500(self):
         self.profile.delete()
         self.client.force_login(self.ofw)
@@ -1845,7 +1852,7 @@ class NotificationTests(TestCase):
         self.assertContains(response, 'dh-notif-badge')
         self.assertContains(response, 'Unread alert')
 
-    def test_management_opening_concern_notifies_ofw_once(self):
+    def test_management_opening_concern_marks_read_without_notifying(self):
         concern = Concern.objects.create(
             ofw=self.profile,
             user=self.ofw_user,
@@ -1863,15 +1870,18 @@ class NotificationTests(TestCase):
         concern.refresh_from_db()
         self.assertIsNotNone(concern.read_by_management_at)
 
-        notifications = Notification.objects.filter(
-            recipient=self.ofw_user, title='Your concern has been read'
+        # Routine read receipts are intentionally silent to keep the bell
+        # focused on concerns that need action.
+        self.assertFalse(
+            Notification.objects.filter(
+                recipient=self.ofw_user,
+                title='Your concern has been read',
+            ).exists()
         )
-        self.assertEqual(notifications.count(), 1)
-        self.assertIn('has been read by the management', notifications.first().message)
-        self.assertEqual(notifications.first().url, reverse('ofw:portal_concerns'))
 
         self.client.get(url)
-        self.assertEqual(notifications.count(), 1)
+        concern.refresh_from_db()
+        self.assertIsNotNone(concern.read_by_management_at)
 
     def test_ofw_opening_own_concern_does_not_mark_it_read(self):
         concern = Concern.objects.create(
@@ -1894,7 +1904,7 @@ class NotificationTests(TestCase):
             ).exists()
         )
 
-    def test_management_opening_concern_editor_notifies_ofw(self):
+    def test_management_opening_concern_editor_marks_read_silently(self):
         concern = Concern.objects.create(
             ofw=self.profile,
             user=self.ofw_user,
@@ -1911,7 +1921,7 @@ class NotificationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         concern.refresh_from_db()
         self.assertIsNotNone(concern.read_by_management_at)
-        self.assertTrue(
+        self.assertFalse(
             Notification.objects.filter(
                 recipient=self.ofw_user, title='Your concern has been read'
             ).exists()
