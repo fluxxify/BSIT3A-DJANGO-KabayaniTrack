@@ -352,7 +352,7 @@ _contacts = crud.make_crud(
         {'field': 'get_contact_type_display', 'label': 'Type', 'badge': _contact_type_badge,
          'raw_field': 'contact_type'},
         {'field': 'country', 'label': 'Country'},
-        {'field': 'city', 'label': 'City'},
+        {'field': 'city', 'label': 'City / Area'},
         {'field': 'phone', 'label': 'Phone'},
         {'field': 'email', 'label': 'Email'},
     ],

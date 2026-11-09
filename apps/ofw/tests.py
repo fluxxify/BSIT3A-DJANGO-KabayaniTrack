@@ -1022,6 +1022,12 @@ class EmergencyContactActionTests(TestCase):
         self.assertEqual(self.owwa.website_url(), 'https://owwa.gov.ph')
         self.assertEqual(self.hospital.website_url(), '')
 
+    def test_contact_form_explains_country_and_city(self):
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(response, 'Deployment country this contact applies to')
+        self.assertContains(response, 'City / Area')
+        self.assertContains(response, 'Shown to OFWs so offices in the same country')
+
     def test_list_shows_call_and_website_actions(self):
         response = self.client.get(reverse('ofw:contact_list'))
         self.assertContains(response, 'tel:+63285511545')

@@ -206,6 +206,19 @@ class EmergencyContactForm(StyledModelForm):
             'email', 'website', 'address', 'notes',
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['country'].help_text = (
+            'Deployment country this contact applies to (e.g. Saudi Arabia). '
+            'OFWs deployed there see it under their local hotlines. '
+            'Use "Philippines" for national hotlines.'
+        )
+        self.fields['city'].label = 'City / Area'
+        self.fields['city'].help_text = (
+            'Optional. City or area covered by this contact (e.g. Riyadh). '
+            'Shown to OFWs so offices in the same country are easy to tell apart.'
+        )
+
 
 class MonitoringReportForm(StyledModelForm):
     class Meta:
