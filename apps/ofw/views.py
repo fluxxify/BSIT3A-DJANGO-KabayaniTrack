@@ -28,7 +28,7 @@ from .forms import (
 )
 from .geo import reverse_geocode
 from .hotlines import hotlines_for_country
-from .locations import COUNTRY_GEO, canonical_country
+from .locations import COUNTRY_GEO, canonical_country, cities_for_country
 from .models import (
     AuditLog,
     CheckIn,
@@ -697,6 +697,13 @@ def contact_list_ajax(request):
 
 def contact_get_ajax(request, pk):
     return _contacts['get_ajax'](request, pk)
+
+
+@login_required(login_url='login')
+def contact_cities(request):
+    """City suggestions for the country selected in the contact form."""
+    country = (request.GET.get('country') or '').strip()
+    return JsonResponse({'cities': cities_for_country(country)})
 
 
 def contact_save_ajax(request):

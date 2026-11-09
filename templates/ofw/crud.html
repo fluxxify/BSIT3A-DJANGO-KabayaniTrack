@@ -217,7 +217,15 @@
               <input type="file" name="{{ f.name }}" id="crud_{{ f.name }}" class="form-control">
               {% else %}
               <input type="{{ f.kind }}" name="{{ f.name }}" id="crud_{{ f.name }}" class="form-control"
-                     {% if f.kind == 'number' %}step="any"{% endif %} {% if f.required %}required{% endif %}>
+                     {% if f.kind == 'number' %}step="any"{% endif %} {% if f.required %}required{% endif %}
+                     {% if f.placeholder %}placeholder="{{ f.placeholder }}"{% endif %}
+                     {% if f.datalist_id %}list="{{ f.datalist_id }}" autocomplete="off"{% endif %}
+                     {% if f.cities_url %}data-cities-url="{{ f.cities_url }}"{% endif %}>
+              {% endif %}
+              {% if f.datalist_id %}
+              <datalist id="{{ f.datalist_id }}">
+                {% for option in f.datalist %}<option value="{{ option }}"></option>{% endfor %}
+              </datalist>
               {% endif %}
               {% if f.help %}<small class="form-hint">{{ f.help }}</small>{% endif %}
             </div>
@@ -333,6 +341,53 @@
     });
   }
 
+  // Country suggestions are rendered by the server. City suggestions are
+  // fetched for the selected country so staff still only type once.
+  const cityField = form.querySelector('input[data-cities-url]');
+  const countryField = form.querySelector('input[name="country"]');
+  const cityDatalist = cityField ? document.getElementById(cityField.getAttribute('list')) : null;
+  let cityTimer = null;
+  let cityRequest = 0;
+
+  function renderCityOptions(cities) {
+    if (!cityDatalist) return;
+    cityDatalist.innerHTML = '';
+    (cities || []).forEach(function (city) {
+      const option = document.createElement('option');
+      option.value = city;
+      cityDatalist.appendChild(option);
+    });
+  }
+
+  function refreshCities() {
+    if (!cityField || !countryField || !cityDatalist) return;
+    const country = countryField.value.trim();
+    if (!country) {
+      renderCityOptions([]);
+      return;
+    }
+    const requestId = ++cityRequest;
+    fetch(cityField.getAttribute('data-cities-url') + '?country=' + encodeURIComponent(country), {
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+    })
+      .then(function (response) { return response.ok ? response.json() : {cities: []}; })
+      .then(function (data) {
+        if (requestId === cityRequest) renderCityOptions(data.cities);
+      })
+      .catch(function () { /* keep the current suggestions on network errors */ });
+  }
+
+  if (cityField && countryField) {
+    countryField.addEventListener('input', function () {
+      clearTimeout(cityTimer);
+      cityTimer = setTimeout(refreshCities, 250);
+    });
+    countryField.addEventListener('change', function () {
+      clearTimeout(cityTimer);
+      refreshCities();
+    });
+  }
+
   modalEl.addEventListener('show.bs.modal', function (event) {
     clearFormError();
     form.reset();
@@ -350,6 +405,7 @@
       title.textContent = '{{ add_label }}';
       submitBtn.textContent = 'Save';
     }
+    refreshCities();
   });
 
   deleteModalEl.addEventListener('show.bs.modal', function (event) {

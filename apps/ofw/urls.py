@@ -76,6 +76,7 @@ urlpatterns = [
     # Emergency contacts
     path('contacts/', views.contact_list_page, name='contact_list'),
     path('contacts/ajax/list/', views.contact_list_ajax, name='contact_list_ajax'),
+    path('contacts/ajax/cities/', views.contact_cities, name='contact_cities'),
     path('contacts/ajax/get/<int:pk>/', views.contact_get_ajax, name='contact_get_ajax'),
     path('contacts/ajax/save/', views.contact_save_ajax, name='contact_save_ajax'),
     path('contacts/ajax/delete/<int:pk>/', views.contact_delete_ajax, name='contact_delete_ajax'),

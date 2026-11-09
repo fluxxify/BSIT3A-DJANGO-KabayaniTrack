@@ -14,6 +14,7 @@ from apps.users.agencies import (
 )
 from apps.users.models import Agency
 
+from .locations import COUNTRY_CHOICES, canonical_country
 from .models import (
     CheckIn,
     Concern,
@@ -213,11 +214,28 @@ class EmergencyContactForm(StyledModelForm):
             'OFWs deployed there see it under their local hotlines. '
             'Use "Philippines" for national hotlines.'
         )
+        self.fields['country'].widget.attrs.update({
+            'list': 'crud-country-options',
+            'autocomplete': 'off',
+            'placeholder': 'Start typing a country',
+        })
         self.fields['city'].label = 'City / Area'
+        self.fields['city'].widget.attrs.update({
+            'list': 'crud-city-options',
+            'autocomplete': 'off',
+            'placeholder': 'Start typing a city',
+            'data-cities-url': 'ofw:contact_cities',
+        })
         self.fields['city'].help_text = (
             'Optional. City or area covered by this contact (e.g. Riyadh). '
             'Shown to OFWs so offices in the same country are easy to tell apart.'
         )
+        # Country names are suggested from the same dataset used by OFW
+        # profiles, so staff pick the exact spelling that hotline matching uses.
+        self.datalists = {'country': COUNTRY_CHOICES}
+
+    def clean_country(self):
+        return canonical_country(self.cleaned_data.get('country', ''))
 
 
 class MonitoringReportForm(StyledModelForm):

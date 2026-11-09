@@ -17,7 +17,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from openpyxl import load_workbook
 
-from apps.ofw.forms import CheckInForm, MonitoringReportForm
+from apps.ofw.forms import CheckInForm, EmergencyContactForm, MonitoringReportForm
 from apps.ofw.hotlines import (
     COUNTRY_HOTLINES,
     PHILIPPINE_HOTLINES,
@@ -1027,6 +1027,37 @@ class EmergencyContactActionTests(TestCase):
         self.assertContains(response, 'Deployment country this contact applies to')
         self.assertContains(response, 'City / Area')
         self.assertContains(response, 'Shown to OFWs so offices in the same country')
+
+    def test_contact_form_offers_country_and_city_suggestions(self):
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(response, 'list="crud-country-options"')
+        self.assertContains(response, 'list="crud-city-options"')
+        self.assertContains(
+            response,
+            'data-cities-url="' + reverse('ofw:contact_cities') + '"',
+        )
+        self.assertContains(response, '<option value="Saudi Arabia">')
+
+    def test_contact_cities_returns_suggestions_for_country(self):
+        response = self.client.get(
+            reverse('ofw:contact_cities'), {'country': 'Saudi Arabia'}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Riyadh', response.json()['cities'])
+
+    def test_contact_form_canonicalizes_country_aliases(self):
+        form = EmergencyContactForm(
+            data={
+                'name': 'POLO Riyadh',
+                'contact_type': 'polo',
+                'country': 'KSA',
+                'city': 'Riyadh',
+                'phone': '+966 11 000 0000',
+            },
+            user=self.admin,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['country'], 'Saudi Arabia')
 
     def test_list_shows_call_and_website_actions(self):
         response = self.client.get(reverse('ofw:contact_list'))

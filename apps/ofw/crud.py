@@ -16,7 +16,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.html import escape
 from django.views.decorators.http import require_POST
@@ -261,6 +261,7 @@ def _xlsx_response(queryset, field_names, field_labels, entity):
 def describe_fields(form):
     """Describe a bound/unbound form's fields for generic template rendering."""
     fields = []
+    datalists = getattr(form, 'datalists', {})
     for name, field in form.fields.items():
         widget = field.widget
         wtype = widget.__class__.__name__
@@ -291,8 +292,22 @@ def describe_fields(form):
             'required': field.required,
             'choices': list(field.choices) if kind == 'select' and field.choices else [],
             'help': str(field.help_text or ''),
+            'placeholder': widget.attrs.get('placeholder', ''),
+            'datalist_id': widget.attrs.get('list', ''),
+            'datalist': datalists.get(name, []),
+            'cities_url': _reversed_url(widget.attrs.get('data-cities-url', '')),
         })
     return fields
+
+
+def _reversed_url(view_name):
+    """Resolve a lazily declared URL name without crashing the whole form."""
+    if not view_name:
+        return ''
+    try:
+        return reverse(view_name)
+    except NoReverseMatch:
+        return ''
 
 
 def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
