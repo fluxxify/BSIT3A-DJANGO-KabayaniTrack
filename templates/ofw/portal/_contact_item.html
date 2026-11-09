@@ -45,12 +45,12 @@ Context:
        data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
       <i class="fas fa-phone me-1"></i>Call
     </a>
-    {% if contact.whatsapp_url %}
+    {% if contact.is_personal and contact.whatsapp_url %}
     <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
       <i class="fab fa-whatsapp me-1"></i>WhatsApp
     </a>
     {% endif %}
-    {% if contact.viber_url %}
+    {% if contact.is_personal and contact.viber_url %}
     <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link"
        data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
       <i class="fab fa-viber me-1"></i>Viber

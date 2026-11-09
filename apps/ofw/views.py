@@ -373,6 +373,7 @@ _contacts = crud.make_crud(
     search_placeholder='Search by name, country, city, or phone...',
     row_actions=_contact_row_actions,
     filters={'contact_type': ('contact_type__in', crud.csv_list)},
+    allow_delete_all=False,
     page_help=[
         'Public hotlines (Emergency, Embassy, POLO, OWWA, DMW, Police, Fire, '
         'Hospital) appear in the OFW portal based on Country: Philippines = '

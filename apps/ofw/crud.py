@@ -313,7 +313,8 @@ def _reversed_url(view_name):
 def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
               title, pretitle='Overview', entity='Record', add_label='Add Record',
               search_placeholder='Search...', detail_url_name=None, filters=None,
-              row_actions=None, on_save=None, on_delete=None, page_help=None):
+              row_actions=None, on_save=None, on_delete=None, page_help=None,
+              allow_delete_all=True):
     """Build the page + AJAX views for a single model.
 
     Returns a dict of view callables keyed by ``page``, ``list_ajax``,
@@ -380,6 +381,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'search_fields': search_fields,
             'detail_url_name': detail_url_name,
             'page_help': page_help or [],
+            'allow_delete_all': allow_delete_all,
         }
         return render(request, 'ofw/crud.html', context)
 

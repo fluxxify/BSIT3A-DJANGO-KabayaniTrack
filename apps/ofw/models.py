@@ -463,6 +463,11 @@ class EmergencyContact(models.Model):
         return 'local'
 
     @property
+    def is_personal(self):
+        """True for family / agency / employer contacts (not public hotlines)."""
+        return self.type_key not in self.PUBLIC_TYPES
+
+    @property
     def visibility_label(self):
         return {
             'national': 'National',

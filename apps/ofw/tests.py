@@ -1107,9 +1107,9 @@ class EmergencyContactActionTests(TestCase):
         self.assertContains(response, '>No country</span>')
         self.assertContains(response, 'Public hotlines (Emergency')
 
-    def test_only_superusers_see_delete_all_button(self):
+    def test_delete_all_button_hidden_on_contacts(self):
         response = self.client.get(reverse('ofw:contact_list'))
-        self.assertContains(response, 'Delete All Records')
+        self.assertNotContains(response, 'Delete All Records')
 
         staff = User.objects.create_user(
             username='staffcontacts', password='Passw0rd!23', is_staff=True
@@ -1557,6 +1557,21 @@ class EmergencySosTests(TestCase):
 
         response = self.client.get(reverse('ofw:portal_sos'))
         self.assertContains(response, 'tel:+639175551234')
+        self.assertContains(response, 'https://wa.me/639175551234')
+        self.assertContains(response, 'viber://chat?number=%2B639175551234')
+
+    def test_public_hotline_hides_messaging_links(self):
+        EmergencyContact.objects.create(
+            name='Philippine Embassy — Abu Dhabi', phone='+971 2 419 2000',
+            contact_type='embassy', country='United Arab Emirates',
+        )
+        EmergencyContact.objects.create(
+            user=self.ofw, name='Mama', phone='+63 917 555 1234',
+            contact_type='family',
+        )
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertNotContains(response, 'https://wa.me/97124192000')
+        self.assertNotContains(response, 'viber://chat?number=%2B97124192000')
         self.assertContains(response, 'https://wa.me/639175551234')
         self.assertContains(response, 'viber://chat?number=%2B639175551234')
 

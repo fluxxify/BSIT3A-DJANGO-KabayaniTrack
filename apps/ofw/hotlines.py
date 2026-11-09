@@ -30,6 +30,7 @@ class StaticHotline:
     """
 
     automatic = True
+    is_personal = False
 
     def __init__(
         self,
