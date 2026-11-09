@@ -488,6 +488,17 @@ class EmergencyContact(models.Model):
             'unassigned': 'No country',
         }[self.visibility]
 
+    @property
+    def location_label(self):
+        """City and country in one readable list cell."""
+        from .locations import canonical_country
+
+        city = (self.city or '').strip()
+        country = canonical_country(self.country)
+        if city and country:
+            return f'{city}, {country}'
+        return city or country
+
 
 class Notification(models.Model):
     """An in-app message delivered to a single user."""

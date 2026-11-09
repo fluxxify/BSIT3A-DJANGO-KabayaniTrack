@@ -1171,6 +1171,21 @@ class EmergencyContactActionTests(TestCase):
         self.assertContains(response, '>No country</span>')
         self.assertContains(response, 'Public hotlines (Emergency')
 
+    def test_list_combines_city_and_country_into_location(self):
+        EmergencyContact.objects.create(
+            name='POLO Riyadh', contact_type='polo', country='KSA',
+            city='Riyadh', phone='+966 11 000 0000',
+        )
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(response, '>Location</th>')
+        self.assertContains(response, 'Riyadh, Saudi Arabia')
+        self.assertNotContains(response, '>Country</th>')
+        self.assertNotContains(response, '>City / Area</th>')
+        self.assertEqual(
+            EmergencyContact.objects.get(name='POLO Riyadh').location_label,
+            'Riyadh, Saudi Arabia',
+        )
+
     def test_delete_all_button_hidden_on_contacts(self):
         response = self.client.get(reverse('ofw:contact_list'))
         self.assertNotContains(response, 'Delete All Records')
