@@ -1440,3 +1440,40 @@ button:focus-visible,
     justify-content: flex-end;
   }
 }
+
+/* Mobile: larger touch targets for emergency action buttons. */
+@media (max-width: 575.98px) {
+  .kt-contact-item {
+    gap: 0.5rem 0.75rem;
+    padding: 1rem;
+  }
+
+  .kt-contact-item__number {
+    max-width: none;
+    text-align: left;
+    margin-top: 0.5rem;
+  }
+
+  .kt-contact-item__number a {
+    display: block;
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .kt-contact-item__actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .kt-contact-item__actions .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px; /* comfortable thumb target */
+  }
+
+  .kt-contact-item__actions .btn.btn-icon {
+    width: auto;
+    min-height: 44px;
+    padding: 0.5rem;
+  }
+}

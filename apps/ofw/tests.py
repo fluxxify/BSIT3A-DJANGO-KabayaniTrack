@@ -1293,7 +1293,9 @@ class FamilyContactTests(TestCase):
         self.client.force_login(self.ofw)
         response = self.client.get(reverse('ofw:portal_contacts'))
         body = response.content.decode()
-        family_section = body[body.find('My Family Emergency Contacts'):]
+        family_start = body.find('My Family Emergency Contacts')
+        family_end = body.find('Add a Family Emergency Contact', family_start)
+        family_section = body[family_start:family_end]
         self.assertNotIn('OWWA Hotline', family_section)
 
     def test_ofw_can_delete_non_family_personal_contact(self):
@@ -1329,6 +1331,8 @@ class FamilyContactTests(TestCase):
         self.client.force_login(self.ofw)
         response = self.client.get(reverse('ofw:portal_contacts'))
         self.assertContains(response, 'Add a Family Emergency Contact')
+        self.assertContains(response, 'No family contacts yet')
+        self.assertContains(response, 'addContactPanel')
         self.assertNotContains(response, 'Request a Family Emergency Contact')
 
 
@@ -1371,6 +1375,7 @@ class ContactLayoutRegressionTests(TestCase):
         response = self.client.get(reverse('ofw:portal_contacts'))
         self.assertContains(response, 'kt-contact-list')
         self.assertContains(response, 'kt-contact-item')
+        self.assertContains(response, 'Need help now?')
         self.assertContains(response, 'National Hotlines')
         self.assertContains(response, 'Liza Santos')
         self.assertContains(response, 'Mother')
