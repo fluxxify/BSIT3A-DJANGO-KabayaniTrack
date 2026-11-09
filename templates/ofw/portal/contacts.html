@@ -25,35 +25,30 @@
   </div>
 
   <div class="card border-danger mb-3">
-    <div class="card-body">
-      <div class="d-flex align-items-center gap-3 mb-3">
-        <span class="avatar bg-danger-lt text-danger">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="avatar avatar-sm bg-danger-lt text-danger">
           <i class="fas fa-tower-broadcast"></i>
         </span>
         <div>
-          <div class="fw-bold text-danger">Need help now?</div>
-          <div class="text-muted small">
-            Tap a number to call. These work even when you only have mobile data.
-          </div>
+          <div class="fw-bold text-danger lh-1">Need help now?</div>
+          <div class="text-muted small">Tap to call. Full hotline list is below.</div>
         </div>
       </div>
       <div class="row g-2">
         <div class="col-12 col-sm-4">
-          <a href="tel:911" class="btn btn-danger w-100 h-100 py-3">
-            <span class="d-block fs-3 fw-bold lh-1">911</span>
-            <span class="d-block small fw-normal mt-1">Philippine emergency</span>
+          <a href="tel:911" class="btn btn-danger w-100">
+            <i class="fas fa-phone me-1"></i>911
           </a>
         </div>
         <div class="col-12 col-sm-4">
-          <a href="tel:1348" class="btn btn-outline-danger w-100 h-100 py-3">
-            <span class="d-block fs-3 fw-bold lh-1">1348</span>
-            <span class="d-block small fw-normal mt-1">OWWA 24/7 hotline</span>
+          <a href="tel:1348" class="btn btn-outline-danger w-100">
+            <i class="fas fa-phone me-1"></i>OWWA 1348
           </a>
         </div>
         <div class="col-12 col-sm-4">
-          <a href="tel:+63285511545" class="btn btn-outline-danger w-100 h-100 py-3">
-            <span class="d-block fs-3 fw-bold lh-1">+632 8551 1545</span>
-            <span class="d-block small fw-normal mt-1">OWWA from abroad</span>
+          <a href="tel:+63285511545" class="btn btn-outline-danger w-100">
+            <i class="fas fa-phone me-1"></i>OWWA abroad
           </a>
         </div>
       </div>
@@ -61,7 +56,7 @@
   </div>
 
   <div class="card mb-3">
-    <div class="card-header">
+    <div class="card-header flex-wrap gap-2">
       <div>
         <h3 class="card-title mb-0">
           <i class="fas fa-people-roof me-2 text-success"></i>My Family Emergency Contacts
@@ -87,8 +82,8 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="card-body text-center py-5">
-      <span class="avatar avatar-xl bg-success-lt text-success mb-3">
+    <div class="card-body text-center py-4">
+      <span class="avatar avatar-lg bg-success-lt text-success mb-3">
         <i class="fas fa-people-roof fa-2x"></i>
       </span>
       <h3 class="mb-1">No family contacts yet</h3>
@@ -104,8 +99,8 @@
     {% endif %}
   </div>
 
-  <div class="card mb-3">
-    <div class="collapse{% if form.errors %} show{% endif %}" id="addContactPanel">
+  <div class="collapse{% if form.errors %} show{% endif %}" id="addContactPanel">
+    <div class="card mb-3">
       <div class="card-header">
         <h3 class="card-title">
           <i class="fas fa-user-plus me-2 text-primary"></i>Add a Family Emergency Contact
@@ -152,7 +147,7 @@
 
   {% if local_hotlines %}
   <div class="card mb-3">
-    <div class="card-header">
+    <div class="card-header flex-wrap gap-2">
       <div>
         <h3 class="card-title mb-0">
           <i class="fas fa-location-dot me-2 text-primary"></i>
@@ -188,7 +183,7 @@
 
   {% if national_hotlines %}
   <div class="card mb-3">
-    <div class="card-header">
+    <div class="card-header flex-wrap gap-2">
       <div>
         <h3 class="card-title mb-0">
           <i class="fas fa-flag me-2 text-danger"></i>
