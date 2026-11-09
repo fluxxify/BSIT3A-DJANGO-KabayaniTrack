@@ -118,7 +118,10 @@ def _apply_filters(qs, filters, params):
             value = transform(raw)
         except (TypeError, ValueError):
             continue
-        qs = qs.filter(**{lookup: value})
+        if isinstance(value, Q):
+            qs = qs.filter(value)
+        else:
+            qs = qs.filter(**{lookup: value})
     return qs
 
 

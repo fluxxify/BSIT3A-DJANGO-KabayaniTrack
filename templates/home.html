@@ -189,6 +189,13 @@
           </div>
           {% endfor %}
           {% endfor %}
+          <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+            <a href="{{ stats.links.welfare_review }}"
+               class="text-decoration-none {% if stats.kpi.welfare_stale %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+              <i class="fas fa-clock me-1"></i>Needs review ({{ stats.welfare_stale_days }}d+)
+            </a>
+            <span class="fw-medium">{{ stats.kpi.welfare_stale }}</span>
+          </div>
         </div>
         <div class="card-footer d-flex">
           <a href="{{ stats.links.welfare_status }}" class="text-decoration-none">

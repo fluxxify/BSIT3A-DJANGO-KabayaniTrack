@@ -49,7 +49,9 @@ from .models import (
     WelfareAssessment,
     WelfareStatus,
     WELFARE_ATTENTION_STATUSES,
+    WELFARE_STALE_DAYS,
 )
+from .welfare import stale_cutoff
 from .notifications import (
     mark_concern_read_by_management,
     notify,
@@ -218,6 +220,14 @@ def _notify_concern_saved(obj, created, actor, previous):
     )
 
 
+def _stale_profile_filter(_value):
+    """Select profiles whose welfare status has not been reviewed recently."""
+    return (
+        Q(welfare_status_updated_at__lt=stale_cutoff())
+        & ~Q(welfare_status=WelfareStatus.REPATRIATED)
+    )
+
+
 _profiles = crud.make_crud(
     model=OFWProfile,
     form_class=OFWProfileForm,
@@ -245,6 +255,7 @@ _profiles = crud.make_crud(
     filters={
         'welfare_status': ('welfare_status__in', crud.csv_list),
         'country': ('country__iexact', str),
+        'stale': ('welfare_status_updated_at__lt', _stale_profile_filter),
     },
 )
 
@@ -871,6 +882,12 @@ def dashboard_stats(user):
         },
     ]
 
+    stale_welfare_count = (
+        profiles.exclude(welfare_status=WelfareStatus.REPATRIATED)
+        .filter(welfare_status_updated_at__lt=stale_cutoff())
+        .count()
+    )
+
     category_labels = dict(Concern.Category.choices)
     category_rows = concerns.values('category').annotate(total=Count('id')).order_by('-total')[:6]
     concern_chart = [
@@ -956,9 +973,11 @@ def dashboard_stats(user):
 
     return {
         'welfare_groups': welfare_groups,
+        'welfare_stale_days': WELFARE_STALE_DAYS,
         'kpi': {
             'ofw_total': profiles.count(),
             'ofw_at_risk': at_risk.count(),
+            'welfare_stale': stale_welfare_count,
             'checkins_month': checkins.filter(checkin_date__gte=month_start).count(),
             'open_concerns': open_concerns.count(),
             'contacts_total': contacts.count(),
@@ -974,6 +993,7 @@ def dashboard_stats(user):
                 reverse('ofw:profile_list')
                 + '?welfare_status=' + ','.join(WELFARE_ATTENTION_STATUSES)
             ),
+            'welfare_review': reverse('ofw:profile_list') + '?stale=1',
             'checkins_month': (
                 reverse('ofw:checkin_list')
                 + f'?date_from={month_start.date()}&date_to={timezone.localdate()}'

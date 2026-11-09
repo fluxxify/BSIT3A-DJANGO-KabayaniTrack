@@ -28,6 +28,7 @@ from .models import (
     OFWProfile,
     PoliceReport,
     SafeLocation,
+    WelfareAssessment,
 )
 
 
@@ -96,6 +97,19 @@ def remember_replaced_profile_picture(sender, instance, **kwargs):
     except sender.DoesNotExist:
         return
     instance._replaced_profile_picture_name = _file_name(previous.profile_picture)
+
+
+@receiver(pre_save, sender=OFWProfile)
+def stamp_welfare_status_change(sender, instance, **kwargs):
+    """Record when a staff member changes the welfare status by hand."""
+    if not instance.pk:
+        return
+    try:
+        previous = sender.objects.only('welfare_status').get(pk=instance.pk)
+    except sender.DoesNotExist:
+        return
+    if previous.welfare_status != instance.welfare_status:
+        instance.welfare_status_updated_at = timezone.now()
 
 
 @receiver(post_save, sender=OFWProfile)
@@ -168,3 +182,24 @@ def update_activity_on_login(sender, request, user, **kwargs):
             'is_account_active', 'days_inactive', 'updated_at',
             'warning_sent_at', 'followup_sent_at', 'escalated_to_police_at',
         ])
+        # A successful login clears the "Unreachable" contact flag only.  It
+        # never lowers an In Danger or Needs Assistance status.
+        from .welfare import clear_unreachable_on_login
+        clear_unreachable_on_login(user)
+
+
+# ---------------------------------------------------------------------------
+# Automatic welfare status updates
+# ---------------------------------------------------------------------------
+
+
+@receiver(post_save, sender=WelfareAssessment)
+def sync_welfare_status_from_assessment(sender, instance, **kwargs):
+    from .welfare import sync_from_assessment
+    sync_from_assessment(instance)
+
+
+@receiver(post_save, sender=CheckIn)
+def sync_welfare_status_from_checkin(sender, instance, **kwargs):
+    from .welfare import sync_from_checkin
+    sync_from_checkin(instance)

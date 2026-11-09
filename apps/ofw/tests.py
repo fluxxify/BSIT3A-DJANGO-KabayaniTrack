@@ -865,6 +865,11 @@ class WelfareStatusClarityTests(TestCase):
             ofw=self.profile, user=self.staff, status='distressed',
             risk_level='high', assessment_date=timezone.localdate(),
         )
+        # Simulate a profile whose status was changed by hand after the
+        # assessment, which is exactly the drift the warning should catch.
+        OFWProfile.objects.filter(pk=self.profile.pk).update(
+            welfare_status='active'
+        )
         response = self.client.get(
             reverse('ofw:profile_detail', args=[self.profile.pk])
         )
@@ -893,6 +898,129 @@ class WelfareStatusClarityTests(TestCase):
             response,
             '?welfare_status=needs_support,distressed,missing',
         )
+
+
+class WelfareStatusAutomationTests(TestCase):
+    """Safe automation may raise a status but never silently lowers it."""
+
+    def setUp(self):
+        self.ofw_user = User.objects.create_user(
+            username='autoofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw_user)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Ana', last_name='Cruz',
+            country='Qatar',
+        )
+
+    def test_latest_assessment_sets_profile_status(self):
+        WelfareAssessment.objects.create(
+            ofw=self.profile, user=None, status='distressed',
+            risk_level='high', assessment_date=timezone.localdate(),
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'distressed')
+        self.assertIsNotNone(self.profile.welfare_status_updated_at)
+
+    def test_older_assessment_does_not_override_current_status(self):
+        WelfareAssessment.objects.create(
+            ofw=self.profile, user=None, status='active',
+            risk_level='low', assessment_date=timezone.localdate(),
+        )
+        WelfareAssessment.objects.create(
+            ofw=self.profile, user=None, status='distressed',
+            risk_level='high',
+            assessment_date=timezone.localdate() - timedelta(days=10),
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'active')
+
+    def test_matching_assessment_refreshes_the_review_clock(self):
+        OFWProfile.objects.filter(pk=self.profile.pk).update(
+            welfare_status_updated_at=timezone.now() - timedelta(days=45)
+        )
+        WelfareAssessment.objects.create(
+            ofw=self.profile, user=None, status='active',
+            risk_level='low', assessment_date=timezone.localdate(),
+        )
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.welfare_status_is_stale)
+
+    def test_checkin_escalates_status(self):
+        CheckIn.objects.create(
+            ofw=self.profile, user=None, checkin_date=timezone.now(),
+            method='call', condition='distressed',
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'distressed')
+
+    def test_safe_checkin_does_not_clear_in_danger(self):
+        self.profile.welfare_status = 'distressed'
+        self.profile.save()
+        CheckIn.objects.create(
+            ofw=self.profile, user=None, checkin_date=timezone.now(),
+            method='call', condition='safe',
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'distressed')
+
+    def test_safe_checkin_clears_unreachable(self):
+        self.profile.welfare_status = 'missing'
+        self.profile.save()
+        CheckIn.objects.create(
+            ofw=self.profile, user=None, checkin_date=timezone.now(),
+            method='call', condition='safe',
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'active')
+
+    def test_login_clears_unreachable_only(self):
+        self.profile.welfare_status = 'missing'
+        self.profile.save()
+        self.assertTrue(self.client.login(
+            username='autoofw', password='Passw0rd!23'
+        ))
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'active')
+
+    def test_login_does_not_clear_in_danger(self):
+        self.profile.welfare_status = 'distressed'
+        self.profile.save()
+        self.assertTrue(self.client.login(
+            username='autoofw', password='Passw0rd!23'
+        ))
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.welfare_status, 'distressed')
+
+    def test_stale_status_is_flagged_for_review(self):
+        OFWProfile.objects.filter(pk=self.profile.pk).update(
+            welfare_status_updated_at=timezone.now() - timedelta(days=45)
+        )
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.welfare_status_is_stale)
+        self.client.force_login(self.ofw_user)
+        response = self.client.get(
+            reverse('ofw:profile_detail', args=[self.profile.pk])
+        )
+        self.assertContains(response, 'Needs review')
+
+    def test_repatriated_status_is_not_flagged_stale(self):
+        OFWProfile.objects.filter(pk=self.profile.pk).update(
+            welfare_status='repatriated',
+            welfare_status_updated_at=timezone.now() - timedelta(days=45),
+        )
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.welfare_status_is_stale)
+
+    def test_stale_filter_limits_profile_list(self):
+        OFWProfile.objects.filter(pk=self.profile.pk).update(
+            welfare_status_updated_at=timezone.now() - timedelta(days=45)
+        )
+        self.client.force_login(self.ofw_user)
+        response = self.client.get(
+            reverse('ofw:profile_list'), {'stale': '1'}
+        )
+        self.assertContains(response, 'Ana')
 
 
 class AuditLogTests(TestCase):

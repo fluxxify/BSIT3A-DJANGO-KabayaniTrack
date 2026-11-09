@@ -12,10 +12,12 @@ The system tracks five key areas:
 import json
 import os
 import re
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 
 class WelfareStatus(models.TextChoices):
@@ -47,6 +49,10 @@ WELFARE_ATTENTION_STATUSES = (
     WelfareStatus.DISTRESSED,
     WelfareStatus.MISSING,
 )
+
+# A welfare status older than this is shown as "Needs review".  The value is
+# never changed automatically; staff decide whether the status is still true.
+WELFARE_STALE_DAYS = 30
 
 
 class OFWProfile(models.Model):
@@ -119,6 +125,7 @@ class OFWProfile(models.Model):
         default=WelfareStatus.ACTIVE,
         db_index=True,
     )
+    welfare_status_updated_at = models.DateTimeField(default=timezone.now)
     remarks = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -152,6 +159,20 @@ class OFWProfile(models.Model):
             WelfareStatus.REPATRIATED: 'fas fa-house',
             WelfareStatus.MISSING: 'fas fa-phone-slash',
         }.get(self.welfare_status, 'fas fa-circle-question')
+
+    @property
+    def welfare_status_is_stale(self):
+        """True when the current status has not been updated for a while.
+
+        This only drives a review flag; it never changes the stored status.
+        Repatriated profiles are excluded because their case is closed.
+        """
+        if self.welfare_status == WelfareStatus.REPATRIATED:
+            return False
+        if not self.welfare_status_updated_at:
+            return False
+        cutoff = timezone.now() - timedelta(days=WELFARE_STALE_DAYS)
+        return self.welfare_status_updated_at < cutoff
 
 
 class WelfareAssessment(models.Model):
