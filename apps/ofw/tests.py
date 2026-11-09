@@ -1851,6 +1851,100 @@ class EmergencyGuideViewTests(TestCase):
             ).exists()
         )
 
+class OpenStreetMapFallbackTests(SimpleTestCase):
+    """Live OpenStreetMap results use the same shape as seeded places."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_rows_are_normalised_filtered_and_sorted_by_distance(self):
+        from apps.ofw import osm_places
+
+        sample = {
+            'elements': [
+                {
+                    'type': 'node', 'id': 1, 'lat': 14.6000, 'lon': 120.9000,
+                    'tags': {'amenity': 'hospital', 'name': 'Far Hospital'},
+                },
+                {
+                    'type': 'node', 'id': 2, 'lat': 14.5801, 'lon': 120.9801,
+                    'tags': {
+                        'amenity': 'police', 'name': 'Near Police', 'phone': '911',
+                    },
+                },
+                {
+                    'type': 'way', 'id': 3,
+                    'center': {'lat': 14.5802, 'lon': 120.9802},
+                    'tags': {'amenity': 'fire_station', 'name': 'Near Fire'},
+                },
+                {
+                    'type': 'node', 'id': 4, 'lat': 14.5800, 'lon': 120.9800,
+                    'tags': {'amenity': 'cafe', 'name': 'Not a safe place'},
+                },
+            ],
+        }
+
+        with mock.patch(
+            'apps.ofw.osm_places._fetch_nominatim', return_value=[],
+        ), mock.patch(
+            'apps.ofw.osm_places._fetch_overpass', return_value=sample,
+        ):
+            rows = osm_places.nearby_safe_places(14.5800, 120.9800, limit=5)
+
+        self.assertEqual(
+            [row['name'] for row in rows],
+            ['Near Police', 'Near Fire', 'Far Hospital'],
+        )
+        self.assertEqual(rows[0]['type_key'], 'police_station')
+        self.assertEqual(rows[0]['source'], 'openstreetmap')
+        self.assertIn('distance_text', rows[0])
+        self.assertIn('maps_url', rows[0])
+        # The portal map expects the same lat/lng aliases as seeded markers.
+        self.assertEqual(rows[0]['lat'], rows[0]['latitude'])
+        self.assertEqual(rows[0]['lng'], rows[0]['longitude'])
+
+    def test_nominatim_is_used_when_overpass_returns_nothing(self):
+        from apps.ofw import osm_places
+
+        nominatim_row = {
+            'id': 'osm-nominatim-1',
+            'name': 'Naga City Police Station',
+            'type': 'Police Station',
+            'type_key': 'police_station',
+            'city': 'Naga City',
+            'country': 'Philippines',
+            'address': 'Poblacion',
+            'phone': '',
+            'emergency_phone': '',
+            'latitude': 13.6288,
+            'longitude': 123.2396,
+            'source': 'openstreetmap',
+        }
+        with mock.patch(
+            'apps.ofw.osm_places._fetch_overpass', return_value=None,
+        ), mock.patch(
+            'apps.ofw.osm_places._fetch_nominatim',
+            return_value=[nominatim_row],
+        ) as nominatim_mock:
+            rows = osm_places.nearby_safe_places(13.6218, 123.1948)
+
+        self.assertEqual(rows[0]['name'], 'Naga City Police Station')
+        self.assertEqual(rows[0]['source'], 'openstreetmap')
+        nominatim_mock.assert_called_once()
+
+    def test_network_failure_returns_empty_list(self):
+        from apps.ofw import osm_places
+
+        with mock.patch(
+            'apps.ofw.osm_places._fetch_overpass', return_value=None,
+        ), mock.patch(
+            'apps.ofw.osm_places._fetch_nominatim', return_value=[],
+        ):
+            rows = osm_places.nearby_safe_places(9.99, 122.81)
+
+        self.assertEqual(rows, [])
+
+
 class LocationContextApiTests(TestCase):
     """The live guide asks the server where the OFW is and what is nearby."""
 
@@ -1913,6 +2007,80 @@ class LocationContextApiTests(TestCase):
             reverse('ofw:location_context'), {'lat': '14.58', 'lng': '120.98'}
         )
         self.assertEqual(response.status_code, 302)
+
+    def test_context_returns_live_places_when_nothing_registered_is_near(self):
+        live_row = {
+            'id': 'osm-node-1',
+            'name': 'Live Kabankalan Police',
+            'type': 'Police Station',
+            'type_key': 'police_station',
+            'city': 'Kabankalan',
+            'country': 'Philippines',
+            'address': 'Poblacion',
+            'phone': '911',
+            'latitude': 9.99,
+            'longitude': 122.81,
+            'distance_km': 0.2,
+            'distance_text': '200 m',
+            'walking_minutes': 3,
+            'bearing': 0,
+            'direction': 'north',
+            'maps_url': 'https://www.google.com/maps/',
+            'source': 'openstreetmap',
+        }
+        with mock.patch(
+            'apps.ofw.geo.reverse_geocode',
+            return_value={
+                'label': 'Kabankalan, Philippines',
+                'city': 'Kabankalan',
+                'country': 'Philippines',
+            },
+        ), mock.patch(
+            'apps.ofw.osm_places.nearby_safe_places',
+            return_value=[live_row],
+        ) as live_mock:
+            response = self.client.get(
+                reverse('ofw:location_context'),
+                {'lat': '9.9900', 'lng': '122.8100', 'live': '1'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['live_source'], 'OpenStreetMap')
+        self.assertEqual(data['live_places'][0]['name'], 'Live Kabankalan Police')
+        live_mock.assert_called_once()
+
+    def test_context_skips_live_lookup_when_registered_place_is_near(self):
+        with mock.patch(
+            'apps.ofw.geo.reverse_geocode',
+            return_value={'label': 'Ermita, Manila, Philippines'},
+        ), mock.patch(
+            'apps.ofw.osm_places.nearby_safe_places',
+        ) as live_mock:
+            response = self.client.get(
+                reverse('ofw:location_context'),
+                {'lat': '14.5800', 'lng': '120.9800', 'live': '1'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['live_places'], [])
+        live_mock.assert_not_called()
+
+    def test_context_skips_live_lookup_without_opt_in(self):
+        with mock.patch(
+            'apps.ofw.geo.reverse_geocode',
+            return_value={'label': 'Kabankalan, Philippines'},
+        ), mock.patch(
+            'apps.ofw.osm_places.nearby_safe_places',
+        ) as live_mock:
+            response = self.client.get(
+                reverse('ofw:location_context'),
+                {'lat': '9.9900', 'lng': '122.8100'},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['live_places'], [])
+        live_mock.assert_not_called()
 
     def test_emergency_ping_notification_mentions_nearest_place(self):
         response = self.client.post(reverse('ofw:location_tracker_ping'), {

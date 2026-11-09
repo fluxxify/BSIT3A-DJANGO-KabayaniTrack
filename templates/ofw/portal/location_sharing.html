@@ -217,6 +217,9 @@
 (function () {
   // --- Map: my last known position + safe places -------------------------
   var mapEl = document.getElementById('myLocationMap');
+  var livePlaceMarkers = [];
+  var liveFallbackKm = 10;
+  var liveFetch = { at: 0, lat: null, lng: null };
   function initMap() {
     if (!mapEl || !window.L) { return; }
     var center = JSON.parse(document.getElementById('live-map-center').textContent || '{}');
@@ -291,6 +294,9 @@
       placeMarkers.forEach(function (marker) {
         marker.setStyle({ color: color, fillColor: color });
       });
+      livePlaceMarkers.forEach(function (marker) {
+        marker.setStyle({ color: color, fillColor: color });
+      });
     });
 
     function distanceKm(a, b) {
@@ -331,6 +337,12 @@
 
     fitNearby(ownLatLng);
     renderNearby(ownLatLng);
+
+    // If the saved position is far from every registered place, fetch live
+    // OpenStreetMap results immediately instead of waiting for a new GPS fix.
+    if (ownLatLng && nearestRegisteredKm(ownLatLng) > liveFallbackKm) {
+      loadLivePlaces(ownLatLng, false);
+    }
   }
 
   function escapeHtml(value) {
@@ -483,6 +495,96 @@
     }
   }
 
+  // --- OpenStreetMap fallback when nothing registered is nearby -----------
+  function nearestRegisteredKm(anchor) {
+    var min = Infinity;
+    (window.__mapPlaces || []).forEach(function (place) {
+      if (!place || place.source === 'openstreetmap' ||
+          place.lat == null || place.lng == null) { return; }
+      var km = distanceKm(anchor, [place.lat, place.lng]);
+      if (km < min) { min = km; }
+    });
+    return min;
+  }
+
+  function addLivePlaceMarker(place) {
+    var map = window.__myLocationMap;
+    if (!map || !window.L || place.lat == null || place.lng == null) { return; }
+    var color = KabayaniMap.primaryColor();
+    var marker = L.circleMarker([place.lat, place.lng], {
+      radius: 7,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.75,
+      weight: 2,
+      dashArray: '4, 3'
+    }).addTo(map);
+    var parts = ['<strong>' + escapeHtml(place.name) + '</strong>'];
+    if (place.type) {
+      parts.push('<span class="text-muted">' + escapeHtml(place.type) + '</span>');
+    }
+    if (place.address) { parts.push(escapeHtml(place.address)); }
+    if (place.phone) { parts.push('Phone: ' + escapeHtml(place.phone)); }
+    parts.push('<span class="text-muted">Live result from OpenStreetMap</span>');
+    if (place.maps_url) {
+      parts.push('<a href="' + escapeHtml(place.maps_url) + '" target="_blank" rel="noopener">Directions</a>');
+    }
+    marker.bindPopup(parts.join('<br>'));
+    livePlaceMarkers.push(marker);
+  }
+
+  function appendLivePlaces(live) {
+    if (!window.__mapPlaces) { window.__mapPlaces = []; }
+    var seen = {};
+    window.__mapPlaces.forEach(function (place) {
+      if (place && place.lat != null && place.lng != null) {
+        seen[Number(place.lat).toFixed(4) + ',' + Number(place.lng).toFixed(4)] = true;
+      }
+    });
+    (live || []).forEach(function (place) {
+      if (!place || place.lat == null || place.lng == null) { return; }
+      var key = Number(place.lat).toFixed(4) + ',' + Number(place.lng).toFixed(4);
+      if (seen[key]) { return; }
+      seen[key] = true;
+      place.source = 'openstreetmap';
+      window.__mapPlaces.push(place);
+      addLivePlaceMarker(place);
+    });
+  }
+
+  function loadLivePlaces(anchor, approximate) {
+    if (!anchor) { return; }
+    var now = Date.now();
+    if (liveFetch.at && now - liveFetch.at < 120000) {
+      var moved = distanceKm([liveFetch.lat, liveFetch.lng], anchor);
+      if (moved < 2) { return; }
+    }
+    liveFetch = { at: now, lat: anchor[0], lng: anchor[1] };
+
+    fetch('{% url "ofw:location_context" %}?lat=' +
+          encodeURIComponent(anchor[0]) + '&lng=' + encodeURIComponent(anchor[1]) +
+          '&live=1', { headers: { 'Accept': 'application/json' } })
+      .then(function (resp) {
+        if (!resp.ok) { throw new Error('HTTP ' + resp.status); }
+        return resp.json();
+      })
+      .then(function (data) {
+        var live = (data && data.live_places) || [];
+        if (!live.length) { return; }
+        appendLivePlaces(live);
+        renderNearby(anchor);
+        renderNearestCards(anchor, approximate);
+        var note = document.getElementById('nearestPlacesNote');
+        if (note) {
+          note.innerHTML = '<i class="fas fa-globe me-1"></i>' +
+            'Live results from OpenStreetMap for your current position.';
+        }
+      })
+      .catch(function () {
+        // Keep the registered safe places; the live lookup is best-effort.
+      });
+  }
+
   // The script runs at the end of <body>, so the map container already exists.
   initMap();
 
@@ -557,6 +659,12 @@
     // load, because this list is the primary answer to "what is near me?".
     renderNearby(anchor);
     renderNearestCards(anchor, approximate);
+
+    // If the nearest registered place is far away (or there is none), ask the
+    // server for live OpenStreetMap results so the list works anywhere.
+    if (nearestRegisteredKm(anchor) > liveFallbackKm) {
+      loadLivePlaces(anchor, approximate);
+    }
 
     if (sharingStatusEl && !approximate) {
       sharingStatusEl.className = 'alert alert-success py-2';

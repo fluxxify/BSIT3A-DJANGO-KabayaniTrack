@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from . import crud
+from . import crud, osm_places
 from .activity import refresh_activities_for_profiles
 from .forms import (
     CheckInForm,
@@ -1944,6 +1944,20 @@ def location_context(request):
     here = reverse_geocode(lat_value, lng_value)
     nearest = nearest_safe_places(lat_value, lng_value, limit=8)
 
+    # No registered place is close enough to be useful: fall back to live
+    # OpenStreetMap data so the guide works anywhere in the world. Callers opt
+    # in with ?live=1 so directories that only need registered places stay
+    # fast and never wait on an external service.
+    want_live = request.GET.get('live', '').lower() in ('1', 'true', 'yes')
+    live_places = []
+    if want_live and (not nearest or nearest[0]['distance_km'] > osm_places.LIVE_FALLBACK_KM):
+        live_places = osm_places.nearby_safe_places(
+            lat_value,
+            lng_value,
+            default_city=here.get('city') or '',
+            default_country=here.get('country') or '',
+        )
+
     return JsonResponse({
         'status': 'ok',
         'you_are_here': here.get('label') or '',
@@ -1953,6 +1967,9 @@ def location_context(request):
         'latitude': lat_value,
         'longitude': lng_value,
         'nearest': nearest,
+        'live_places': live_places,
+        'live_source': 'OpenStreetMap' if live_places else '',
+        'live_fallback_km': osm_places.LIVE_FALLBACK_KM,
     })
 
 

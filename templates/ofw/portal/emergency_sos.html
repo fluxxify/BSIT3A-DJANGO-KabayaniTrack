@@ -677,7 +677,21 @@ window.KabayaniGuide = (function () {
   }
 
   function renderContext(data) {
-    var nearest = data.nearest || [];
+    // Registered places first, then live OpenStreetMap fallback results. Both
+    // carry the same distance fields, so one sorted list is enough.
+    var seen = {};
+    var nearest = [];
+    (data.nearest || []).concat(data.live_places || []).forEach(function (place) {
+      var key = String(place.name || '').toLowerCase() + '|' +
+        Number(place.latitude).toFixed(3) + ',' + Number(place.longitude).toFixed(3);
+      if (!seen[key]) {
+        seen[key] = true;
+        nearest.push(place);
+      }
+    });
+    nearest.sort(function (a, b) {
+      return (a.distance_km || Infinity) - (b.distance_km || Infinity);
+    });
 
     if (data.you_are_here) {
       hereEl.innerHTML =
@@ -706,6 +720,7 @@ window.KabayaniGuide = (function () {
     var meta = [target.type];
     if (target.city) meta.push(target.city);
     if (target.country) meta.push(target.country);
+    if (target.source === 'openstreetmap') meta.push('OpenStreetMap');
     metaEl.innerHTML = esc(meta.join(' · ')) +
       (target.address
         ? '<div class="eg-meta-address">' + esc(target.address) + '</div>'
@@ -741,7 +756,8 @@ window.KabayaniGuide = (function () {
     lastFetchLat = lat;
     lastFetchLng = lng;
     fetch('{% url "ofw:location_context" %}?lat=' + encodeURIComponent(lat) +
-          '&lng=' + encodeURIComponent(lng), { headers: { 'Accept': 'application/json' } })
+          '&lng=' + encodeURIComponent(lng) + '&live=1',
+          { headers: { 'Accept': 'application/json' } })
       .then(function (resp) { return resp.json(); })
       .then(function (data) {
         if (data.status === 'ok') renderContext(data);
