@@ -165,6 +165,35 @@
                         </div>
                     </div>
 
+                    <!-- Agency -->
+                    {% if not agency %}
+                    <div class="mb-3">
+                        <label class="form-label" for="id_agency">
+                            Agency / Partner Office&nbsp;<span class="text-secondary fw-normal">(Optional)</span>
+                        </label>
+                        {% if agencies %}
+                        <select id="id_agency" name="agency"
+                                class="form-select {% if errors.agency %}is-invalid{% endif %}">
+                            <option value="">I don't know yet / not listed</option>
+                            {% for item in agencies %}
+                            <option value="{{ item.pk }}"{% if form_data.agency == item.pk|stringformat:'s' %} selected{% endif %}>{{ item.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-hint">
+                            Select the recruitment agency or partner office that handles your deployment
+                            so your profile appears in their dashboard automatically.
+                        </small>
+                        {% else %}
+                        <p class="form-hint mb-0">
+                            No partner agency is available right now. You can still create your account.
+                        </p>
+                        {% endif %}
+                        {% if errors.agency %}
+                        <div class="text-danger small mt-1">{{ errors.agency }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
                     <!-- Password -->
                     <div class="mb-3">
                         <label class="form-label required" for="password">Password</label>

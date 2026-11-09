@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
@@ -92,6 +93,7 @@ class AgencyWorkspaceTests(TestCase):
         from apps.ofw.models import OFWProfile
         from apps.users.models import Agency, AgencyStaff
 
+        cache.clear()
         self.Agency = Agency
         self.AgencyStaff = AgencyStaff
         self.OFWProfile = OFWProfile
@@ -142,6 +144,74 @@ class AgencyWorkspaceTests(TestCase):
         )
         self.assertEqual(profile.agency_org, self.agency_a)
         self.assertEqual(profile.agency, self.agency_a.name)
+
+    def test_generic_registration_lists_active_agencies(self):
+        response = self.client.get(reverse('register'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agency / Partner Office')
+        self.assertContains(response, self.agency_a.name)
+
+    def test_generic_registration_can_choose_an_agency(self):
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'public_new_ofw',
+                'first_name': 'Mia',
+                'last_name': 'Lopez',
+                'email': 'public_new_ofw@example.com',
+                'password': 'Str0ngPassw0rd!',
+                'confirm_password': 'Str0ngPassw0rd!',
+                'agency': str(self.agency_a.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        profile = self.OFWProfile.objects.get(user__username='public_new_ofw')
+        self.assertEqual(profile.agency_org, self.agency_a)
+        self.assertEqual(profile.agency, self.agency_a.name)
+
+    def test_generic_registration_without_agency_still_works(self):
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'independent_ofw',
+                'first_name': 'Noel',
+                'last_name': 'Reyes',
+                'email': 'independent_ofw@example.com',
+                'password': 'Str0ngPassw0rd!',
+                'confirm_password': 'Str0ngPassw0rd!',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        profile = self.OFWProfile.objects.get(user__username='independent_ofw')
+        self.assertIsNone(profile.agency_org)
+
+    def test_generic_registration_rejects_inactive_agency(self):
+        self.agency_a.is_active = False
+        self.agency_a.save(update_fields=['is_active'])
+
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'inactive_agency_ofw',
+                'first_name': 'Rina',
+                'last_name': 'Cruz',
+                'email': 'inactive_agency_ofw@example.com',
+                'password': 'Str0ngPassw0rd!',
+                'confirm_password': 'Str0ngPassw0rd!',
+                'agency': str(self.agency_a.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Choose a valid agency')
+        self.assertFalse(
+            self.OFWProfile.objects.filter(
+                user__username='inactive_agency_ofw'
+            ).exists()
+        )
 
     def test_dashboard_only_counts_own_agency_ofws(self):
         self.client.force_login(self.staff_a)

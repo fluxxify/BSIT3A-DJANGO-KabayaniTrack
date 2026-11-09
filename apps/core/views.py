@@ -230,6 +230,10 @@ def register_view(request, agency_slug=None):
         return redirect('dashboard')
 
     context = _auth_context(agency)
+    if agency is None:
+        from apps.users.agencies import active_agencies
+
+        context['agencies'] = active_agencies()
 
     if request.method == 'GET':
         return render(request, 'auth/register.html', context)
@@ -259,9 +263,23 @@ def register_view(request, agency_slug=None):
         'email': request.POST.get('email', ''),
         'password': request.POST.get('password', ''),
         'confirm_password': request.POST.get('confirm_password', ''),
+        'agency': request.POST.get('agency', ''),
     }
 
     errors = _validate_registration_data(form_data)
+
+    # The public registration page lets an OFW choose their agency so the
+    # profile is visible to that agency's staff right away.  Agency links
+    # (/a/<slug>/register/) stay fixed to their agency and ignore this field.
+    if agency is None and form_data['agency']:
+        from apps.users.models import Agency
+
+        try:
+            agency = Agency.objects.get(
+                pk=int(form_data['agency']), is_active=True,
+            )
+        except (Agency.DoesNotExist, TypeError, ValueError):
+            errors['agency'] = 'Choose a valid agency from the list.'
 
     if errors:
         return render(

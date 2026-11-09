@@ -2316,6 +2316,101 @@ class LocationRetentionCommandTests(TestCase):
         call_command('prune_location_history', execute=True, stdout=StringIO())
         self.assertFalse(LocationTracker.objects.filter(pk=ping.pk).exists())
 
+class LinkOFWAgenciesCommandTests(TestCase):
+    """Existing OFWs can be linked to an agency after registration."""
+
+    def setUp(self):
+        from apps.users.models import Agency
+
+        self.agency = Agency.objects.create(
+            name='Overseas Workers Welfare Administration', slug='owwa',
+        )
+        self.other_agency = Agency.objects.create(
+            name='Other Partner Agency', slug='other',
+        )
+        self.user = User.objects.create_user(
+            username='legacy_owwa_ofw', password='Passw0rd!23',
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user,
+            first_name='Liza',
+            last_name='Reyes',
+            country='Qatar',
+            agency='OWWA',
+        )
+
+    def _run(self, **options):
+        from io import StringIO
+
+        call_command('link_ofw_agencies', stdout=StringIO(), **options)
+
+    def test_links_profile_using_saved_agency_slug(self):
+        self._run()
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, self.agency)
+        self.assertEqual(
+            self.profile.agency,
+            'Overseas Workers Welfare Administration',
+        )
+
+    def test_links_profile_using_saved_agency_full_name(self):
+        self.profile.agency = 'Overseas Workers Welfare Administration'
+        self.profile.save(update_fields=['agency'])
+
+        self._run()
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, self.agency)
+
+    def test_dry_run_does_not_change_anything(self):
+        self._run(dry_run=True)
+
+        self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.agency_org)
+        self.assertEqual(self.profile.agency, 'OWWA')
+
+    def test_assigns_one_ofw_even_when_saved_text_does_not_match(self):
+        self.profile.agency = 'Unknown office'
+        self.profile.save(update_fields=['agency'])
+
+        self._run(username='legacy_owwa_ofw', agency='other')
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.agency_org, self.other_agency)
+        self.assertEqual(self.profile.agency, 'Other Partner Agency')
+
+    def test_unknown_username_raises_command_error(self):
+        with self.assertRaises(CommandError):
+            self._run(username='does_not_exist', agency='owwa')
+
+    def test_username_only_reports_link_status(self):
+        from io import StringIO
+
+        output = StringIO()
+        call_command(
+            'link_ofw_agencies',
+            username='legacy_owwa_ofw',
+            stdout=output,
+        )
+        self.assertIn('NOT LINKED', output.getvalue())
+
+    def test_linked_ofw_appears_in_agency_profile_list(self):
+        from apps.users.models import AgencyStaff
+
+        staff = User.objects.create_user(
+            username='owwa_list_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=staff, agency=self.agency)
+
+        self._run()
+        self.client.force_login(staff)
+        response = self.client.get(reverse('ofw:profile_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Liza Reyes')
+
+
 class OFWConnectedSafetyPagesTests(TestCase):
     """OFW-side pages connected to the agency safety consoles."""
 
