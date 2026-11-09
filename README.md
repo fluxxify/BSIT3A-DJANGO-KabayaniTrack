@@ -1,13 +1,14 @@
 # KABAYANITRACK: A WEB-BASED MONITORING SYSTEM FOR OVERSEAS FILIPINO WORKERS (OFWs)
 
-*In Partial Fulfillment of the requirements of the Degree Bachelor of Science in Information Technology*
+The Errors
 
-**By:**
-Eduardo S. Caballeda Jr. · John Paul B. Canoy · Xymer John A. Adino
-October 2026
+Eduardo S. Caballeda Jr. 
 
----
+John Paul B. Canoy 
+
+Xymer John A. Adino
+
 
 ## 📄 Project Document
 
-📎 [**KabayaniTrack-Document.docx**](docs/KabayaniTrack-Document.docx) — Klikahin / i-download para makita ang buong dokumento (Introduction, Objectives, Significance, SDG Alignment, Scope, Limitations).
+📎 [**KabayaniTrack-Document.docx**](docs/KabayaniTrack-Document.docx)
