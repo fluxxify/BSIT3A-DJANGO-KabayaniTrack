@@ -84,7 +84,7 @@
               {% for row in concern_rows %}
               <tr>
                 <td>
-                  {{ row.obj.title|truncatechars:90 }}
+                  <span class="text-nowrap" title="{{ row.obj.title }}">{{ row.obj.title|truncatechars:70 }}</span>
                   <div class="text-muted small">{{ row.obj.get_category_display }}</div>
                 </td>
                 <td><span class="badge {{ row.severity_badge }}">{{ row.obj.get_severity_display }}</span></td>

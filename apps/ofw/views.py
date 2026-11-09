@@ -315,8 +315,10 @@ _concerns = crud.make_crud(
     columns=[
         {'field': 'ofw', 'label': 'OFW'},
         {'field': 'title', 'label': 'Concern', 'url_name': 'ofw:concern_detail',
-         'truncate': 70,
-         'meta_fields': ['get_category_display', 'get_severity_display']},
+         'truncate': 70, 'nowrap': True,
+         'meta_fields': ['get_category_display']},
+        {'field': 'get_severity_display', 'label': 'Severity', 'badge': _severity_badge,
+         'raw_field': 'severity'},
         {'field': 'get_status_display', 'label': 'Status', 'badge': _concern_status_badge,
          'raw_field': 'status'},
         {'field': 'reported_date', 'label': 'Reported', 'type': 'date'},
@@ -331,7 +333,7 @@ _concerns = crud.make_crud(
         'Concerns are labelled automatically from the description (or the '
         'category when the description is empty), so staff no longer type a '
         'Title. The label is what OFWs see in their own portal. The second '
-        'line under each label shows its category and severity.',
+        'line under each label shows its category.',
     ],
     filters={
         'status': ('status__in', crud.csv_list),

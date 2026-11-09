@@ -159,9 +159,15 @@ def _format_cell(value, column):
             return escape(str(value))
 
     text = str(value)
+    original = text
     limit = column.get('truncate')
-    if limit and len(text) > limit:
-        return f'<span title="{escape(text)}">{escape(text[:limit].rstrip())}…</span>'
+    truncated = bool(limit) and len(text) > limit
+    if truncated:
+        text = text[:limit].rstrip()
+    rendered = escape(text) + ('…' if truncated else '')
+    if truncated or column.get('nowrap'):
+        # Keep long labels on one line so rows stay the same height.
+        return f'<span class="text-nowrap" title="{escape(original)}">{rendered}</span>'
     return escape(text)
 
 

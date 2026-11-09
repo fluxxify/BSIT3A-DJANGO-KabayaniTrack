@@ -1255,11 +1255,12 @@ class ConcernDetailTests(TestCase):
         # The concern label is shown once and links to the full details.
         self.assertContains(response, 'Unpaid overtime')
 
-    def test_list_merges_category_and_severity_under_the_label(self):
+    def test_list_shows_category_under_the_label_and_keeps_severity_column(self):
         response = self.client.get(reverse('ofw:concern_list'))
-        self.assertContains(response, 'Salary / Compensation · High')
+        self.assertContains(response, 'Salary / Compensation')
+        self.assertContains(response, '<th>Severity</th>')
         self.assertNotContains(response, '<th>Category</th>')
-        self.assertNotContains(response, '<th>Severity</th>')
+        self.assertContains(response, 'text-nowrap')
 
     def test_other_user_cannot_view_detail(self):
         other = User.objects.create_user(username='other3', password='Passw0rd!23')
