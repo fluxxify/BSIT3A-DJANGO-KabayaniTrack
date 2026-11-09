@@ -1156,6 +1156,11 @@ class EmergencyContactActionTests(TestCase):
         self.assertEqual(contact.visibility, 'private')
         self.assertEqual(contact.owner_label, 'Liza Santos')
 
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(response, '>Family / Next of Kin</span>')
+        self.assertContains(response, '>Private</span>')
+        self.assertContains(response, 'Liza Santos')
+
     def test_list_shows_call_and_website_actions(self):
         response = self.client.get(reverse('ofw:contact_list'))
         self.assertContains(response, 'tel:+63285511545')
