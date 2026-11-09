@@ -13,10 +13,6 @@
   .sos-actions .btn {
     min-height: 42px;
   }
-  .sos-number {
-    font-size: 1.05rem;
-    font-weight: 600;
-  }
 </style>
 {% endblock %}
 {% block content %}
@@ -84,41 +80,10 @@
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-people-roof me-2 text-success"></i>My Family Emergency Contacts</h3>
     </div>
-    <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead>
-          <tr><th>Name</th><th>Phone</th><th class="w-1">Call / Message</th></tr>
-        </thead>
-        <tbody>
-          {% for contact in family_contacts %}
-          <tr>
-            <td>
-              <div class="fw-medium">{{ contact.name }}</div>
-              <div class="text-muted small">{{ contact.relationship|default:contact.get_contact_type_display }}</div>
-            </td>
-            <td class="sos-number">{{ contact.phone }}</td>
-            <td>
-              <div class="d-flex gap-1 flex-wrap">
-                <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-sm call-number"
-                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
-                  <i class="fas fa-phone me-1"></i>Call
-                </a>
-                {% if contact.whatsapp_url %}
-                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
-                  <i class="fab fa-whatsapp me-1"></i>WhatsApp
-                </a>
-                {% endif %}
-                {% if contact.viber_url %}
-                <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link" data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
-                  <i class="fab fa-viber me-1"></i>Viber
-                </a>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kt-contact-list">
+      {% for contact in family_contacts %}
+      {% include 'ofw/portal/_contact_item.html' with contact=contact %}
+      {% endfor %}
     </div>
   </div>
   {% endif %}
@@ -134,17 +99,10 @@
         <span class="text-muted small">Auto-filled from your profile</span>
       </div>
     </div>
-    <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead>
-          <tr><th>Office</th><th>Type</th><th>Phone</th><th class="w-1">Call / Message</th></tr>
-        </thead>
-        <tbody>
-          {% for contact in local_hotlines %}
-          {% include 'ofw/portal/_sos_hotline_row.html' with contact=contact %}
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kt-contact-list">
+      {% for contact in local_hotlines %}
+      {% include 'ofw/portal/_contact_item.html' with contact=contact %}
+      {% endfor %}
     </div>
   </div>
   {% endif %}
@@ -154,42 +112,10 @@
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-flag me-2 text-danger"></i>National Hotlines (Philippines · 24/7)</h3>
     </div>
-    <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead>
-          <tr><th>Office</th><th>Phone</th><th class="w-1">Call / Message</th></tr>
-        </thead>
-        <tbody>
-          {% for contact in national_hotlines %}
-          <tr>
-            <td>
-              <div class="fw-medium">{{ contact.name }}</div>
-              {% if contact.email %}<div class="text-muted small">{{ contact.email }}</div>{% endif %}
-              {% if contact.automatic and contact.notes %}<div class="text-muted small">{{ contact.notes }}</div>{% endif %}
-            </td>
-            <td class="sos-number">{{ contact.phone }}</td>
-            <td>
-              <div class="d-flex gap-1 flex-wrap">
-                <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-sm call-number"
-                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
-                  <i class="fas fa-phone me-1"></i>Call
-                </a>
-                {% if contact.whatsapp_url %}
-                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
-                  <i class="fab fa-whatsapp me-1"></i>WhatsApp
-                </a>
-                {% endif %}
-                {% if contact.viber_url %}
-                <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link" data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
-                  <i class="fab fa-viber me-1"></i>Viber
-                </a>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kt-contact-list">
+      {% for contact in national_hotlines %}
+      {% include 'ofw/portal/_contact_item.html' with contact=contact %}
+      {% endfor %}
     </div>
   </div>
   {% endif %}

@@ -1332,6 +1332,59 @@ class FamilyContactTests(TestCase):
         self.assertNotContains(response, 'Request a Family Emergency Contact')
 
 
+class ContactLayoutRegressionTests(TestCase):
+    """Hotlines and family contacts stay readable on small screens.
+
+    Both pages share ``ofw/portal/_contact_item.html`` instead of tables so the
+    "National hotlines" and family contact details never scatter into columns
+    or force a horizontal scroll on phones.
+    """
+
+    def setUp(self):
+        self.ofw = User.objects.create_user(
+            username='layout_ofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.ofw)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw, first_name='Mia', last_name='Santos', country='Kuwait',
+            city_abroad='Kuwait City',
+        )
+        EmergencyContact.objects.create(
+            user=self.ofw, name='Liza Santos', contact_type='family',
+            relationship='Mother', phone='+63 917 555 1234',
+            address='10 Rizal St., Cebu City',
+        )
+        self.client.force_login(self.ofw)
+
+    def test_sos_page_uses_shared_contact_cards(self):
+        response = self.client.get(reverse('ofw:portal_sos'))
+        self.assertContains(response, 'kt-contact-list')
+        self.assertContains(response, 'kt-contact-item')
+        self.assertContains(response, 'National Hotlines')
+        self.assertContains(response, 'Liza Santos')
+        self.assertContains(response, 'tel:+639175551234')
+        # The old hotline table row partial is gone from the page.
+        self.assertNotContains(response, 'sos-number')
+        self.assertNotContains(response, '<th>Office</th>')
+
+    def test_manage_contacts_page_uses_shared_contact_cards(self):
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertContains(response, 'kt-contact-list')
+        self.assertContains(response, 'kt-contact-item')
+        self.assertContains(response, 'National Hotlines')
+        self.assertContains(response, 'Liza Santos')
+        self.assertContains(response, 'Mother')
+        self.assertContains(response, 'title="Edit"')
+        self.assertContains(response, 'title="Remove"')
+        self.assertNotContains(response, '<th>Office</th>')
+
+    def test_contact_pages_do_not_fall_back_to_tables(self):
+        for url_name in ('ofw:portal_sos', 'ofw:portal_contacts'):
+            with self.subTest(page=url_name):
+                response = self.client.get(reverse(url_name))
+                self.assertNotContains(response, 'table-responsive')
+
+
 class EmergencySosTests(TestCase):
     """The one-tap SOS page and the Call / WhatsApp / Viber deep links."""
 

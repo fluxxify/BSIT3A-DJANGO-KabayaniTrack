@@ -1,13 +1,4 @@
 {% extends "theme/base.html" %}
-{% block extra_css %}
-<style>
-  .contact-actions .btn {
-    --tblr-btn-padding-x: 0.38rem;
-    --tblr-btn-padding-y: 0.28rem;
-    font-size: 0.8rem;
-  }
-</style>
-{% endblock %}
 {% block content %}
 <div class="container-xl">
   <div class="page-header d-print-none" aria-label="Page header">
@@ -37,43 +28,10 @@
         <span class="text-muted small">Auto-filled from your profile</span>
       </div>
     </div>
-    <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead>
-          <tr><th>Office</th><th>Type</th><th>City</th><th>Phone</th><th class="w-1">Actions</th></tr>
-        </thead>
-        <tbody>
-          {% for contact in local_hotlines %}
-          <tr>
-            <td>
-              <div class="fw-medium">{{ contact.name }}</div>
-              {% if contact.automatic and contact.notes %}<div class="text-muted small">{{ contact.notes }}</div>{% endif %}
-            </td>
-            <td>{{ contact.get_contact_type_display }}</td>
-            <td class="text-muted">{{ contact.city|default:'—' }}</td>
-            <td><a href="tel:{{ contact.dial_number }}" class="call-number" data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">{{ contact.phone }}</a></td>
-            <td>
-              <div class="d-flex gap-1">
-                <a href="tel:{{ contact.dial_number }}" class="btn btn-ghost-success btn-icon btn-sm call-number"
-                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}" title="Emergency hotline call">
-                  <i class="fas fa-phone"></i>
-                </a>
-                {% if contact.whatsapp_url %}
-                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Message on WhatsApp">
-                  <i class="fab fa-whatsapp text-success"></i>
-                </a>
-                {% endif %}
-                {% if contact.website_url %}
-                <a href="{{ contact.website_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Open Website">
-                  <i class="fas fa-globe text-primary"></i>
-                </a>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kt-contact-list">
+      {% for contact in local_hotlines %}
+      {% include 'ofw/portal/_contact_item.html' with contact=contact %}
+      {% endfor %}
     </div>
   </div>
   {% elif not location_country %}
@@ -98,44 +56,10 @@
         National Hotlines (Philippines · 24/7)
       </h3>
     </div>
-    <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead>
-          <tr><th>Office</th><th>Phone</th><th>Email</th><th class="w-1">Actions</th></tr>
-        </thead>
-        <tbody>
-          {% for contact in national_hotlines %}
-          <tr>
-            <td>
-              <div class="fw-medium">{{ contact.name }}</div>
-              {% if contact.automatic and contact.notes %}<div class="text-muted small">{{ contact.notes }}</div>{% endif %}
-            </td>
-            <td><a href="tel:{{ contact.dial_number }}" class="call-number" data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">{{ contact.phone }}</a></td>
-            <td class="text-muted">
-              {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}
-            </td>
-            <td>
-              <div class="d-flex gap-1">
-                <a href="tel:{{ contact.dial_number }}" class="btn btn-ghost-success btn-icon btn-sm call-number"
-                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}" title="Call">
-                  <i class="fas fa-phone"></i>
-                </a>
-                {% if contact.whatsapp_url %}
-                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Message on WhatsApp">
-                  <i class="fab fa-whatsapp text-success"></i>
-                </a>
-                {% endif %}
-                {% if contact.website_url %}
-                <a href="{{ contact.website_url }}" target="_blank" rel="noopener" class="btn btn-ghost-secondary btn-icon btn-sm" title="Open Website">
-                  <i class="fas fa-globe text-primary"></i>
-                </a>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="kt-contact-list">
+      {% for contact in national_hotlines %}
+      {% include 'ofw/portal/_contact_item.html' with contact=contact %}
+      {% endfor %}
     </div>
   </div>
   {% endif %}
@@ -144,61 +68,17 @@
     <div class="card-header">
       <h3 class="card-title"><i class="fas fa-people-roof me-2 text-success"></i>My Family Emergency Contacts</h3>
     </div>
-    <div class="table-responsive">
-      <table class="table table-vcenter card-table">
-        <thead>
-          <tr><th>Name</th><th>Relationship</th><th>Phone</th><th>Email</th><th>Address</th><th class="w-1">Actions</th></tr>
-        </thead>
-        <tbody>
-          {% for contact in my_contacts %}
-          <tr>
-            <td class="fw-medium">{{ contact.name }}</td>
-            <td>{{ contact.relationship|default:contact.get_contact_type_display }}</td>
-            <td><a href="tel:{{ contact.dial_number }}" class="call-number" data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">{{ contact.phone }}</a></td>
-            <td class="text-muted">
-              {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% else %}—{% endif %}
-            </td>
-            <td class="text-muted">{{ contact.address|default:'—' }}</td>
-            <td>
-              <div class="d-flex gap-1 contact-actions">
-                <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-icon call-number"
-                   data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}" title="Call {{ contact.name }}">
-                  <i class="fas fa-phone"></i>
-                </a>
-                {% if contact.whatsapp_url %}
-                <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-icon" title="Message on WhatsApp">
-                  <i class="fab fa-whatsapp"></i>
-                </a>
-                {% endif %}
-                {% if contact.viber_url %}
-                <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-icon viber-link"
-                   title="Message on Viber" data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
-                  <i class="fab fa-viber"></i>
-                </a>
-                {% endif %}
-                <a href="{% url 'ofw:portal_contact_edit' contact.pk %}" class="btn btn-ghost-secondary btn-icon" title="Edit">
-                  <i class="fas fa-pen"></i>
-                </a>
-                <form method="post" action="{% url 'ofw:portal_contact_delete' contact.pk %}"
-                      onsubmit="return confirm('Remove {{ contact.name }} from your emergency contacts?');">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-ghost-danger btn-icon" title="Remove">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </form>
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="text-muted text-center">
-              You have no family emergency contact on file yet. Add one using the form below.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    {% if my_contacts %}
+    <div class="kt-contact-list">
+      {% for contact in my_contacts %}
+      {% include 'ofw/portal/_contact_item.html' with contact=contact manage=True %}
+      {% endfor %}
     </div>
+    {% else %}
+    <div class="card-body text-muted text-center">
+      You have no family emergency contact on file yet. Add one using the form below.
+    </div>
+    {% endif %}
   </div>
 
   <div class="row row-deck row-cards">

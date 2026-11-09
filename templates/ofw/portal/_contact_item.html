@@ -1,0 +1,79 @@
+{% comment %}
+Shared responsive contact / hotline row.
+
+The same markup is used by the Emergency Contacts page and the Manage Contacts
+page so hotlines, embassies and family contacts always keep the same readable
+layout on phones and desktop.
+
+Context:
+  contact  EmergencyContact instance or the StaticHotline adapter.
+  manage   Optional. When true, Edit and Delete actions are shown.
+{% endcomment %}
+<div class="kt-contact-item">
+  <div class="kt-contact-item__main">
+    <div class="kt-contact-item__name">{{ contact.name }}</div>
+    <div class="kt-contact-item__meta">
+      <span class="badge bg-secondary-lt">
+        {% if manage %}{{ contact.relationship|default:contact.get_contact_type_display }}{% else %}{{ contact.get_contact_type_display }}{% endif %}
+      </span>
+      {% if contact.city %}
+      <span class="kt-contact-item__meta-text">
+        <i class="fas fa-location-dot me-1"></i>{{ contact.city }}
+      </span>
+      {% endif %}
+    </div>
+    {% if contact.address %}
+    <div class="kt-contact-item__detail">{{ contact.address }}</div>
+    {% endif %}
+    {% if contact.email %}
+    <div class="kt-contact-item__detail">
+      <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
+    </div>
+    {% endif %}
+    {% if contact.notes %}
+    <div class="kt-contact-item__detail kt-contact-item__detail--muted">{{ contact.notes }}</div>
+    {% endif %}
+  </div>
+
+  <div class="kt-contact-item__number">
+    <a href="tel:{{ contact.dial_number }}" class="call-number"
+       data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">{{ contact.phone }}</a>
+  </div>
+
+  <div class="kt-contact-item__actions">
+    <a href="tel:{{ contact.dial_number }}" class="btn btn-success btn-sm call-number"
+       data-number="{{ contact.dial_number }}" data-name="{{ contact.name }}">
+      <i class="fas fa-phone me-1"></i>Call
+    </a>
+    {% if contact.whatsapp_url %}
+    <a href="{{ contact.whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-outline-success btn-sm">
+      <i class="fab fa-whatsapp me-1"></i>WhatsApp
+    </a>
+    {% endif %}
+    {% if contact.viber_url %}
+    <a href="{{ contact.viber_url }}" class="btn btn-outline-purple btn-sm viber-link"
+       data-name="{{ contact.name }}" data-whatsapp="{{ contact.whatsapp_url }}">
+      <i class="fab fa-viber me-1"></i>Viber
+    </a>
+    {% endif %}
+    {% if contact.website_url %}
+    <a href="{{ contact.website_url }}" target="_blank" rel="noopener"
+       class="btn btn-ghost-secondary btn-icon btn-sm" title="Website">
+      <i class="fas fa-globe text-primary"></i>
+    </a>
+    {% endif %}
+    {% if manage %}
+    <a href="{% url 'ofw:portal_contact_edit' contact.pk %}"
+       class="btn btn-ghost-secondary btn-icon btn-sm" title="Edit">
+      <i class="fas fa-pen"></i>
+    </a>
+    <form method="post" action="{% url 'ofw:portal_contact_delete' contact.pk %}"
+          onsubmit="return confirm('Remove {{ contact.name }} from your emergency contacts?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost-danger btn-icon btn-sm" title="Remove">
+        <i class="fas fa-trash"></i>
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
