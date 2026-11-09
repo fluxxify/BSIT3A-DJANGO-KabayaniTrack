@@ -118,6 +118,7 @@
               {% else %}
               {{ cell.html|safe }}
               {% endif %}
+              {% if cell.meta %}<div class="text-muted small">{{ cell.meta|safe }}</div>{% endif %}
             </td>
             {% endfor %}
             <td>

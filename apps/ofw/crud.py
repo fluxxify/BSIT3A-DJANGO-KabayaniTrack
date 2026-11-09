@@ -186,9 +186,18 @@ def _build_rows(objects, columns, row_actions=None):
             if raw_field:
                 badge_value = getattr(obj, raw_field, value)
 
+            meta_parts = []
+            for meta_field in column.get('meta_fields', []):
+                meta_value = getattr(obj, meta_field, '')
+                if callable(meta_value):
+                    meta_value = meta_value()
+                if meta_value not in (None, ''):
+                    meta_parts.append(escape(str(meta_value)))
+
             cells.append({
                 'html': _format_cell(value, column),
                 'badge': _badge(badge_value, column),
+                'meta': ' · '.join(meta_parts),
                 'url': reverse(column['url_name'], args=[obj.pk]) if column.get('url_name') else None,
             })
 

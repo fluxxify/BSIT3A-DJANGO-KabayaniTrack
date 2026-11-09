@@ -357,11 +357,26 @@ class Concern(models.Model):
         return text
 
     @property
-    def has_extra_description(self):
-        """True when the description adds something beyond the heading."""
+    def extra_description(self):
+        """The part of the description that the heading does not already show."""
         description = ' '.join((self.description or '').split())
         title = ' '.join((self.title or '').split())
-        return bool(description) and description != title
+        if not description:
+            return ''
+        if not title:
+            return description
+        if description == title:
+            # Legacy records may repeat the title exactly.  Only show it again
+            # when the heading had to truncate the text.
+            return description if len(title) > 90 else ''
+        if not title.endswith('…') and description.startswith(title):
+            return description[len(title):].lstrip(' .,;:—')
+        return description
+
+    @property
+    def has_extra_description(self):
+        """True when the description adds something beyond the heading."""
+        return bool(self.extra_description)
 
 
 class ConcernProof(models.Model):

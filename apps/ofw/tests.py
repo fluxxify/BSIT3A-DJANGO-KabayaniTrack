@@ -1214,11 +1214,32 @@ class ConcernDetailTests(TestCase):
         self.assertContains(response, '…')
         self.assertContains(response, '>Description</h3>')
 
+    def test_long_legacy_title_still_shows_the_full_description(self):
+        text = ('A very long legacy concern title that was saved before the '
+                'automatic short labels existed and therefore repeats itself.')
+        concern = Concern.objects.create(
+            ofw=self.profile, user=self.staff, title=text, description=text,
+            category='other', severity='medium', status='open',
+            reported_date=timezone.localdate(),
+        )
+        response = self.client.get(
+            reverse('ofw:concern_detail', args=[concern.pk])
+        )
+        self.assertContains(response, '>Description</h3>')
+        self.assertContains(response, text)
+
     def test_build_title_uses_the_first_sentence(self):
         concern = Concern(
             description='Wages are missing. The employer stopped paying.',
         )
         self.assertEqual(concern.build_title(), 'Wages are missing.')
+
+    def test_extra_description_drops_the_repeated_first_sentence(self):
+        concern = Concern(
+            title='Wages are missing.',
+            description='Wages are missing. The employer stopped paying.',
+        )
+        self.assertEqual(concern.extra_description, 'The employer stopped paying.')
 
     def test_list_shows_view_action(self):
         response = self.client.get(reverse('ofw:concern_list'))
@@ -1233,6 +1254,12 @@ class ConcernDetailTests(TestCase):
         self.assertNotContains(response, '>Description</th>')
         # The concern label is shown once and links to the full details.
         self.assertContains(response, 'Unpaid overtime')
+
+    def test_list_merges_category_and_severity_under_the_label(self):
+        response = self.client.get(reverse('ofw:concern_list'))
+        self.assertContains(response, 'Salary / Compensation · High')
+        self.assertNotContains(response, '<th>Category</th>')
+        self.assertNotContains(response, '<th>Severity</th>')
 
     def test_other_user_cannot_view_detail(self):
         other = User.objects.create_user(username='other3', password='Passw0rd!23')
