@@ -171,7 +171,32 @@ class AgencyWorkspaceTests(TestCase):
         self.assertEqual(profile.agency_org, self.agency_a)
         self.assertEqual(profile.agency, self.agency_a.name)
 
-    def test_generic_registration_without_agency_still_works(self):
+    def test_generic_registration_requires_an_agency(self):
+        response = self.client.post(
+            reverse('register'),
+            {
+                'username': 'independent_ofw',
+                'first_name': 'Noel',
+                'last_name': 'Reyes',
+                'email': 'independent_ofw@example.com',
+                'password': 'Str0ngPassw0rd!',
+                'confirm_password': 'Str0ngPassw0rd!',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, 'Please select your agency or partner office.'
+        )
+        self.assertFalse(
+            self.OFWProfile.objects.filter(
+                user__username='independent_ofw'
+            ).exists()
+        )
+
+    def test_generic_registration_allowed_when_no_agencies_exist(self):
+        self.Agency.objects.update(is_active=False)
+
         response = self.client.post(
             reverse('register'),
             {

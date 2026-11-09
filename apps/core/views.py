@@ -230,10 +230,13 @@ def register_view(request, agency_slug=None):
         return redirect('dashboard')
 
     context = _auth_context(agency)
+    agencies_available = False
     if agency is None:
         from apps.users.agencies import active_agencies
 
-        context['agencies'] = active_agencies()
+        available_agencies = list(active_agencies())
+        agencies_available = bool(available_agencies)
+        context['agencies'] = available_agencies
 
     if request.method == 'GET':
         return render(request, 'auth/register.html', context)
@@ -280,6 +283,8 @@ def register_view(request, agency_slug=None):
             )
         except (Agency.DoesNotExist, TypeError, ValueError):
             errors['agency'] = 'Choose a valid agency from the list.'
+    elif agency is None and agencies_available:
+        errors['agency'] = 'Please select your agency or partner office.'
 
     if errors:
         return render(
