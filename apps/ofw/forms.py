@@ -175,7 +175,7 @@ class ConcernForm(StyledModelForm):
     class Meta:
         model = Concern
         fields = [
-            'ofw', 'title', 'category', 'severity', 'status',
+            'ofw', 'category', 'severity', 'status',
             'reported_date', 'description', 'resolved_date',
         ]
 
@@ -190,6 +190,16 @@ class ConcernForm(StyledModelForm):
         if agency is not None and ofw is not None and ofw.agency_org_id != agency.id:
             raise ValidationError('You can only report concerns for OFWs assigned to your agency.')
         return cleaned
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        # Title is no longer typed by staff; derive it from the report so the
+        # portal and the dashboard show the same label.
+        obj.title = obj.build_title()
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
 
 
 class OFWOwnerChoiceField(forms.ModelChoiceField):

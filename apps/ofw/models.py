@@ -285,6 +285,18 @@ class Concern(models.Model):
     def __str__(self):
         return self.title
 
+    def build_title(self):
+        """Return the short label used in lists, headings and notifications.
+
+        Nobody types a title any more: an OFW only writes a description, and
+        the console shows a derived label.  Keeping the rule on the model means
+        the portal and the management dashboard always agree.
+        """
+        text = ' '.join((self.description or '').split())
+        if text:
+            return text[:200]
+        return f'{self.get_category_display()} concern'
+
 
 class ConcernProof(models.Model):
     """A photo or video file submitted as proof for a reported concern."""

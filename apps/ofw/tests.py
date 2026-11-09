@@ -17,7 +17,12 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from openpyxl import load_workbook
 
-from apps.ofw.forms import CheckInForm, EmergencyContactForm, MonitoringReportForm
+from apps.ofw.forms import (
+    CheckInForm,
+    ConcernForm,
+    EmergencyContactForm,
+    MonitoringReportForm,
+)
 from apps.ofw.hotlines import (
     COUNTRY_HOTLINES,
     PHILIPPINE_HOTLINES,
@@ -998,6 +1003,46 @@ class ConcernDetailTests(TestCase):
         response = self.client.get(reverse('ofw:concern_detail', args=[self.concern.pk]))
         self.assertEqual(response.status_code, 404)
 
+    def test_staff_do_not_type_a_title(self):
+        form = ConcernForm(user=self.staff)
+        self.assertNotIn('title', form.fields)
+
+        response = self.client.get(reverse('ofw:concern_list'))
+        self.assertNotContains(response, 'name="title"')
+        self.assertContains(response, 'labelled automatically')
+
+    def test_staff_concern_gets_an_automatic_title(self):
+        form = ConcernForm(
+            data={
+                'ofw': self.profile.pk,
+                'category': 'salary',
+                'severity': 'medium',
+                'status': 'open',
+                'reported_date': timezone.localdate().isoformat(),
+                'description': '  Wages   not paid for two months  ',
+            },
+            user=self.staff,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        concern = form.save()
+        self.assertEqual(concern.title, 'Wages not paid for two months')
+
+    def test_staff_concern_without_description_uses_category(self):
+        form = ConcernForm(
+            data={
+                'ofw': self.profile.pk,
+                'category': 'health',
+                'severity': 'medium',
+                'status': 'open',
+                'reported_date': timezone.localdate().isoformat(),
+                'description': '',
+            },
+            user=self.staff,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        concern = form.save()
+        self.assertEqual(concern.title, 'Health / Medical concern')
+
 
 class EmergencyContactActionTests(TestCase):
     def setUp(self):
@@ -1677,11 +1722,11 @@ class NotificationTests(TestCase):
         self.client.force_login(self.staff)
         create = self.client.post(reverse('ofw:concern_save_ajax'), {
             'ofw': self.profile.pk,
-            'title': 'Passport withheld',
             'category': 'documents',
             'severity': 'high',
             'status': 'open',
             'reported_date': timezone.localdate().isoformat(),
+            'description': 'Passport withheld',
         })
         self.assertEqual(create.status_code, 200)
         concern = Concern.objects.get(title='Passport withheld')
@@ -1694,11 +1739,11 @@ class NotificationTests(TestCase):
         update = self.client.post(reverse('ofw:concern_save_ajax'), {
             'id': concern.pk,
             'ofw': self.profile.pk,
-            'title': 'Passport withheld',
             'category': 'documents',
             'severity': 'high',
             'status': 'resolved',
             'reported_date': concern.reported_date.isoformat(),
+            'description': 'Passport withheld',
         })
         self.assertEqual(update.status_code, 200)
         notification = Notification.objects.filter(

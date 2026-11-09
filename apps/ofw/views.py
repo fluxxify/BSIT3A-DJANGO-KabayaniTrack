@@ -315,8 +315,13 @@ _concerns = crud.make_crud(
     title='Reported Concerns',
     entity='Concern',
     add_label='Report Concern',
-    search_placeholder='Search by OFW, title, or description...',
+    search_placeholder='Search by OFW or description...',
     detail_url_name='ofw:concern_detail',
+    page_help=[
+        'Concerns are labelled automatically from the description (or the '
+        'category when the description is empty), so staff no longer type a '
+        'Title. The label is what OFWs see in their own portal.',
+    ],
     filters={
         'status': ('status__in', crud.csv_list),
         'category': ('category__in', crud.csv_list),
