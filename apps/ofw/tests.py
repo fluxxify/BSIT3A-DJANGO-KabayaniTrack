@@ -1741,6 +1741,33 @@ class SeedSafeLocationsCommandTests(TestCase):
         self.assertEqual(rows[0]['name'], 'Masulog Barangay Health Center')
         self.assertLess(rows[0]['distance_km'], 1)
 
+    def test_kabankalan_has_local_emergency_services(self):
+        """Standing in Kabankalan must list Kabankalan places first."""
+        from django.core.management import call_command
+
+        from apps.ofw.views import nearest_safe_places
+
+        call_command('seed_safe_locations', verbosity=0)
+        rows = nearest_safe_places(9.9950, 122.8130, limit=6)
+        self.assertTrue(rows)
+        self.assertEqual(rows[0]['city'], 'Kabankalan')
+        self.assertLess(rows[0]['distance_km'], 1)
+        self.assertTrue(
+            all(row['city'] == 'Kabankalan' for row in rows),
+            [row['name'] for row in rows],
+        )
+
+        police = nearest_safe_places(
+            9.9950,
+            122.8130,
+            limit=1,
+            locations=SafeLocation.objects.filter(
+                is_active=True,
+                location_type=SafeLocation.LocationType.POLICE_STATION,
+            ),
+        )
+        self.assertEqual(police[0]['name'], 'Kabankalan City Police Station')
+
     def test_command_seeds_every_ofw_deployment_country(self):
         from django.core.management import call_command
 

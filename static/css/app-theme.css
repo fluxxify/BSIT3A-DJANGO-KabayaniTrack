@@ -1284,6 +1284,27 @@ button:focus-visible,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+/* Shared map legend dots. Safe places follow the active theme primary colour. */
+.kt-map-legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.kt-map-legend-dot--safe {
+  background-color: var(--tblr-primary);
+}
+
+.kt-map-legend-dot--live {
+  background-color: var(--tblr-success);
+}
+
+.kt-map-legend-dot--you {
+  background-color: var(--tblr-danger);
+}
+
 @media (max-width: 767.98px) {
   .dh-auth-bg::before {
     background-position: 34% center;

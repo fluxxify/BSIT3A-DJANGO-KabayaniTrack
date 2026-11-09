@@ -114,6 +114,28 @@ PHILIPPINES_SAFE_LOCATIONS = [
      '911', 10.322445, 123.019797),
     ('La Castellana Rural Health Unit', HOSPITAL, 'La Castellana',
      'Poblacion, La Castellana, Negros Occidental', '', 10.323600, 123.021000),
+    # --- Kabankalan City --------------------------------------------------
+    # A full local set so an OFW standing in Kabankalan gets Kabankalan
+    # emergency services first instead of the nearest Bacolod/La Castellana
+    # entries. Coordinates verified against OpenStreetMap.
+    ('Kabankalan City Police Station', POLICE, 'Kabankalan',
+     'Poblacion, Kabankalan City, Negros Occidental',
+     '911', 9.9959289, 122.8126685),
+    ('Kabankalan City Fire Station', FIRE, 'Kabankalan',
+     'Repollo Street, Barangay 2, Poblacion, Kabankalan City, Negros Occidental',
+     '+63 34 467 6741', 9.9950710, 122.8125888),
+    ('Dr. Gumersindo Garcia Sr. Memorial Hospital', HOSPITAL, 'Kabankalan',
+     'Poblacion, Kabankalan City, Negros Occidental',
+     '', 9.9897257, 122.8131748),
+    ('Lorenzo D. Zayco District Hospital', HOSPITAL, 'Kabankalan',
+     'Guanzon Street, Barangay 1, Binicuil, Kabankalan, Negros Occidental',
+     '', 10.0101253, 122.8208858),
+    ('Holy Mother of Mercy Hospital', HOSPITAL, 'Kabankalan',
+     'Barangay 9, Hilamonan, Kabankalan, Negros Occidental',
+     '', 9.9829729, 122.8202739),
+    ('Barangay 4 Health Center', HOSPITAL, 'Kabankalan',
+     'Barangay 4, Kabankalan City, Negros Occidental',
+     '', 9.9906665, 122.8159221),
     # --- Mindanao ---------------------------------------------------------
     ('Davao City Police Office', POLICE, 'Davao City',
      'San Pedro Street, Davao City', '911', 7.067200, 125.608700),

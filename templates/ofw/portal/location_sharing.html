@@ -211,6 +211,7 @@
 
 {% block extra_js %}
 <script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'js/kabayani-map.js' %}"></script>
 <script src="{% static 'js/kabayani-location.js' %}?v=20261109a"></script>
 <script>
 (function () {
@@ -235,22 +236,9 @@
     mapEl.addEventListener('mouseleave', function () {
       map.scrollWheelZoom.disable();
     });
-    // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
-    var esri = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: 'Tiles &copy; Esri' }
-    );
-    var switched = false;
-    esri.on('tileerror', function () {
-      if (switched) { return; }
-      switched = true;
-      map.removeLayer(esri);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-    });
-    esri.addTo(map);
+    // Esri up to its native detail, then OpenStreetMap so deep zooms never
+    // show the "Map data not yet available" placeholder tile.
+    KabayaniMap.addBaseLayer(map, { maxZoom: 19 });
 
     // Dragging, pinch zoom and keyboard arrows stay enabled.
     map.dragging.enable();
@@ -274,13 +262,15 @@
     }
 
     var placePoints = [];
+    var placeMarkers = [];
+    var safeColor = KabayaniMap.primaryColor();
     places.forEach(function (place) {
       if (!place || place.lat == null || place.lng == null) { return; }
       placePoints.push([place.lat, place.lng]);
       var marker = L.circleMarker([place.lat, place.lng], {
         radius: 7,
-        color: '#206bc4',
-        fillColor: '#206bc4',
+        color: safeColor,
+        fillColor: safeColor,
         fillOpacity: 0.75,
         weight: 2
       }).addTo(map);
@@ -292,6 +282,15 @@
         parts.push('<a href="' + escapeHtml(place.maps_url) + '" target="_blank" rel="noopener">Directions</a>');
       }
       marker.bindPopup(parts.join('<br>'));
+      placeMarkers.push(marker);
+    });
+
+    // Keep safe-place markers on the active theme colour without a reload.
+    KabayaniMap.onThemeChange(function () {
+      var color = KabayaniMap.primaryColor();
+      placeMarkers.forEach(function (marker) {
+        marker.setStyle({ color: color, fillColor: color });
+      });
     });
 
     function distanceKm(a, b) {

@@ -60,10 +60,10 @@
       </h5>
       <div class="card-actions text-muted small">
         <span class="me-2 d-none d-sm-inline">
-          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2fb344;"></span> Live OFW
+          <span class="kt-map-legend-dot kt-map-legend-dot--live"></span> Live OFW
         </span>
         <span class="me-2">
-          <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#206bc4;"></span> Safe place
+          <span class="kt-map-legend-dot kt-map-legend-dot--safe"></span> Safe place
         </span>
         <span id="mapUpdatedAt" title="Live clock — the map refreshes every 5 seconds"></span>
       </div>
@@ -269,6 +269,7 @@
 
 {% block extra_js %}
 <script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'js/kabayani-map.js' %}"></script>
 <script>
 (function () {
   var mapEl = document.getElementById('locationTrackerMap');
@@ -299,27 +300,9 @@
     map.panBy([dx, dy], { animate: false });
   }, { passive: false });
 
-  // Esri World Street Map first; fall back to OpenStreetMap if tiles fail.
-  function addBaseLayer(targetMap) {
-    var esri = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>' }
-    );
-    var switched = false;
-    esri.on('tileerror', function () {
-      if (switched) { return; }
-      switched = true;
-      targetMap.removeLayer(esri);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(targetMap);
-    });
-    esri.addTo(targetMap);
-    return esri;
-  }
-
-  addBaseLayer(map);
+  // Esri up to its native detail, then OpenStreetMap so deep zooms never show
+  // the "Map data not yet available" placeholder tile.
+  KabayaniMap.addBaseLayer(map, { maxZoom: 19 });
 
   // Dragging, pinch zoom and keyboard arrows stay enabled.
   map.dragging.enable();
@@ -344,17 +327,18 @@
     } catch (err) {
       places = [];
     }
+    var safeColor = KabayaniMap.primaryColor();
     places.forEach(function (place) {
       if (!place || place.lat == null || place.lng == null) { return; }
       var marker = L.circleMarker([place.lat, place.lng], {
         radius: 6,
-        color: '#206bc4',
-        fillColor: '#206bc4',
+        color: safeColor,
+        fillColor: safeColor,
         fillOpacity: 0.8,
         weight: 2
       }).addTo(map);
       var parts = ['<strong>' + escapeHtml(place.name) + '</strong>'];
-      if (place.type) { parts.push('<span style="color:#6c757d;">' + escapeHtml(place.type) + '</span>'); }
+      if (place.type) { parts.push('<span class="text-muted">' + escapeHtml(place.type) + '</span>'); }
       if (place.address) { parts.push(escapeHtml(place.address)); }
       if (place.city || place.country) {
         parts.push(escapeHtml([place.city, place.country].filter(Boolean).join(', ')));
@@ -365,6 +349,17 @@
       }
       marker.bindPopup(parts.join('<br>'));
       placeMarkers.push(marker);
+    });
+
+    // Keep safe-place markers on the active theme colour without a reload.
+    KabayaniMap.onThemeChange(function () {
+      var color = KabayaniMap.primaryColor();
+      placeMarkers.forEach(function (marker) {
+        marker.setStyle({ color: color, fillColor: color });
+      });
+      Object.keys(historyLines).forEach(function (id) {
+        if (historyLines[id]) { historyLines[id].setStyle({ color: color }); }
+      });
     });
   })();
 
@@ -423,7 +418,7 @@
     return (
       '<b>' + esc(ofw.name) + '</b><br>' +
       (ofw.country ? esc(ofw.country) + '<br>' : '') +
-      (ofw.sharing_enabled ? '<span style="color:#206bc4;"><b>Live sharing enabled</b></span><br>' : '') +
+      (ofw.sharing_enabled ? '<span class="text-primary"><b>Live sharing enabled</b></span><br>' : '') +
       (ofw.is_emergency ? '<span style="color:#d63939;"><b>EMERGENCY SOS</b></span><br>' : '') +
       (ofw.freshness === 'live' ? '<b>Live now</b><br>' : ofw.freshness_label + '<br>') +
       esc(ofw.recorded_at.replace('T', ' ')) +
@@ -518,7 +513,7 @@
         }
         var latlngs = pings.map(function (p) { return [p.lat, p.lng]; });
         var line = L.polyline(latlngs, {
-          color: '#206bc4',
+          color: KabayaniMap.primaryColor(),
           weight: 3,
           opacity: 0.7,
           dashArray: '6, 10'

@@ -250,13 +250,11 @@
 {% block extra_js %}
 {% if latest_ping %}
 <script src="{% static 'libs/leaflet/leaflet.js' %}"></script>
+<script src="{% static 'js/kabayani-map.js' %}"></script>
 <script>
 (function () {
   var map = L.map('guideMap', { scrollWheelZoom: false });
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>'
-  }).addTo(map);
+  KabayaniMap.addBaseLayer(map, { maxZoom: 19 });
 
   var bounds = [[{{ latest_ping.latitude }}, {{ latest_ping.longitude }}]];
   L.marker([{{ latest_ping.latitude }}, {{ latest_ping.longitude }}], { zIndexOffset: 1000 })
