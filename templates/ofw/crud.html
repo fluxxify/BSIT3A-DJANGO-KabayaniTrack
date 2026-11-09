@@ -215,7 +215,8 @@
                 {{ f.label }}{% if f.required %} <span class="text-danger">*</span>{% endif %}
               </label>
               {% if f.kind == 'select' %}
-              <select name="{{ f.name }}" id="crud_{{ f.name }}" class="form-select" {% if f.required %}required{% endif %}>
+              <select name="{{ f.name }}" id="crud_{{ f.name }}" class="form-select" {% if f.required %}required{% endif %}
+                      {% if f.public_types %}data-public-types="{{ f.public_types }}"{% endif %}>
                 {% for value, label in f.choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
               </select>
               {% elif f.kind == 'textarea' %}
@@ -399,6 +400,36 @@
     });
   }
 
+  // Contact forms: only show fields that apply to the selected type so staff
+  // are not asked for Country on a family contact or Relationship on a hotline.
+  const contactTypeField = form.querySelector('[name="contact_type"]');
+  const contactPublicTypes = contactTypeField
+    ? (contactTypeField.getAttribute('data-public-types') || '').split(',').filter(Boolean)
+    : [];
+
+  function toggleContactField(name, visible) {
+    const field = form.querySelector('[name="' + name + '"]');
+    if (!field) return;
+    const row = field.closest('.col-12');
+    if (row) row.classList.toggle('d-none', !visible);
+  }
+
+  function applyContactFieldVisibility() {
+    if (!contactTypeField) return;
+    const type = contactTypeField.value;
+    const isPublic = contactPublicTypes.indexOf(type) !== -1;
+    const isFamily = type === 'family';
+    toggleContactField('relationship', isFamily);
+    toggleContactField('user', !isPublic);
+    toggleContactField('country', !isFamily);
+    toggleContactField('city', !isFamily);
+    toggleContactField('website', !isFamily);
+  }
+
+  if (contactTypeField) {
+    contactTypeField.addEventListener('change', applyContactFieldVisibility);
+  }
+
   modalEl.addEventListener('show.bs.modal', function (event) {
     clearFormError();
     form.reset();
@@ -416,6 +447,7 @@
       title.textContent = '{{ add_label }}';
       submitBtn.textContent = 'Save';
     }
+    applyContactFieldVisibility();
     refreshCities();
   });
 

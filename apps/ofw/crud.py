@@ -296,6 +296,7 @@ def describe_fields(form):
             'datalist_id': widget.attrs.get('list', ''),
             'datalist': datalists.get(name, []),
             'cities_url': _reversed_url(widget.attrs.get('data-cities-url', '')),
+            'public_types': widget.attrs.get('data-public-types', ''),
         })
     return fields
 

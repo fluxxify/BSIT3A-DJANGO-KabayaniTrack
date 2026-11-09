@@ -253,6 +253,9 @@ class EmergencyContactForm(StyledModelForm):
             'autocomplete': 'off',
             'placeholder': 'Start typing a country',
         })
+        self.fields['contact_type'].widget.attrs.update({
+            'data-public-types': ','.join(EmergencyContact.PUBLIC_TYPES),
+        })
         self.fields['city'].label = 'City / Area'
         self.fields['city'].widget.attrs.update({
             'list': 'crud-city-options',

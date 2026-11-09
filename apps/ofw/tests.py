@@ -1038,6 +1038,18 @@ class EmergencyContactActionTests(TestCase):
         )
         self.assertContains(response, '<option value="Saudi Arabia">')
 
+    def test_contact_form_hides_fields_that_do_not_apply(self):
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(
+            response,
+            'data-public-types="emergency,embassy,polo,owwa,dmw,police,fire,hospital"',
+        )
+        self.assertContains(response, 'applyContactFieldVisibility')
+        form = EmergencyContactForm()
+        self.assertIn(
+            'data-public-types', form.fields['contact_type'].widget.attrs
+        )
+
     def test_contact_cities_returns_suggestions_for_country(self):
         response = self.client.get(
             reverse('ofw:contact_cities'), {'country': 'Saudi Arabia'}
