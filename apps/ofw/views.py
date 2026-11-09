@@ -302,8 +302,8 @@ _concerns = crud.make_crud(
     form_class=ConcernForm,
     columns=[
         {'field': 'ofw', 'label': 'OFW'},
-        {'field': 'title', 'label': 'Concern', 'url_name': 'ofw:concern_detail'},
-        {'field': 'description', 'label': 'Description', 'truncate': 50},
+        {'field': 'title', 'label': 'Concern', 'url_name': 'ofw:concern_detail',
+         'truncate': 70},
         {'field': 'get_category_display', 'label': 'Category'},
         {'field': 'get_severity_display', 'label': 'Severity', 'badge': _severity_badge,
          'raw_field': 'severity'},

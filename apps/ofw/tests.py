@@ -997,6 +997,13 @@ class ConcernDetailTests(TestCase):
             reverse('ofw:concern_detail', args=[self.concern.pk]),
         )
 
+    def test_list_does_not_repeat_the_description_column(self):
+        response = self.client.get(reverse('ofw:concern_list'))
+        self.assertContains(response, 'Concern')
+        self.assertNotContains(response, '>Description</th>')
+        # The concern label is shown once and links to the full details.
+        self.assertContains(response, 'Unpaid overtime')
+
     def test_other_user_cannot_view_detail(self):
         other = User.objects.create_user(username='other3', password='Passw0rd!23')
         self.client.force_login(other)
