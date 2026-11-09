@@ -4,6 +4,7 @@ import os
 import re
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 
@@ -191,6 +192,16 @@ class ConcernForm(StyledModelForm):
         return cleaned
 
 
+class OFWOwnerChoiceField(forms.ModelChoiceField):
+    """Label OFW accounts with the profile name staff recognise."""
+
+    def label_from_instance(self, obj):
+        profile = next(iter(obj.ofw_profiles.all()), None)
+        if profile and profile.full_name:
+            return f'{profile.full_name} ({obj.get_username()})'
+        return obj.get_username()
+
+
 class EmergencyContactForm(StyledModelForm):
     # Declared explicitly so forms.URLField gets assume_scheme (models.URLField
     # can't pass it, and Django 5.x warns when the scheme is left implicit).
@@ -199,16 +210,39 @@ class EmergencyContactForm(StyledModelForm):
         assume_scheme='https',
         help_text='Official website (leave blank to use the default for this type)',
     )
+    user = OFWOwnerChoiceField(
+        queryset=get_user_model().objects.none(),
+        required=False,
+        label='Belongs to OFW',
+        help_text=(
+            'Optional. Select the OFW who owns this contact. Leave blank for '
+            'shared hotlines or staff-only records.'
+        ),
+    )
 
     class Meta:
         model = EmergencyContact
         fields = [
-            'name', 'contact_type', 'relationship', 'country', 'city', 'phone',
-            'email', 'website', 'address', 'notes',
+            'name', 'contact_type', 'user', 'relationship', 'country', 'city',
+            'phone', 'email', 'website', 'address', 'notes',
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        owner_qs = (
+            get_user_model().objects
+            .filter(ofw_profiles__isnull=False)
+            .prefetch_related('ofw_profiles')
+            .distinct()
+            .order_by('first_name', 'last_name', 'username')
+        )
+        if not is_global_staff(self.user):
+            agency = agency_for_user(self.user)
+            owner_qs = (
+                owner_qs.filter(ofw_profiles__agency_org=agency)
+                if agency is not None else owner_qs.none()
+            )
+        self.fields['user'].queryset = owner_qs
         self.fields['country'].help_text = (
             'Deployment country this contact applies to (e.g. Saudi Arabia). '
             'OFWs deployed there see it under their local hotlines. '

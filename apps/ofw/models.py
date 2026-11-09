@@ -419,6 +419,58 @@ class EmergencyContact(models.Model):
         # Viber expects the number with a URL-encoded leading plus sign.
         return f'viber://chat?number=%2B{number}'
 
+    @property
+    def type_key(self):
+        """Type used by badges; older rows may have a blank type."""
+        if self.contact_type:
+            return self.contact_type
+        if self.user_id:
+            return self.ContactType.FAMILY
+        return self.ContactType.OTHER
+
+    @property
+    def type_label(self):
+        if not self.contact_type:
+            return dict(self.ContactType.choices).get(
+                self.type_key, self.type_key
+            )
+        return self.get_contact_type_display()
+
+    @property
+    def owner_label(self):
+        """Who this contact belongs to, for the staff dashboard."""
+        if not self.user_id:
+            if self.type_key in self.PUBLIC_TYPES:
+                return 'Shared hotline'
+            return 'Staff record'
+        profile = next(iter(self.user.ofw_profiles.all()), None)
+        if profile and profile.full_name:
+            return profile.full_name
+        return self.user.get_username()
+
+    @property
+    def visibility(self):
+        """Where the contact appears for OFWs: national, local or private."""
+        from .locations import canonical_country
+
+        if self.type_key not in self.PUBLIC_TYPES:
+            return 'private'
+        country = canonical_country(self.country)
+        if not country:
+            return 'unassigned'
+        if country == 'Philippines':
+            return 'national'
+        return 'local'
+
+    @property
+    def visibility_label(self):
+        return {
+            'national': 'National',
+            'local': 'Local',
+            'private': 'Private',
+            'unassigned': 'No country',
+        }[self.visibility]
+
 
 class Notification(models.Model):
     """An in-app message delivered to a single user."""

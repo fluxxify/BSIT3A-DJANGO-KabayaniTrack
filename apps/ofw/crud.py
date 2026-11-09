@@ -313,7 +313,7 @@ def _reversed_url(view_name):
 def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
               title, pretitle='Overview', entity='Record', add_label='Add Record',
               search_placeholder='Search...', detail_url_name=None, filters=None,
-              row_actions=None, on_save=None, on_delete=None):
+              row_actions=None, on_save=None, on_delete=None, page_help=None):
     """Build the page + AJAX views for a single model.
 
     Returns a dict of view callables keyed by ``page``, ``list_ajax``,
@@ -379,6 +379,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'colspan': len(columns) + 2,
             'search_fields': search_fields,
             'detail_url_name': detail_url_name,
+            'page_help': page_help or [],
         }
         return render(request, 'ofw/crud.html', context)
 
@@ -552,7 +553,10 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
         # Build header from form field names, excluding relational/file fields
         # that don't serialize well to a spreadsheet.
-        field_names = [name for name in form_field_names if name not in ('profile_picture', 'attachment')]
+        field_names = [
+            name for name in form_field_names
+            if name not in ('profile_picture', 'attachment', 'user')
+        ]
 
         export_format = request.GET.get('format', 'xlsx').lower()
         if export_format == 'csv':

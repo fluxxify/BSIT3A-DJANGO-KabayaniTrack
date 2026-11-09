@@ -108,6 +108,13 @@ _contact_type_badge = {
     'other': 'bg-secondary-lt text-secondary',
 }
 
+_contact_visibility_badge = {
+    'national': 'bg-primary-lt text-primary',
+    'local': 'bg-azure-lt text-azure',
+    'private': 'bg-secondary-lt text-secondary',
+    'unassigned': 'bg-warning-lt text-warning',
+}
+
 _report_status_badge = {
     'draft': 'bg-secondary-lt text-secondary',
     'submitted': 'bg-warning-lt text-warning',
@@ -349,10 +356,13 @@ _contacts = crud.make_crud(
     form_class=EmergencyContactForm,
     columns=[
         {'field': 'name', 'label': 'Contact'},
-        {'field': 'get_contact_type_display', 'label': 'Type', 'badge': _contact_type_badge,
-         'raw_field': 'contact_type'},
+        {'field': 'owner_label', 'label': 'Owner'},
+        {'field': 'type_label', 'label': 'Type', 'badge': _contact_type_badge,
+         'raw_field': 'type_key'},
         {'field': 'country', 'label': 'Country'},
         {'field': 'city', 'label': 'City / Area'},
+        {'field': 'visibility_label', 'label': 'Shown to OFWs',
+         'badge': _contact_visibility_badge, 'raw_field': 'visibility'},
         {'field': 'phone', 'label': 'Phone'},
         {'field': 'email', 'label': 'Email'},
     ],
@@ -363,6 +373,17 @@ _contacts = crud.make_crud(
     search_placeholder='Search by name, country, city, or phone...',
     row_actions=_contact_row_actions,
     filters={'contact_type': ('contact_type__in', crud.csv_list)},
+    page_help=[
+        'Public hotlines (Emergency, Embassy, POLO, OWWA, DMW, Police, Fire, '
+        'Hospital) appear in the OFW portal based on Country: Philippines = '
+        'National Hotlines for everyone; any other country = Local Hotlines '
+        'for OFWs deployed there.',
+        'Private contacts (Family, Agency, Employer, Other) stay in this '
+        'dashboard only. Use "Belongs to OFW" to attach a contact to a '
+        'specific OFW so it appears in their own portal.',
+        'The "Shown to OFWs" badge tells you where each contact goes. '
+        '"No country" means it is not visible to any OFW yet.',
+    ],
 )
 
 _reports = crud.make_crud(

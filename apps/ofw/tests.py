@@ -1059,6 +1059,80 @@ class EmergencyContactActionTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data['country'], 'Saudi Arabia')
 
+    def test_contact_form_assigns_owner_ofw(self):
+        ofw_user = User.objects.create_user(
+            username='owner1', password='Passw0rd!23'
+        )
+        mark_as_ofw(ofw_user)
+        OFWProfile.objects.create(
+            user=ofw_user, first_name='Liza', last_name='Santos',
+            country='Saudi Arabia',
+        )
+        form = EmergencyContactForm(
+            data={
+                'name': 'Mama Santos',
+                'contact_type': 'family',
+                'user': ofw_user.pk,
+                'relationship': 'Mother',
+                'phone': '09171234567',
+            },
+            user=self.admin,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        contact = form.save()
+        self.assertEqual(contact.user, ofw_user)
+        self.assertEqual(contact.owner_label, 'Liza Santos')
+        self.assertEqual(contact.visibility, 'private')
+
+    def test_list_explains_owner_and_visibility(self):
+        ofw_user = User.objects.create_user(
+            username='owner2', password='Passw0rd!23'
+        )
+        mark_as_ofw(ofw_user)
+        OFWProfile.objects.create(
+            user=ofw_user, first_name='Liza', last_name='Santos',
+            country='Saudi Arabia',
+        )
+        EmergencyContact.objects.create(
+            user=ofw_user, name='Mama Santos', contact_type='family',
+            phone='09171234567',
+        )
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(response, 'Owner')
+        self.assertContains(response, 'Shown to OFWs')
+        self.assertContains(response, 'Liza Santos')
+        self.assertContains(response, '>Private</span>')
+        self.assertContains(response, '>National</span>')
+        self.assertContains(response, 'Shared hotline')
+        self.assertContains(response, '>No country</span>')
+        self.assertContains(response, 'Public hotlines (Emergency')
+
+    def test_local_hotline_visibility(self):
+        contact = EmergencyContact.objects.create(
+            name='POLO Riyadh', contact_type='polo',
+            country='Saudi Arabia', phone='+966 11 000 0000',
+        )
+        self.assertEqual(contact.visibility, 'local')
+        self.assertEqual(contact.visibility_label, 'Local')
+
+    def test_blank_type_defaults_to_family_for_ofw_contact(self):
+        ofw_user = User.objects.create_user(
+            username='owner3', password='Passw0rd!23'
+        )
+        mark_as_ofw(ofw_user)
+        OFWProfile.objects.create(
+            user=ofw_user, first_name='Liza', last_name='Santos',
+            country='Saudi Arabia',
+        )
+        contact = EmergencyContact.objects.create(
+            user=ofw_user, name='Legacy contact', contact_type='',
+            phone='09171234567',
+        )
+        self.assertEqual(contact.type_key, 'family')
+        self.assertEqual(contact.type_label, 'Family / Next of Kin')
+        self.assertEqual(contact.visibility, 'private')
+        self.assertEqual(contact.owner_label, 'Liza Santos')
+
     def test_list_shows_call_and_website_actions(self):
         response = self.client.get(reverse('ofw:contact_list'))
         self.assertContains(response, 'tel:+63285511545')
