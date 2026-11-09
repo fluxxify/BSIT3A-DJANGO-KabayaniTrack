@@ -1107,6 +1107,17 @@ class EmergencyContactActionTests(TestCase):
         self.assertContains(response, '>No country</span>')
         self.assertContains(response, 'Public hotlines (Emergency')
 
+    def test_only_superusers_see_delete_all_button(self):
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertContains(response, 'Delete All Records')
+
+        staff = User.objects.create_user(
+            username='staffcontacts', password='Passw0rd!23', is_staff=True
+        )
+        self.client.force_login(staff)
+        response = self.client.get(reverse('ofw:contact_list'))
+        self.assertNotContains(response, 'Delete All Records')
+
     def test_local_hotline_visibility(self):
         contact = EmergencyContact.objects.create(
             name='POLO Riyadh', contact_type='polo',
