@@ -2,8 +2,12 @@
 
 In Partial Fulfillment of the requirements of the Degree Bachelor of Science in Information Technology
 
+The Errors
+
 Eduardo S. Caballeda Jr.
+
 John Paul B. Canoy
+
 Xymer John A. Adino
 
 October 2026
