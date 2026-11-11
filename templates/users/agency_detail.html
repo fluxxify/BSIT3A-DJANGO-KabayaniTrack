@@ -1,0 +1,298 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">Agency details</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h2 class="page-title mb-0">{{ agency.name }}</h2>
+          {% if agency.is_active %}
+          <span class="badge bg-success-lt text-success">Active</span>
+          {% else %}
+          <span class="badge bg-danger-lt text-danger">Inactive</span>
+          {% endif %}
+        </div>
+        <div class="text-muted mt-1">
+          {{ agency.slug }}{% if agency.category %} · {{ agency.category }}{% endif %}
+          · created {{ agency.created_at|date:"M j, Y" }}
+        </div>
+      </div>
+      <div class="col-auto">
+        <div class="btn-list">
+          <a href="{% url 'users:agency_list' %}" class="btn btn-outline-secondary">
+            <i class="ti ti-arrow-left me-1"></i> Agencies
+          </a>
+          <a href="{% url 'users:user_list' %}?agency={{ agency.pk }}" class="btn btn-outline-primary">
+            <i class="fas fa-users me-1"></i> Manage users
+          </a>
+          <a href="{% url 'ofw:profile_list' %}?agency={{ agency.pk }}" class="btn btn-primary">
+            <i class="fas fa-passport me-1"></i> View OFWs
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-cards mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">OFWs monitored</div>
+          <div class="h1 mb-0">{{ ofw_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Needs attention</div>
+          <div class="h1 mb-0 {% if attention_count %}text-danger{% endif %}">{{ attention_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Open concerns</div>
+          <div class="h1 mb-0 {% if open_concerns %}text-warning{% endif %}">{{ open_concerns }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Agency users</div>
+          <div class="h1 mb-0">{{ staff_count }}</div>
+          <div class="small text-muted">
+            {{ active_staff_count }} active{% if inactive_staff_count %} · {{ inactive_staff_count }} inactive{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-cards mb-3">
+    <div class="col-lg-7">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-building me-2 text-primary"></i>Agency information</h3>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <div class="subheader">Address</div>
+              <div>{{ agency.address|default:"Not provided" }}</div>
+            </div>
+            <div class="col-sm-6">
+              <div class="subheader">Website</div>
+              {% if agency.website %}
+              <a href="{{ agency.website }}" target="_blank" rel="noopener">{{ agency.website }}</a>
+              {% else %}
+              <span class="text-muted">Not provided</span>
+              {% endif %}
+            </div>
+            <div class="col-sm-6">
+              <div class="subheader">Phone</div>
+              <div>{{ agency.phone|default:"Not provided" }}</div>
+            </div>
+            <div class="col-sm-6">
+              <div class="subheader">Email</div>
+              <div>
+                {% if agency.email %}
+                <a href="mailto:{{ agency.email }}">{{ agency.email }}</a>
+                {% else %}
+                <span class="text-muted">Not provided</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="subheader">Description</div>
+              <div>{{ agency.description|default:"No description yet."|linebreaksbr }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-heart-pulse me-2 text-danger"></i>Welfare overview</h3>
+          <div class="card-actions">
+            <a href="{% url 'ofw:profile_list' %}?agency={{ agency.pk }}" class="btn btn-sm btn-outline-primary">View all</a>
+          </div>
+        </div>
+        <div class="card-body">
+          {% for item in welfare_items %}
+          <div class="d-flex justify-content-between align-items-center{% if not forloop.last %} mb-2{% endif %}">
+            <span class="text-muted">{{ item.label }}</span>
+            <span class="fw-medium">{{ item.value }}</span>
+          </div>
+          {% endfor %}
+          <div class="border-top mt-3 pt-3 d-flex justify-content-between align-items-center">
+            <span class="text-muted">Concerns recorded</span>
+            <span class="fw-medium">{{ concern_count }}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <span class="text-muted">Concerns resolved / closed</span>
+            <span class="fw-medium">{{ resolved_concerns }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-users me-2 text-warning"></i>Agency users
+        <span class="text-muted fw-normal">— {{ staff_count }}</span>
+      </h3>
+      <div class="card-actions">
+        <a href="{% url 'users:user_list' %}?agency={{ agency.pk }}" class="btn btn-sm btn-outline-primary">
+          Manage users
+        </a>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table text-nowrap">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for membership in staff %}
+          <tr>
+            <td>
+              <div class="fw-medium">
+                {% if membership.user.first_name or membership.user.last_name %}
+                  {{ membership.user.first_name }} {{ membership.user.last_name }}
+                {% else %}
+                  <span class="text-muted">No name set</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="text-muted">{{ membership.user.username }}</td>
+            <td class="text-muted">{{ membership.user.email|default:"—" }}</td>
+            <td>
+              {% if membership.user.is_active %}
+              <span class="badge bg-success-lt text-success">Active</span>
+              {% else %}
+              <span class="badge bg-danger-lt text-danger">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-muted">{{ membership.created_at|date:"M j, Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">
+              No users are assigned to this agency yet.
+              <a href="{% url 'users:user_list' %}?agency=unassigned">Assign an existing staff account</a>
+              or add a new user from User Management.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="fas fa-passport me-2 text-primary"></i>Assigned OFWs
+        <span class="text-muted fw-normal">— {{ ofw_count }}</span>
+      </h3>
+      {% if ofw_count > 25 %}
+      <div class="card-actions">
+        <a href="{% url 'ofw:profile_list' %}?agency={{ agency.pk }}" class="btn btn-sm btn-outline-primary">
+          View all {{ ofw_count }}
+        </a>
+      </div>
+      {% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table text-nowrap">
+        <thead>
+          <tr>
+            <th>OFW</th>
+            <th>Country</th>
+            <th>Welfare</th>
+            <th>Employer</th>
+            <th>Contact</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ofw_rows %}
+          <tr>
+            <td>
+              <a href="{% url 'ofw:profile_detail' row.profile.pk %}" class="fw-medium text-reset text-decoration-none">
+                {{ row.profile.full_name }}
+              </a>
+            </td>
+            <td class="text-muted">{{ row.profile.country|default:"—" }}</td>
+            <td><span class="badge {{ row.badge }}">{{ row.profile.get_welfare_status_display }}</span></td>
+            <td class="text-muted">{{ row.profile.employer_name|default:"—" }}</td>
+            <td class="text-muted">{{ row.profile.contact_number|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">
+              No OFWs are assigned to this agency yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-circle-exclamation me-2 text-danger"></i>Recent concerns</h3>
+      <div class="card-actions">
+        <a href="{% url 'ofw:concern_list' %}" class="btn btn-sm btn-outline-primary">All concerns</a>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table text-nowrap">
+        <thead>
+          <tr>
+            <th>Concern</th>
+            <th>OFW</th>
+            <th>Status</th>
+            <th>Reported</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in recent_concerns %}
+          <tr>
+            <td>
+              <a href="{% url 'ofw:concern_detail' row.concern.pk %}" class="text-reset text-decoration-none fw-medium">
+                {{ row.concern.display_title }}
+              </a>
+              <div class="text-muted small">{{ row.concern.get_category_display }}</div>
+            </td>
+            <td class="text-muted">{{ row.concern.ofw.full_name }}</td>
+            <td><span class="badge {{ row.badge }}">{{ row.concern.get_status_display }}</span></td>
+            <td class="text-muted">{{ row.concern.reported_date|date:"M j, Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-muted py-4">
+              No concerns have been recorded for this agency.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

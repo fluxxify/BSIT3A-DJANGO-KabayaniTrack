@@ -345,3 +345,381 @@ class AgencyWorkspaceTests(TestCase):
         self.assertEqual(response.status_code, 403)
         location.refresh_from_db()
         self.assertTrue(location.is_active)
+
+
+class AgencyManagementTests(TestCase):
+    """Administrator-only agency list, detail, create, edit and status pages."""
+
+    def setUp(self):
+        from apps.ofw.models import OFWProfile
+        from apps.users.models import Agency, AgencyStaff
+
+        self.Agency = Agency
+        self.AgencyStaff = AgencyStaff
+
+        self.admin = User.objects.create_superuser(
+            username='agency_admin', email='admin@example.com', password='Passw0rd!23'
+        )
+        self.alpha = Agency.objects.create(
+            name='Alpha Agency', slug='alpha', category='Employment agency',
+            address='1 Alpha Street', phone='09170000001',
+        )
+        self.beta = Agency.objects.create(
+            name='Beta Agency', slug='beta', category='Employment agency',
+        )
+        self.alpha_staff = User.objects.create_user(
+            username='alpha_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.alpha_staff, agency=self.alpha)
+        self.beta_staff = User.objects.create_user(
+            username='beta_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.beta_staff, agency=self.beta)
+
+        OFWProfile.objects.create(
+            first_name='Ana', last_name='Alpha', agency_org=self.alpha,
+        )
+        OFWProfile.objects.create(
+            first_name='Ben', last_name='Beta', agency_org=self.beta,
+        )
+
+    def test_admin_can_list_agencies_with_counts(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('users:agency_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Alpha Agency')
+        self.assertContains(response, 'Beta Agency')
+        rows = {agency.name: agency for agency in response.context['page_obj']}
+        self.assertEqual(rows['Alpha Agency'].ofw_count, 1)
+        self.assertEqual(rows['Alpha Agency'].staff_count, 1)
+        self.assertEqual(rows['Alpha Agency'].active_staff_count, 1)
+
+    def test_agency_staff_is_redirected_from_global_agency_pages(self):
+        self.client.force_login(self.alpha_staff)
+
+        self.assertEqual(
+            self.client.get(reverse('users:agency_list')).status_code, 302
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse('users:agency_detail', args=[self.beta.pk])
+            ).status_code,
+            302,
+        )
+
+    def test_admin_can_create_agency_and_audit_entry(self):
+        from apps.ofw.models import AuditLog
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:agency_save_ajax'), {
+            'name': 'Gamma Manpower',
+            'slug': '',
+            'category': 'Employment agency',
+            'address': '3 Gamma Street',
+            'phone': '09170000003',
+            'email': 'gamma@example.com',
+            'is_active': 'true',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        agency = self.Agency.objects.get(name='Gamma Manpower')
+        self.assertEqual(agency.slug, 'gamma-manpower')
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name='Agency', action=AuditLog.Action.CREATE,
+                object_repr='Gamma Manpower',
+            ).exists()
+        )
+
+    def test_duplicate_agency_name_and_slug_are_rejected(self):
+        self.client.force_login(self.admin)
+
+        duplicate_name = self.client.post(reverse('users:agency_save_ajax'), {
+            'name': 'Alpha Agency',
+            'slug': 'alpha-two',
+            'is_active': 'true',
+        })
+        duplicate_slug = self.client.post(reverse('users:agency_save_ajax'), {
+            'name': 'Gamma Agency',
+            'slug': 'alpha',
+            'is_active': 'true',
+        })
+
+        self.assertEqual(duplicate_name.status_code, 400)
+        self.assertEqual(duplicate_slug.status_code, 400)
+        self.assertFalse(self.Agency.objects.filter(name='Gamma Agency').exists())
+
+    def test_admin_can_edit_and_deactivate_agency(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:agency_save_ajax'), {
+            'id': self.alpha.pk,
+            'name': 'Alpha Agency Updated',
+            'slug': 'alpha',
+            'category': 'Employment agency',
+            'is_active': 'true',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.alpha.refresh_from_db()
+        self.assertEqual(self.alpha.name, 'Alpha Agency Updated')
+
+        toggle = self.client.post(
+            reverse('users:agency_toggle_ajax', args=[self.alpha.pk])
+        )
+        self.assertEqual(toggle.status_code, 200)
+        self.alpha.refresh_from_db()
+        self.assertFalse(self.alpha.is_active)
+
+    def test_agency_detail_shows_assigned_users_and_ofws(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('users:agency_detail', args=[self.alpha.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Alpha Agency')
+        self.assertContains(response, 'alpha_staff')
+        self.assertContains(response, 'Ana Alpha')
+        self.assertNotContains(response, 'beta_staff')
+        self.assertNotContains(response, 'Ben Beta')
+        self.assertEqual(response.context['staff_count'], 1)
+        self.assertEqual(response.context['ofw_count'], 1)
+
+    def test_agency_save_requires_admin(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.post(reverse('users:agency_save_ajax'), {
+            'name': 'Blocked Agency',
+            'slug': 'blocked',
+            'is_active': 'true',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(self.Agency.objects.filter(name='Blocked Agency').exists())
+
+
+class AgencyUserManagementTests(TestCase):
+    """Agency assignment, filters and account safety on the Users page."""
+
+    def setUp(self):
+        from apps.ofw.models import OFWProfile
+        from apps.users.models import Agency, AgencyStaff
+
+        self.Agency = Agency
+        self.AgencyStaff = AgencyStaff
+        self.OFWProfile = OFWProfile
+
+        self.admin = User.objects.create_superuser(
+            username='users_admin', email='admin@example.com', password='Passw0rd!23'
+        )
+        self.alpha = Agency.objects.create(name='Alpha Agency', slug='alpha')
+        self.beta = Agency.objects.create(name='Beta Agency', slug='beta')
+
+        self.alpha_staff = User.objects.create_user(
+            username='alpha_user', password='Passw0rd!23', is_staff=True,
+            first_name='Alice', last_name='Alpha',
+        )
+        AgencyStaff.objects.create(user=self.alpha_staff, agency=self.alpha)
+
+        self.beta_staff = User.objects.create_user(
+            username='beta_user', password='Passw0rd!23', is_staff=True,
+            first_name='Bob', last_name='Beta',
+        )
+        AgencyStaff.objects.create(user=self.beta_staff, agency=self.beta)
+
+        self.ofw_user = User.objects.create_user(
+            username='ofw_user', password='Passw0rd!23',
+            first_name='Oscar', last_name='Worker',
+        )
+        OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Oscar', last_name='Worker',
+            agency_org=self.alpha,
+        )
+
+    def test_users_page_shows_agency_and_can_filter_by_agency(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('users:user_list'), {'agency': self.alpha.pk}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        usernames = {user.username for user in response.context['users']}
+        self.assertIn('alpha_user', usernames)
+        self.assertIn('ofw_user', usernames)
+        self.assertNotIn('beta_user', usernames)
+        self.assertContains(response, 'Alpha Agency')
+
+    def test_users_page_can_filter_by_role_and_status(self):
+        self.alpha_staff.is_active = False
+        self.alpha_staff.save(update_fields=['is_active'])
+        self.client.force_login(self.admin)
+
+        agency_filter = self.client.get(
+            reverse('users:user_list'), {'role': 'agency'}
+        )
+        inactive_filter = self.client.get(
+            reverse('users:user_list'), {'status': 'inactive'}
+        )
+
+        self.assertEqual(
+            {user.username for user in agency_filter.context['users']},
+            {'alpha_user', 'beta_user'},
+        )
+        self.assertEqual(
+            {user.username for user in inactive_filter.context['users']},
+            {'alpha_user'},
+        )
+
+    def test_admin_can_create_agency_staff(self):
+        from apps.ofw.models import AuditLog
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:user_save_ajax'), {
+            'username': 'new_agency_staff',
+            'first_name': 'New',
+            'last_name': 'Staff',
+            'email': 'new_staff@example.com',
+            'password': 'Str0ngPassw0rd!',
+            'is_active': 'true',
+            'is_staff': 'true',
+            'agency': self.beta.pk,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        user = User.objects.get(username='new_agency_staff')
+        self.assertTrue(user.is_staff)
+        self.assertEqual(user.agency_staff.agency, self.beta)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                model_name='User', action=AuditLog.Action.CREATE,
+                object_repr='new_agency_staff',
+            ).exists()
+        )
+
+    def test_new_staff_account_requires_an_agency(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:user_save_ajax'), {
+            'username': 'unscoped_staff',
+            'password': 'Str0ngPassw0rd!',
+            'is_active': 'true',
+            'is_staff': 'true',
+            'agency': '',
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Assign an agency', response.json()['error'])
+        self.assertFalse(User.objects.filter(username='unscoped_staff').exists())
+
+    def test_admin_can_reassign_and_clear_an_agency(self):
+        self.client.force_login(self.admin)
+        reassign = self.client.post(reverse('users:user_save_ajax'), {
+            'id': self.alpha_staff.pk,
+            'username': self.alpha_staff.username,
+            'first_name': self.alpha_staff.first_name,
+            'last_name': self.alpha_staff.last_name,
+            'email': self.alpha_staff.email,
+            'is_active': 'true',
+            'is_staff': 'true',
+            'agency': self.beta.pk,
+        })
+        self.assertEqual(reassign.status_code, 200)
+        self.alpha_staff.refresh_from_db()
+        self.assertEqual(self.alpha_staff.agency_staff.agency, self.beta)
+
+        clear = self.client.post(reverse('users:user_save_ajax'), {
+            'id': self.alpha_staff.pk,
+            'username': self.alpha_staff.username,
+            'first_name': self.alpha_staff.first_name,
+            'last_name': self.alpha_staff.last_name,
+            'email': self.alpha_staff.email,
+            'is_active': 'true',
+            'is_staff': 'true',
+            'agency': '',
+        })
+        self.assertEqual(clear.status_code, 200)
+        self.assertFalse(
+            self.AgencyStaff.objects.filter(user=self.alpha_staff).exists()
+        )
+
+    def test_account_update_is_written_to_the_audit_log(self):
+        from apps.ofw.models import AuditLog
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:user_save_ajax'), {
+            'id': self.alpha_staff.pk,
+            'username': self.alpha_staff.username,
+            'first_name': 'Alicia',
+            'last_name': self.alpha_staff.last_name,
+            'email': self.alpha_staff.email,
+            'is_active': 'true',
+            'is_staff': 'true',
+            'agency': self.alpha.pk,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        entry = AuditLog.objects.filter(
+            model_name='User', action=AuditLog.Action.UPDATE,
+            object_id=str(self.alpha_staff.pk),
+        ).latest('created_at')
+        self.assertIn('first_name', entry.changes)
+
+    def test_account_with_linked_records_cannot_be_deleted(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('users:user_delete_ajax', args=[self.ofw_user.pk])
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Deactivate', response.json()['error'])
+        self.assertTrue(User.objects.filter(pk=self.ofw_user.pk).exists())
+
+    def test_empty_account_can_be_deleted(self):
+        empty = User.objects.create_user(
+            username='empty_account', password='Passw0rd!23'
+        )
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('users:user_delete_ajax', args=[empty.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(pk=empty.pk).exists())
+
+    def test_admin_cannot_deactivate_own_account(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('users:user_save_ajax'), {
+            'id': self.admin.pk,
+            'username': self.admin.username,
+            'is_active': 'false',
+            'is_staff': 'true',
+            'agency': '',
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('deactivate your own account', response.json()['error'])
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+
+    def test_user_ajax_list_uses_agency_and_role_filters(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('users:user_list_ajax'), {
+            'agency': self.alpha.pk,
+            'role': 'agency',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['total'], 1)
+        self.assertEqual(payload['data'][0]['username'], 'alpha_user')
+        self.assertEqual(payload['data'][0]['agency_name'], 'Alpha Agency')
+
+    def test_agency_staff_cannot_manage_global_accounts(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.post(reverse('users:user_save_ajax'), {
+            'username': 'blocked_account',
+            'password': 'Str0ngPassw0rd!',
+            'is_active': 'true',
+            'is_staff': 'false',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(User.objects.filter(username='blocked_account').exists())

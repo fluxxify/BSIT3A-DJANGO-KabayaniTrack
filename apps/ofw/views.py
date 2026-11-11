@@ -228,6 +228,46 @@ def _stale_profile_filter(_value):
     )
 
 
+def _agency_choices(user):
+    """Agency filter choices limited to the agencies the user may see."""
+    from apps.users.agencies import agency_for_user
+    from apps.users.models import Agency
+
+    agencies = Agency.objects.order_by('name')
+    if not user.is_superuser:
+        agency = agency_for_user(user)
+        agencies = agencies.filter(pk=agency.pk) if agency else agencies.none()
+    return [
+        (
+            str(agency.pk),
+            agency.name + ('' if agency.is_active else ' (inactive)'),
+        )
+        for agency in agencies
+    ]
+
+
+def _profile_filter_fields(request=None):
+    """Agency choices for the global OFW list filter."""
+    return [
+        {
+            'name': 'agency',
+            'label': 'Agency',
+            'choices': _agency_choices(request.user) if request else [],
+        },
+    ]
+
+
+def _report_filter_fields(request=None):
+    """Agency choices for the reports list."""
+    return [
+        {
+            'name': 'agency',
+            'label': 'Agency',
+            'choices': _agency_choices(request.user) if request else [],
+        },
+    ]
+
+
 _profiles = crud.make_crud(
     model=OFWProfile,
     form_class=OFWProfileForm,
@@ -256,7 +296,9 @@ _profiles = crud.make_crud(
         'welfare_status': ('welfare_status__in', crud.csv_list),
         'country': ('country__iexact', str),
         'stale': ('welfare_status_updated_at__lt', _stale_profile_filter),
+        'agency': ('agency_org_id', int),
     },
+    filter_fields=_profile_filter_fields,
 )
 
 _assessments = crud.make_crud(
@@ -279,6 +321,8 @@ _assessments = crud.make_crud(
     filters={
         'status': ('status__in', crud.csv_list),
         'risk_level': ('risk_level__in', crud.csv_list),
+        'date_from': ('assessment_date__gte', str),
+        'date_to': ('assessment_date__lte', str),
     },
     on_save=_notify_assessment_saved,
 )
@@ -417,8 +461,9 @@ _contacts = crud.make_crud(
         'National Hotlines for everyone; any other country = Local Hotlines '
         'for OFWs deployed there.',
         'Private contacts (Family, Agency, Employer, Other) stay in this '
-        'dashboard only. Use "Belongs to OFW" to attach a contact to a '
-        'specific OFW so it appears in their own portal.',
+        'dashboard only. Attach a contact to a specific OFW so it appears in '
+        'their own portal. Private contacts without an OFW owner are visible '
+        'only to the agency that created them and to administrators.',
         'The "Shown to OFWs" badge tells you where each contact goes. '
         '"No country" means it is not visible to any OFW yet.',
     ],
@@ -429,6 +474,7 @@ _reports = crud.make_crud(
     form_class=MonitoringReportForm,
     columns=[
         {'field': 'title', 'label': 'Report Title'},
+        {'field': 'agency', 'label': 'Agency'},
         {'field': 'get_report_type_display', 'label': 'Type'},
         {'field': 'period_start', 'label': 'From', 'type': 'date'},
         {'field': 'period_end', 'label': 'To', 'type': 'date'},
@@ -436,15 +482,22 @@ _reports = crud.make_crud(
         {'field': 'get_status_display', 'label': 'Status', 'badge': _report_status_badge,
          'raw_field': 'status'},
     ],
-    search_fields=['title', 'country', 'summary'],
+    search_fields=['title', 'country', 'summary', 'agency__name'],
     title='Reports',
     entity='Report',
     add_label='Add Report',
-    search_placeholder='Search by title or country...',
+    search_placeholder='Search by title, country, or agency...',
     filters={
         'status': ('status__in', crud.csv_list),
         'report_type': ('report_type__in', crud.csv_list),
+        'agency': ('agency_id', int),
     },
+    filter_fields=_report_filter_fields,
+    page_help=[
+        'Reports created by an agency account are automatically tagged with '
+        'that agency and stay inside its workspace. Administrators see every '
+        'agency and can filter by agency here.',
+    ],
 )
 
 
@@ -574,14 +627,18 @@ def concern_status_ajax(request, pk):
 
     from .notifications import notify
     if new_status == Concern.Status.RESOLVED:
-        notify(
-            concern.user,
-            'Your concern has been resolved',
-            f'Your concern "{concern.title}" has been marked as resolved by '
-            f'your agency.',
-            url=reverse('ofw:portal_concerns'),
-            level=Notification.Level.SUCCESS,
-        )
+        # Notify the OFW who owns the concern, not the staff account that
+        # happened to record it on their behalf.
+        recipient = concern.ofw.user if concern.ofw_id else None
+        if recipient is not None:
+            notify(
+                recipient,
+                'Your concern has been resolved',
+                f'Your concern "{concern.title}" has been marked as resolved '
+                f'by your agency.',
+                url=reverse('ofw:portal_concerns'),
+                level=Notification.Level.SUCCESS,
+            )
         notify_managers(
             f'Concern resolved: {concern.title}',
             f'{request.user.get_full_name() or request.user.username} marked '
@@ -992,6 +1049,66 @@ def dashboard_stats(user):
 
     country_links = {row['country']: row['link'] for row in deployment_countries}
 
+    # Administrator-only overview: one row per agency so the dashboard answers
+    # "which agency needs attention?" without opening each workspace.
+    admin_overview = None
+    if user.is_superuser:
+        from django.contrib.auth import get_user_model
+
+        from apps.users.models import Agency, AgencyStaff
+
+        agency_rows = (
+            Agency.objects.annotate(
+                ofw_total=Count('ofws', distinct=True),
+                staff_total=Count('staff', distinct=True),
+                attention_total=Count(
+                    'ofws',
+                    filter=Q(
+                        ofws__welfare_status__in=WELFARE_ATTENTION_STATUSES
+                    ),
+                    distinct=True,
+                ),
+                open_concern_total=Count(
+                    'ofws__concerns',
+                    filter=Q(
+                        ofws__concerns__status__in=[
+                            'open', 'in_progress', 'escalated',
+                        ]
+                    ),
+                    distinct=True,
+                ),
+            ).order_by('-ofw_total', 'name')
+        )
+        admin_overview = {
+            'agencies_total': Agency.objects.count(),
+            'agencies_active': Agency.objects.filter(is_active=True).count(),
+            'agency_users_total': AgencyStaff.objects.count(),
+            'unassigned_staff_total': get_user_model().objects.filter(
+                is_staff=True,
+                is_superuser=False,
+                agency_staff__isnull=True,
+            ).count(),
+            'resolved_concerns_total': concerns.filter(
+                status__in=['resolved', 'closed']
+            ).count(),
+            'agency_rows': [
+                {
+                    'agency': row,
+                    'ofw_total': row.ofw_total,
+                    'staff_total': row.staff_total,
+                    'attention_total': row.attention_total,
+                    'open_concern_total': row.open_concern_total,
+                    'url': reverse('users:agency_detail', args=[row.pk]),
+                    'ofw_url': (
+                        reverse('ofw:profile_list')
+                        + '?'
+                        + urlencode({'agency': row.pk})
+                    ),
+                }
+                for row in agency_rows
+            ],
+        }
+
     return {
         'welfare_groups': welfare_groups,
         'welfare_stale_days': WELFARE_STALE_DAYS,
@@ -1045,6 +1162,7 @@ def dashboard_stats(user):
         'map_markers_json': _json_for_script(map_markers),
         'map_ofws_json': _json_for_script(map_ofws),
         'country_links_json': _json_for_script(country_links),
+        'admin_overview': admin_overview,
     }
 
 

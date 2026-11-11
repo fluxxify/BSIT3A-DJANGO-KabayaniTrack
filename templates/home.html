@@ -206,6 +206,133 @@
     </div>
   </div>
 
+  {% if stats.admin_overview %}
+  <div class="row row-deck row-cards mt-3">
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Registered agencies</div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ stats.admin_overview.agencies_total }}</div>
+            <span class="text-muted small">{{ stats.admin_overview.agencies_active }} active</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'users:agency_list' %}" class="text-decoration-none">
+            Manage agencies <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Agency users</div>
+          <div class="h1 mb-0">{{ stats.admin_overview.agency_users_total }}</div>
+          {% if stats.admin_overview.unassigned_staff_total %}
+          <div class="small text-warning mt-2">
+            {{ stats.admin_overview.unassigned_staff_total }} unassigned staff
+          </div>
+          {% endif %}
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'users:user_list' %}?role=agency" class="text-decoration-none">
+            Manage users <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Resolved concerns</div>
+          <div class="h1 mb-0 text-success">{{ stats.admin_overview.resolved_concerns_total }}</div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'ofw:concern_list' %}?status=resolved,closed" class="text-decoration-none">
+            View resolved <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">Unassigned staff</div>
+          <div class="h1 mb-0 {% if stats.admin_overview.unassigned_staff_total %}text-warning{% endif %}">
+            {{ stats.admin_overview.unassigned_staff_total }}
+          </div>
+          <div class="small text-muted mt-2">Can see every agency's records</div>
+        </div>
+        <div class="card-footer">
+          <a href="{% url 'users:user_list' %}?agency=unassigned" class="text-decoration-none">
+            Review accounts <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-building me-2 text-primary"></i>Agency overview</h3>
+      <div class="card-actions">
+        <a href="{% url 'users:agency_list' %}" class="btn btn-sm btn-outline-primary">
+          All agencies
+        </a>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table text-nowrap">
+        <thead>
+          <tr>
+            <th>Agency</th>
+            <th class="text-center">OFWs</th>
+            <th class="text-center">Needs attention</th>
+            <th class="text-center">Open concerns</th>
+            <th class="text-center">Users</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in stats.admin_overview.agency_rows %}
+          <tr>
+            <td>
+              <a href="{{ row.url }}" class="fw-medium text-reset text-decoration-none">
+                {{ row.agency.name }}
+              </a>
+            </td>
+            <td class="text-center">
+              <a href="{{ row.ofw_url }}" class="text-decoration-none">{{ row.ofw_total }}</a>
+            </td>
+            <td class="text-center {% if row.attention_total %}text-danger fw-semibold{% endif %}">
+              {{ row.attention_total }}
+            </td>
+            <td class="text-center {% if row.open_concern_total %}text-warning fw-semibold{% endif %}">
+              {{ row.open_concern_total }}
+            </td>
+            <td class="text-center">{{ row.staff_total }}</td>
+            <td>
+              {% if row.agency.is_active %}
+              <span class="badge bg-success-lt text-success">Active</span>
+              {% else %}
+              <span class="badge bg-danger-lt text-danger">Inactive</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">
+              No agencies registered yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row row-deck row-cards mt-3">
     <div class="col-lg-4">
       <div class="card">

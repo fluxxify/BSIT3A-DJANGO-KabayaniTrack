@@ -6,6 +6,7 @@ those views so the entity modules stay small and consistent.
 """
 
 import csv
+import inspect
 import json
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -77,9 +78,18 @@ def _scoped(user, model):
         if model is OFWProfile:
             return model.objects.filter(agency_org=agency)
         if model is EmergencyContact:
+            # Owned contacts follow the OFW's agency.  Unowned records belong
+            # to the agency that created them.  Legacy unowned rows have no
+            # agency, so only genuinely public hotlines may be shared; a
+            # private "staff record" from another agency stays hidden.
             return model.objects.filter(
-                Q(user__isnull=True) |
-                Q(user__ofw_profiles__agency_org=agency)
+                Q(agency=agency)
+                | Q(user__ofw_profiles__agency_org=agency)
+                | Q(
+                    user__isnull=True,
+                    agency__isnull=True,
+                    contact_type__in=EmergencyContact.PUBLIC_TYPES,
+                )
             ).distinct()
         if model is MonitoringReport:
             return model.objects.filter(agency=agency)
@@ -191,6 +201,7 @@ def _build_rows(objects, columns, row_actions=None):
                     'html': render(obj),
                     'badge': None,
                     'meta': '',
+                    'label': column.get('label', ''),
                     'url': reverse(column['url_name'], args=[obj.pk]) if column.get('url_name') else None,
                 })
                 continue
@@ -216,6 +227,7 @@ def _build_rows(objects, columns, row_actions=None):
                 'html': _format_cell(value, column),
                 'badge': _badge(badge_value, column),
                 'meta': ' · '.join(meta_parts),
+                'label': column.get('label', ''),
                 'url': reverse(column['url_name'], args=[obj.pk]) if column.get('url_name') else None,
             })
 
@@ -345,7 +357,8 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
               title, pretitle='Overview', entity='Record', add_label='Add Record',
               search_placeholder='Search...', detail_url_name=None, filters=None,
               row_actions=None, on_save=None, on_delete=None, page_help=None,
-              allow_delete_all=True, prefetch_related=None, show_index=True):
+              allow_delete_all=True, prefetch_related=None, show_index=True,
+              filter_fields=None):
     """Build the page + AJAX views for a single model.
 
     Returns a dict of view callables keyed by ``page``, ``list_ajax``,
@@ -396,6 +409,30 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             if request.GET.get(key)
         ]
 
+        if filter_fields is None:
+            resolved_filter_fields = []
+        elif callable(filter_fields):
+            try:
+                sig_params = inspect.signature(filter_fields).parameters
+                wants_request = 'request' in sig_params or any(
+                    p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
+                    for p in sig_params.values()
+                )
+            except (TypeError, ValueError):
+                wants_request = False
+            resolved_filter_fields = (
+                filter_fields(request) if wants_request else filter_fields()
+            )
+        else:
+            resolved_filter_fields = list(filter_fields)
+        resolved_filter_fields = [
+            {
+                **field,
+                'selected': request.GET.get(field['name'], ''),
+            }
+            for field in resolved_filter_fields
+        ]
+
         context = {
             'page_title': title,
             'page_pretitle': pretitle,
@@ -410,6 +447,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'query': query,
             'querystring': params.urlencode(),
             'filter_items': filter_items,
+            'filter_fields': resolved_filter_fields,
             'search_placeholder': search_placeholder,
             'colspan': len(columns) + (2 if show_index else 1),
             'search_fields': search_fields,
@@ -493,6 +531,15 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
                 obj.agency_org = agency
             if model is MonitoringReport:
                 obj.agency = agency
+            if model is EmergencyContact:
+                # Private unowned contacts are stamped with their creator's
+                # agency so other agencies cannot see staff records.  Public
+                # hotlines stay shared for every agency.
+                if obj.user_id is None:
+                    if obj.contact_type in EmergencyContact.PUBLIC_TYPES:
+                        obj.agency = None
+                    else:
+                        obj.agency = agency
         if not obj.pk and hasattr(obj, 'user'):
             # An agency officer adding a paper profile should not turn that
             # profile into their own OFW portal account.  Directory contacts

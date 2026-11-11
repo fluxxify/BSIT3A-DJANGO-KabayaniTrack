@@ -3925,3 +3925,380 @@ class RateLimitTests(SimpleTestCase):
         view(self._request(pk=1))
         self.assertEqual(view(self._request(pk=1)).status_code, 429)
         self.assertEqual(view(self._request(pk=2)).status_code, 200)
+
+
+class AdminDashboardOverviewTests(TestCase):
+    """The dashboard shows an administrator-only agency comparison."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        self.Agency = Agency
+        self.admin = User.objects.create_superuser(
+            username='dashboard_admin', email='admin@example.com',
+            password='Passw0rd!23',
+        )
+        self.alpha = Agency.objects.create(name='Alpha Agency', slug='alpha')
+        self.beta = Agency.objects.create(name='Beta Agency', slug='beta')
+        self.alpha_staff = User.objects.create_user(
+            username='alpha_officer', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.alpha_staff, agency=self.alpha)
+
+        self.alpha_ofw = OFWProfile.objects.create(
+            first_name='Ana', last_name='Alpha', agency_org=self.alpha,
+            welfare_status='distressed',
+        )
+        OFWProfile.objects.create(
+            first_name='Ben', last_name='Beta', agency_org=self.beta,
+        )
+        Concern.objects.create(
+            ofw=self.alpha_ofw, title='Salary delay', category='salary',
+            severity='high', status='open', reported_date='2026-10-01',
+        )
+        Concern.objects.create(
+            ofw=self.alpha_ofw, title='Resolved case', category='other',
+            severity='low', status='resolved', reported_date='2026-09-01',
+        )
+
+    def test_admin_dashboard_has_agency_overview(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agency overview')
+        self.assertContains(response, 'Alpha Agency')
+        self.assertContains(response, 'Beta Agency')
+        overview = response.context['stats']['admin_overview']
+        self.assertEqual(overview['agencies_total'], 2)
+        self.assertEqual(overview['agency_users_total'], 1)
+        rows = {row['agency'].name: row for row in overview['agency_rows']}
+        self.assertEqual(rows['Alpha Agency']['ofw_total'], 1)
+        self.assertEqual(rows['Alpha Agency']['attention_total'], 1)
+        self.assertEqual(rows['Alpha Agency']['open_concern_total'], 1)
+        self.assertEqual(overview['resolved_concerns_total'], 1)
+
+    def test_agency_staff_does_not_see_global_agency_overview(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context['stats']['admin_overview'])
+        self.assertNotContains(response, 'Agency overview')
+
+
+class ReportAgencyFilterTests(TestCase):
+    """Reports carry an agency column and stay inside the agency workspace."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        self.Agency = Agency
+        self.admin = User.objects.create_superuser(
+            username='report_admin', email='admin@example.com',
+            password='Passw0rd!23',
+        )
+        self.alpha = Agency.objects.create(name='Alpha Agency', slug='alpha')
+        self.beta = Agency.objects.create(name='Beta Agency', slug='beta')
+        self.alpha_staff = User.objects.create_user(
+            username='alpha_report_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.alpha_staff, agency=self.alpha)
+
+        self.alpha_report = MonitoringReport.objects.create(
+            title='Alpha monthly report', report_type='monthly',
+            period_start='2026-10-01', period_end='2026-10-31',
+            status='submitted', agency=self.alpha,
+        )
+        self.beta_report = MonitoringReport.objects.create(
+            title='Beta monthly report', report_type='monthly',
+            period_start='2026-10-01', period_end='2026-10-31',
+            status='submitted', agency=self.beta,
+        )
+
+    def test_admin_sees_agency_column_and_can_filter(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('ofw:report_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agency')
+        self.assertContains(response, 'Alpha monthly report')
+        self.assertContains(response, 'Beta monthly report')
+
+        filtered = self.client.get(
+            reverse('ofw:report_list'), {'agency': self.alpha.pk}
+        )
+        self.assertContains(filtered, 'Alpha monthly report')
+        self.assertNotContains(filtered, 'Beta monthly report')
+
+    def test_agency_staff_only_sees_own_reports_even_with_foreign_filter(self):
+        self.client.force_login(self.alpha_staff)
+        unfiltered = self.client.get(reverse('ofw:report_list'))
+        self.assertContains(unfiltered, 'Alpha monthly report')
+        self.assertNotContains(unfiltered, 'Beta monthly report')
+
+        foreign_filter = self.client.get(
+            reverse('ofw:report_list'), {'agency': self.beta.pk}
+        )
+        self.assertEqual(foreign_filter.status_code, 200)
+        self.assertEqual(
+            list(foreign_filter.context['page_obj'].object_list), []
+        )
+
+    def test_agency_report_created_through_ajax_is_tagged(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.post(reverse('ofw:report_save_ajax'), {
+            'title': 'New agency report',
+            'report_type': 'monthly',
+            'period_start': '2026-11-01',
+            'period_end': '2026-11-30',
+            'country': 'Qatar',
+            'summary': 'Summary',
+            'status': 'draft',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        report = MonitoringReport.objects.get(title='New agency report')
+        self.assertEqual(report.agency, self.alpha)
+
+
+class WelfareDateFilterTests(TestCase):
+    """Welfare assessments can be narrowed to a date range."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='welfare_staff', password='Passw0rd!23', is_staff=True,
+        )
+        self.old_ofw = OFWProfile.objects.create(
+            first_name='Oldcase', last_name='Worker',
+        )
+        self.new_ofw = OFWProfile.objects.create(
+            first_name='Newcase', last_name='Worker',
+        )
+        WelfareAssessment.objects.create(
+            ofw=self.old_ofw, status='active', risk_level='low',
+            assessment_date='2026-01-15', assessor='Officer',
+        )
+        WelfareAssessment.objects.create(
+            ofw=self.new_ofw, status='active', risk_level='low',
+            assessment_date='2026-10-15', assessor='Officer',
+        )
+        self.client.force_login(self.staff)
+
+    def test_date_from_limits_assessments(self):
+        response = self.client.get(
+            reverse('ofw:assessment_list'), {'date_from': '2026-10-01'}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        names = [
+            assessment.ofw.first_name
+            for assessment in response.context['page_obj'].object_list
+        ]
+        self.assertIn('Newcase', names)
+        self.assertNotIn('Oldcase', names)
+
+    def test_date_to_limits_assessments(self):
+        response = self.client.get(
+            reverse('ofw:assessment_list'), {'date_to': '2026-02-01'}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        names = [
+            assessment.ofw.first_name
+            for assessment in response.context['page_obj'].object_list
+        ]
+        self.assertIn('Oldcase', names)
+        self.assertNotIn('Newcase', names)
+
+
+class ConcernNotificationRecipientTests(TestCase):
+    """Resolving a staff-recorded concern notifies the OFW, never the staff."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='concern_staff', password='Passw0rd!23', is_staff=True,
+        )
+        self.ofw_user = User.objects.create_user(
+            username='concern_ofw', password='Passw0rd!23',
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Nena', last_name='Worker',
+        )
+        self.concern = Concern.objects.create(
+            ofw=self.profile, user=self.staff, title='Unpaid wages',
+            category='salary', severity='high', status='open',
+            reported_date='2026-10-01',
+        )
+        self.client.force_login(self.staff)
+
+    def test_resolved_concern_notifies_the_ofw_owner(self):
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': 'resolved'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.concern.refresh_from_db()
+        self.assertEqual(self.concern.status, 'resolved')
+        self.assertTrue(Notification.objects.filter(
+            recipient=self.ofw_user,
+            title='Your concern has been resolved',
+        ).exists())
+        self.assertFalse(Notification.objects.filter(
+            recipient=self.staff,
+            title='Your concern has been resolved',
+        ).exists())
+
+    def test_profile_without_account_does_not_notify_the_staff_creator(self):
+        profile = OFWProfile.objects.create(
+            first_name='Paper', last_name='Only',
+        )
+        concern = Concern.objects.create(
+            ofw=profile, user=self.staff, title='Paper concern',
+            category='other', severity='low', status='open',
+            reported_date='2026-10-02',
+        )
+
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[concern.pk]),
+            {'status': 'resolved'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Notification.objects.filter(
+            recipient=self.staff,
+            title='Your concern has been resolved',
+        ).exists())
+
+
+class EmergencyContactAgencyIsolationTests(TestCase):
+    """Private staff contacts never leak to another agency."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        self.Agency = Agency
+        self.admin = User.objects.create_superuser(
+            username='contact_admin', email='admin@example.com',
+            password='Passw0rd!23',
+        )
+        self.alpha = Agency.objects.create(name='Alpha Agency', slug='alpha')
+        self.beta = Agency.objects.create(name='Beta Agency', slug='beta')
+        self.alpha_staff = User.objects.create_user(
+            username='alpha_contact_staff', password='Passw0rd!23',
+            is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.alpha_staff, agency=self.alpha)
+        self.beta_staff = User.objects.create_user(
+            username='beta_contact_staff', password='Passw0rd!23',
+            is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.beta_staff, agency=self.beta)
+
+        self.alpha_ofw = User.objects.create_user(
+            username='alpha_contact_ofw', password='Passw0rd!23',
+        )
+        OFWProfile.objects.create(
+            user=self.alpha_ofw, first_name='Alpha', last_name='OFW',
+            agency_org=self.alpha,
+        )
+        self.beta_ofw = User.objects.create_user(
+            username='beta_contact_ofw', password='Passw0rd!23',
+        )
+        OFWProfile.objects.create(
+            user=self.beta_ofw, first_name='Beta', last_name='OFW',
+            agency_org=self.beta,
+        )
+
+        EmergencyContact.objects.create(
+            name='Alpha staff record', contact_type='family', phone='09170000001',
+            agency=self.alpha,
+        )
+        EmergencyContact.objects.create(
+            name='Beta staff record', contact_type='family', phone='09170000002',
+            agency=self.beta,
+        )
+        EmergencyContact.objects.create(
+            name='Legacy staff record', contact_type='other', phone='09170000003',
+        )
+        EmergencyContact.objects.create(
+            name='Shared OWWA hotline', contact_type='owwa', phone='09170000004',
+        )
+        EmergencyContact.objects.create(
+            user=self.alpha_ofw, name='Alpha family', contact_type='family',
+            phone='09170000005',
+        )
+        EmergencyContact.objects.create(
+            user=self.beta_ofw, name='Beta family', contact_type='family',
+            phone='09170000006',
+        )
+
+    def test_agency_sees_only_its_own_private_contacts(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.get(reverse('ofw:contact_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Alpha staff record')
+        self.assertContains(response, 'Alpha family')
+        self.assertContains(response, 'Shared OWWA hotline')
+        self.assertNotContains(response, 'Beta staff record')
+        self.assertNotContains(response, 'Legacy staff record')
+        self.assertNotContains(response, 'Beta family')
+
+    def test_admin_still_sees_every_contact(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('ofw:contact_list'))
+
+        self.assertContains(response, 'Alpha staff record')
+        self.assertContains(response, 'Beta staff record')
+        self.assertContains(response, 'Legacy staff record')
+
+    def test_foreign_contact_detail_is_not_reachable(self):
+        beta_contact = EmergencyContact.objects.get(name='Beta staff record')
+        self.client.force_login(self.alpha_staff)
+        response = self.client.get(
+            reverse('ofw:contact_get_ajax', args=[beta_contact.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_new_private_contact_is_stamped_with_the_agency(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.post(reverse('ofw:contact_save_ajax'), {
+            'name': 'Alpha new contact',
+            'contact_type': 'employer',
+            'phone': '09170000007',
+            'country': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        contact = EmergencyContact.objects.get(name='Alpha new contact')
+        self.assertEqual(contact.agency, self.alpha)
+
+        self.client.force_login(self.beta_staff)
+        beta_page = self.client.get(reverse('ofw:contact_list'))
+        beta_names = {
+            item.name for item in beta_page.context['page_obj'].object_list
+        }
+        self.assertNotIn('Alpha new contact', beta_names)
+
+    def test_new_public_hotline_stays_shared(self):
+        self.client.force_login(self.alpha_staff)
+        response = self.client.post(reverse('ofw:contact_save_ajax'), {
+            'name': 'Alpha public hotline',
+            'contact_type': 'police',
+            'phone': '09170000008',
+            'country': 'Philippines',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        contact = EmergencyContact.objects.get(name='Alpha public hotline')
+        self.assertIsNone(contact.agency)
+
+        self.client.force_login(self.beta_staff)
+        beta_page = self.client.get(reverse('ofw:contact_list'))
+        beta_names = {
+            item.name for item in beta_page.context['page_obj'].object_list
+        }
+        self.assertIn('Alpha public hotline', beta_names)

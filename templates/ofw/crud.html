@@ -77,6 +77,25 @@
     </div>
   </div>
 
+  {% if filter_fields %}
+  <form method="GET" class="d-flex flex-wrap align-items-end gap-2 mb-3">
+    {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+    {% for f in filter_fields %}
+    <div>
+      <label class="form-label small mb-1" for="crud-filter-{{ f.name }}">{{ f.label }}</label>
+      <select name="{{ f.name }}" id="crud-filter-{{ f.name }}" class="form-select form-select-sm">
+        <option value="">All</option>
+        {% for value, label in f.choices %}
+        <option value="{{ value }}" {% if f.selected == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+    <a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+  </form>
+  {% endif %}
+
   {% if filter_items %}
   <div class="alert alert-info alert-dismissible d-flex align-items-center py-2">
     <i class="ti ti-filter me-2"></i>
@@ -96,7 +115,7 @@
         {% endif %}
       </div>
     </div>
-    <div class="table-responsive">
+    <div class="table-responsive d-none d-md-block">
       <table class="table table-vcenter table-hover card-table table-sm" id="crudTable">
         <thead>
           <tr>
@@ -162,6 +181,79 @@
         {% endfor %}
         </tbody>
       </table>
+    </div>
+
+    <!-- Mobile card view: the same rows without horizontal scrolling. -->
+    <div class="d-md-none px-2 pt-2" id="crudCards">
+      {% for row in rows %}
+      <div class="card card-sm mb-2" data-card-row-id="{{ row.id }}">
+        <div class="card-body py-2">
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div class="min-w-0">
+              <div class="fw-semibold text-truncate">
+                {% if row.cells.0.url %}
+                <a href="{{ row.cells.0.url }}" class="text-reset text-decoration-none">{{ row.cells.0.html|safe }}</a>
+                {% else %}
+                {{ row.cells.0.html|safe }}
+                {% endif %}
+              </div>
+              {% if row.cells.0.meta %}
+              <div class="text-muted small">{{ row.cells.0.meta|safe }}</div>
+              {% endif %}
+            </div>
+            <div class="d-flex gap-1 flex-shrink-0">
+              {% for action in row.actions %}
+              <a href="{{ action.href }}" class="btn btn-ghost-secondary btn-icon btn-sm" title="{{ action.title }}"{% if action.target %} target="{{ action.target }}" rel="noopener"{% endif %}>
+                <i class="{{ action.icon }} {{ action.icon_class }}"></i>
+              </a>
+              {% endfor %}
+              {% if detail_url_name %}
+              <a href="{% url detail_url_name row.id %}" class="btn btn-ghost-secondary btn-icon btn-sm" title="View">
+                <i class="fas fa-eye text-info"></i>
+              </a>
+              {% endif %}
+              <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#crudModal" data-mode="edit" data-id="{{ row.id }}" title="Edit">
+                <i class="fas fa-edit text-primary"></i>
+              </button>
+              <button type="button" class="btn btn-ghost-secondary btn-icon btn-sm" data-bs-toggle="modal" data-bs-target="#deleteCrudModal" data-id="{{ row.id }}" title="Delete">
+                <i class="fas fa-trash-alt text-danger"></i>
+              </button>
+            </div>
+          </div>
+          <div class="row g-1 mt-2 small">
+            {% for cell in row.cells %}
+            {% if not forloop.first %}
+            <div class="col-6">
+              <div class="text-muted">{{ cell.label }}</div>
+              <div class="text-truncate">
+                {% if cell.badge %}
+                <span class="badge {{ cell.badge }}">{{ cell.html|safe }}</span>
+                {% elif cell.url %}
+                <a href="{{ cell.url }}" class="text-reset text-decoration-none">{{ cell.html|safe }}</a>
+                {% else %}
+                {{ cell.html|safe }}
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="empty py-5">
+        <div class="empty-icon">
+          <i class="fas fa-folder-open fa-2x text-muted"></i>
+        </div>
+        <p class="empty-title">No records found</p>
+        <p class="empty-subtitle">Try adjusting your search or add a new record.</p>
+        <div class="empty-action">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crudModal" data-mode="create">
+            <i class="fas fa-plus-circle me-2"></i> {{ add_label }}
+          </button>
+        </div>
+      </div>
+      {% endfor %}
     </div>
 
     {% if page_obj.paginator.num_pages > 1 %}

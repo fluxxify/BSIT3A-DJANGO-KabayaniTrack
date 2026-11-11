@@ -441,6 +441,17 @@ class EmergencyContact(models.Model):
         null=True,
         blank=True,
     )
+    agency = models.ForeignKey(
+        'users.Agency',
+        related_name='emergency_contacts',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text=(
+            'Agency that owns an unassigned contact. Keeps private staff '
+            'records inside their own agency.'
+        ),
+    )
     name = models.CharField(max_length=200, help_text='Person or office to contact')
     contact_type = models.CharField(
         max_length=20,
