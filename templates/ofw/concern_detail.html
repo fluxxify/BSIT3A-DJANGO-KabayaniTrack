@@ -8,7 +8,7 @@
         <h2 class="page-title mb-0">
           {{ concern.display_title }}
           <span class="badge {{ severity_badge }} ms-2">{{ concern.get_severity_display }}</span>
-          <span class="badge {{ status_badge }} ms-1">{{ concern.get_status_display }}</span>
+          <span class="badge status-badge {{ status_badge }} ms-1" id="concernStatusBadge">{{ concern.get_status_display }}</span>
         </h2>
       </div>
       <div class="col-auto ms-auto d-print-none">
@@ -18,14 +18,15 @@
                 class="d-inline" id="concernStatusForm" data-url="{% url 'ofw:concern_status_ajax' concern.pk %}">
             {% csrf_token %}
             <select name="status" class="form-select form-select-sm d-inline w-auto"
+                    aria-label="Concern status"
                     onchange="this.form.requestSubmit()">
-              {% for value, label in concern.status.field.choices %}
+              {% for value, label in status_choices %}
               <option value="{{ value }}"{% if concern.status == value %} selected{% endif %}>
                 {{ label }}
               </option>
               {% endfor %}
             </select>
-            <span class="text-muted small ms-1">Status</span>
+            <span class="text-muted small ms-1" data-status-note>Status</span>
           </form>
           {% endif %}
           {% if request.user.is_superuser %}
@@ -254,13 +255,24 @@
 (function () {
   var form = document.getElementById('concernStatusForm');
   if (!form) return;
+  var select = form.querySelector('select[name="status"]');
+  if (!select) return;
+  var badge = document.getElementById('concernStatusBadge');
+  var note = form.querySelector('[data-status-note]');
+  var previousValue = select.value;
+  var resetTimer = null;
+
+  function setNote(text) {
+    if (note) note.textContent = text;
+  }
+
   form.addEventListener('submit', function (event) {
     event.preventDefault();
-    var select = form.querySelector('select[name="status"]');
-    var btn = select;
-    var original = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>';
+    previousValue = select.value;
+    select.disabled = true;
+    setNote('Saving...');
+    if (resetTimer) window.clearTimeout(resetTimer);
+
     fetch(form.getAttribute('data-url'), {
       method: 'POST',
       headers: {
@@ -271,26 +283,20 @@
     }).then(async function (resp) {
       var data = await resp.json().catch(function () { return {}; });
       if (!resp.ok) throw new Error(data.error || 'Could not update status.');
-      var badge = document.querySelector('.status-badge');
-      if (badge) {
+      if (badge && data.status_display) {
         badge.textContent = data.status_display;
-        badge.className = 'badge ' + {
-          'Open': 'bg-secondary-lt text-secondary',
-          'In Progress': 'bg-info-lt text-info',
-          'Escalated': 'bg-warning-lt text-warning',
-          'Resolved': 'bg-success-lt text-success',
-          'Closed': 'bg-dark-lt text-dark',
-        }[data.status_display] || 'bg-secondary-lt text-secondary';
+        badge.className = 'badge status-badge ms-1 ' +
+          (data.status_class || 'bg-secondary-lt text-secondary');
       }
-      btn.innerHTML = '<i class="fas fa-check me-1"></i> Updated';
-      setTimeout(function () {
-        btn.disabled = false;
-        btn.innerHTML = original;
-      }, 1200);
+      setNote('Saved');
+      resetTimer = window.setTimeout(function () { setNote('Status'); }, 1500);
     }).catch(function (err) {
+      // Restore the previous selection if the server rejected the change.
+      select.value = previousValue;
+      setNote('Status');
       alert(err.message);
-      btn.disabled = false;
-      btn.innerHTML = original;
+    }).then(function () {
+      select.disabled = false;
     });
   });
 })();

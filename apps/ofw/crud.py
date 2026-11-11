@@ -114,6 +114,15 @@ def csv_list(value):
     return [item for item in value.split(',') if item]
 
 
+def date_value(value):
+    """Parse an ISO date for a query filter.
+
+    ``_apply_filters`` ignores the value when this raises ``ValueError``, so a
+    mistyped ``?date_from=`` can no longer crash the list page.
+    """
+    return date.fromisoformat(value)
+
+
 def _apply_filters(qs, filters, params):
     """Apply configured query-string filters to a queryset.
 
@@ -388,10 +397,23 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
         return qs.order_by(*order_by)
 
     def _row_data(objects):
-        return {
-            str(obj.pk): {name: _serialize(getattr(obj, name, '')) for name in form_field_names}
-            for obj in objects
-        }
+        rows = {}
+        for obj in objects:
+            values = {}
+            for name in form_field_names:
+                value = getattr(obj, name, '')
+                # Legacy contacts may have a blank stored type.  Send the
+                # effective type so the edit form does not silently switch the
+                # contact to the first choice (Emergency Hotline) on save.
+                if (
+                    model is EmergencyContact
+                    and name == 'contact_type'
+                    and not value
+                ):
+                    value = obj.type_key
+                values[name] = _serialize(value)
+            rows[str(obj.pk)] = values
+        return rows
 
     @login_required(login_url='login')
     def page(request):
@@ -433,6 +455,16 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             for field in resolved_filter_fields
         ]
 
+        # Applied filters such as ``?welfare_status=distressed`` (from a
+        # dashboard drill-down) have no visible control on the profile list.
+        # Tell the user the view is filtered instead of hiding the fact.
+        visible_filter_names = {field['name'] for field in resolved_filter_fields}
+        hidden_filter_items = [
+            (key, value)
+            for key, value in filter_items
+            if key not in visible_filter_names
+        ]
+
         context = {
             'page_title': title,
             'page_pretitle': pretitle,
@@ -447,6 +479,7 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             'query': query,
             'querystring': params.urlencode(),
             'filter_items': filter_items,
+            'hidden_filter_items': hidden_filter_items,
             'filter_fields': resolved_filter_fields,
             'search_placeholder': search_placeholder,
             'colspan': len(columns) + (2 if show_index else 1),

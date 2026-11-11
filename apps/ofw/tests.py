@@ -4490,3 +4490,261 @@ class AllActivityTests(TestCase):
         self.assertNotContains(
             self.client.get(reverse('dashboard')), 'All Activity'
         )
+
+
+class ConcernDetailStatusControlTests(TestCase):
+    """The status control on the concern detail page must actually work."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='status_staff', password='Passw0rd!23', is_staff=True,
+        )
+        self.profile = OFWProfile.objects.create(
+            first_name='Nena', last_name='Ramos', country='Dubai',
+        )
+        self.concern = Concern.objects.create(
+            ofw=self.profile,
+            title='Unpaid salary',
+            category='salary',
+            severity='high',
+            status=Concern.Status.RESOLVED,
+            reported_date=timezone.localdate(),
+            resolved_date=timezone.localdate(),
+            description='Unpaid salary for two months.',
+        )
+        self.client.force_login(self.staff)
+
+    def test_detail_page_lists_every_status_option(self):
+        response = self.client.get(
+            reverse('ofw:concern_detail', args=[self.concern.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for value, _label in Concern.Status.choices:
+            self.assertContains(response, f'<option value="{value}"')
+        self.assertContains(response, 'id="concernStatusBadge"')
+        self.assertContains(response, 'status-badge')
+
+    def test_status_endpoint_returns_the_badge_class(self):
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': Concern.Status.IN_PROGRESS},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status_display'], 'In Progress')
+        self.assertEqual(data['status_class'], 'bg-warning-lt text-warning')
+
+    def test_reopening_a_concern_clears_the_resolution_date(self):
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': Concern.Status.OPEN},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.concern.refresh_from_db()
+        self.assertEqual(self.concern.status, Concern.Status.OPEN)
+        self.assertIsNone(self.concern.resolved_date)
+
+    def test_resolving_stamps_the_resolution_date(self):
+        self.concern.resolved_date = None
+        self.concern.status = Concern.Status.OPEN
+        self.concern.save(update_fields=['status', 'resolved_date'])
+
+        response = self.client.post(
+            reverse('ofw:concern_status_ajax', args=[self.concern.pk]),
+            {'status': Concern.Status.RESOLVED},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.concern.refresh_from_db()
+        self.assertEqual(self.concern.resolved_date, timezone.localdate())
+
+
+class ConcernResolutionDateFormTests(TestCase):
+    """The add/edit modal keeps the resolution date in step with the status."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='concern_form_staff', password='Passw0rd!23', is_staff=True,
+        )
+        self.profile = OFWProfile.objects.create(
+            first_name='Lito', last_name='Cruz', country='Qatar',
+        )
+
+    def _form(self, **overrides):
+        data = {
+            'ofw': self.profile.pk,
+            'category': 'salary',
+            'severity': 'medium',
+            'status': Concern.Status.OPEN,
+            'reported_date': timezone.localdate().isoformat(),
+            'description': 'Salary was delayed.',
+        }
+        data.update(overrides)
+        return ConcernForm(data=data, user=self.staff)
+
+    def test_saving_a_resolved_concern_sets_the_resolution_date(self):
+        form = self._form(status=Concern.Status.RESOLVED)
+        self.assertTrue(form.is_valid(), form.errors)
+
+        concern = form.save()
+
+        self.assertEqual(concern.resolved_date, timezone.localdate())
+
+    def test_editing_a_resolved_concern_back_to_open_clears_the_date(self):
+        concern = self._form(status=Concern.Status.RESOLVED).save()
+        form = ConcernForm(
+            data={
+                'ofw': self.profile.pk,
+                'category': 'salary',
+                'severity': 'medium',
+                'status': Concern.Status.OPEN,
+                'reported_date': concern.reported_date.isoformat(),
+                'description': concern.description,
+                'resolved_date': concern.resolved_date.isoformat(),
+            },
+            instance=concern,
+            user=self.staff,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+        form.save()
+        concern.refresh_from_db()
+
+        self.assertEqual(concern.status, Concern.Status.OPEN)
+        self.assertIsNone(concern.resolved_date)
+
+
+class ManagementFilterUiTests(TestCase):
+    """Filters exist in the UI, not only in the URL contract."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='filter_staff', password='Passw0rd!23', is_staff=True,
+        )
+        self.profile = OFWProfile.objects.create(
+            first_name='Mila', last_name='Reyes', country='Kuwait',
+        )
+        self.client.force_login(self.staff)
+
+    def test_concern_list_renders_status_category_severity_and_date_filters(self):
+        response = self.client.get(reverse('ofw:concern_list'))
+
+        for name in ('status', 'category', 'severity', 'date_from', 'date_to'):
+            self.assertContains(response, f'name="{name}"')
+
+    def test_assessment_list_renders_status_risk_and_date_filters(self):
+        response = self.client.get(reverse('ofw:assessment_list'))
+
+        for name in ('status', 'risk_level', 'date_from', 'date_to'):
+            self.assertContains(response, f'name="{name}"')
+
+    def test_checkin_list_renders_condition_and_date_filters(self):
+        response = self.client.get(reverse('ofw:checkin_list'))
+
+        for name in ('condition', 'date_from', 'date_to'):
+            self.assertContains(response, f'name="{name}"')
+
+    def test_contact_list_renders_type_filter(self):
+        response = self.client.get(reverse('ofw:contact_list'))
+
+        self.assertContains(response, 'name="contact_type"')
+
+    def test_concern_status_filter_limits_the_list(self):
+        Concern.objects.create(
+            ofw=self.profile, title='Open case', status=Concern.Status.OPEN,
+            category='other', severity='low', reported_date=timezone.localdate(),
+        )
+        Concern.objects.create(
+            ofw=self.profile, title='Resolved case',
+            status=Concern.Status.RESOLVED, category='other', severity='low',
+            reported_date=timezone.localdate(),
+        )
+        response = self.client.get(
+            reverse('ofw:concern_list'), {'status': Concern.Status.RESOLVED}
+        )
+
+        self.assertContains(response, 'Resolved case')
+        self.assertNotContains(response, 'Open case')
+
+    def test_invalid_date_filters_do_not_crash_management_lists(self):
+        WelfareAssessment.objects.create(
+            ofw=self.profile, status='active', risk_level='low',
+            assessment_date=timezone.localdate(),
+        )
+        for url_name in ('ofw:assessment_list', 'ofw:concern_list', 'ofw:checkin_list'):
+            with self.subTest(page=url_name):
+                response = self.client.get(
+                    reverse(url_name), {'date_from': 'not-a-date'}
+                )
+                self.assertEqual(response.status_code, 200)
+
+
+class LegacyContactEditTests(TestCase):
+    """A blank stored contact type must not become Emergency on save."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='legacy_admin', email='legacy@example.com',
+            password='Passw0rd!23',
+        )
+        self.ofw_user = User.objects.create_user(
+            username='legacy_ofw', password='Passw0rd!23',
+        )
+        mark_as_ofw(self.ofw_user)
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Liza', last_name='Santos',
+            country='Saudi Arabia',
+        )
+        self.contact = EmergencyContact.objects.create(
+            user=self.ofw_user, name='Legacy contact', contact_type='',
+            phone='09171234567',
+        )
+        self.client.force_login(self.admin)
+
+    def test_edit_payload_uses_the_effective_contact_type(self):
+        response = self.client.get(reverse('ofw:contact_list'))
+
+        rows = response.context['rows_json']
+        self.assertEqual(rows[str(self.contact.pk)]['contact_type'], 'family')
+
+
+class EmergencyContactDuplicateTests(TestCase):
+    """New directory entries cannot silently duplicate an existing record."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='dup_admin', email='dup@example.com',
+            password='Passw0rd!23',
+        )
+
+    def _form(self, **overrides):
+        data = {
+            'name': 'Mama Santos',
+            'contact_type': 'family',
+            'phone': '09171234567',
+            'country': 'Philippines',
+        }
+        data.update(overrides)
+        return EmergencyContactForm(data=data, user=self.admin)
+
+    def test_duplicate_name_type_and_phone_is_rejected(self):
+        first = self._form()
+        self.assertTrue(first.is_valid(), first.errors)
+        first.save()
+
+        second = self._form()
+
+        self.assertFalse(second.is_valid())
+        self.assertIn(
+            'already exists', ' '.join(second.non_field_errors())
+        )
+
+    def test_a_different_phone_is_allowed(self):
+        self._form().save()
+
+        second = self._form(phone='09179876543')
+
+        self.assertTrue(second.is_valid(), second.errors)

@@ -7,6 +7,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
+from django.utils import timezone
 
 from apps.users.agencies import (
     agency_for_user,
@@ -215,6 +216,14 @@ class ConcernForm(StyledModelForm):
         # Title is no longer typed by staff; derive it from the report so the
         # portal and the dashboard show the same label.
         obj.title = obj.build_title()
+        # Keep the resolution date in step with the status chosen in the form.
+        # The detail-page status control already does this, so both routes now
+        # produce the same record.
+        if obj.status == Concern.Status.RESOLVED:
+            if not obj.resolved_date:
+                obj.resolved_date = timezone.localdate()
+        else:
+            obj.resolved_date = None
         if commit:
             obj.save()
             self.save_m2m()
@@ -302,6 +311,37 @@ class EmergencyContactForm(StyledModelForm):
 
     def clean_country(self):
         return canonical_country(self.cleaned_data.get('country', ''))
+
+    def clean(self):
+        cleaned = super().clean()
+        # Guard new records only.  Legacy duplicates stay editable so staff can
+        # merge or correct them instead of being blocked by the validation.
+        if self.instance.pk:
+            return cleaned
+
+        name = (cleaned.get('name') or '').strip()
+        phone = re.sub(r'[^\d+]', '', cleaned.get('phone') or '')
+        if not name or not phone:
+            return cleaned
+
+        contact_type = cleaned.get('contact_type') or ''
+        owner = cleaned.get('user')
+        candidates = EmergencyContact.objects.filter(
+            name__iexact=name,
+            contact_type=contact_type,
+        )
+        if owner is not None:
+            candidates = candidates.filter(user=owner)
+        else:
+            candidates = candidates.filter(user__isnull=True)
+
+        for existing in candidates.only('phone'):
+            if re.sub(r'[^\d+]', '', existing.phone or '') == phone:
+                raise ValidationError(
+                    'A contact with this name and number already exists. '
+                    'Edit the existing record instead of adding a duplicate.'
+                )
+        return cleaned
 
 
 class MonitoringReportForm(StyledModelForm):

@@ -257,6 +257,39 @@ def _profile_filter_fields(request=None):
     ]
 
 
+# The generic CRUD page renders a filter control for every entry below.  The
+# matching query parameters are declared again in each ``make_crud`` call so the
+# same rules also work from a URL or an export link.
+_concern_filter_fields = [
+    {'name': 'status', 'label': 'Status', 'choices': Concern.Status.choices},
+    {'name': 'category', 'label': 'Category', 'choices': Concern.Category.choices},
+    {'name': 'severity', 'label': 'Severity', 'choices': Concern.Severity.choices},
+    {'name': 'date_from', 'label': 'Reported from', 'type': 'date'},
+    {'name': 'date_to', 'label': 'Reported to', 'type': 'date'},
+]
+
+_assessment_filter_fields = [
+    {'name': 'status', 'label': 'Status', 'choices': WelfareStatus.choices},
+    {'name': 'risk_level', 'label': 'Risk level', 'choices': RiskLevel.choices},
+    {'name': 'date_from', 'label': 'Assessed from', 'type': 'date'},
+    {'name': 'date_to', 'label': 'Assessed to', 'type': 'date'},
+]
+
+_checkin_filter_fields = [
+    {'name': 'condition', 'label': 'Condition', 'choices': CheckIn.Condition.choices},
+    {'name': 'date_from', 'label': 'Check-in from', 'type': 'date'},
+    {'name': 'date_to', 'label': 'Check-in to', 'type': 'date'},
+]
+
+_contact_filter_fields = [
+    {
+        'name': 'contact_type',
+        'label': 'Contact type',
+        'choices': EmergencyContact.ContactType.choices,
+    },
+]
+
+
 def _report_filter_fields(request=None):
     """Agency choices for the reports list."""
     return [
@@ -321,9 +354,10 @@ _assessments = crud.make_crud(
     filters={
         'status': ('status__in', crud.csv_list),
         'risk_level': ('risk_level__in', crud.csv_list),
-        'date_from': ('assessment_date__gte', str),
-        'date_to': ('assessment_date__lte', str),
+        'date_from': ('assessment_date__gte', crud.date_value),
+        'date_to': ('assessment_date__lte', crud.date_value),
     },
+    filter_fields=_assessment_filter_fields,
     on_save=_notify_assessment_saved,
 )
 
@@ -347,9 +381,10 @@ _checkins = crud.make_crud(
     detail_url_name='ofw:checkin_detail',
     filters={
         'condition': ('condition__in', crud.csv_list),
-        'date_from': ('checkin_date__date__gte', str),
-        'date_to': ('checkin_date__date__lte', str),
+        'date_from': ('checkin_date__date__gte', crud.date_value),
+        'date_to': ('checkin_date__date__lte', crud.date_value),
     },
+    filter_fields=_checkin_filter_fields,
     on_save=_notify_checkin_saved,
 )
 
@@ -383,7 +418,8 @@ _concerns = crud.make_crud(
          'raw_field': 'status', 'nowrap': True},
         {'field': 'proofs', 'label': 'Proof', 'render': _concern_proof_cell,
          'url_name': 'ofw:concern_detail'},
-        {'field': 'reported_date', 'label': 'Reported', 'type': 'date'},
+        {'field': 'reported_date', 'label': 'Reported', 'type': 'date',
+         'nowrap': True},
     ],
     search_fields=['ofw__first_name', 'ofw__last_name', 'title', 'description'],
     title='Reported Concerns',
@@ -403,9 +439,10 @@ _concerns = crud.make_crud(
         'status': ('status__in', crud.csv_list),
         'category': ('category__in', crud.csv_list),
         'severity': ('severity__in', crud.csv_list),
-        'date_from': ('reported_date__gte', str),
-        'date_to': ('reported_date__lte', str),
+        'date_from': ('reported_date__gte', crud.date_value),
+        'date_to': ('reported_date__lte', crud.date_value),
     },
+    filter_fields=_concern_filter_fields,
     on_save=_notify_concern_saved,
 )
 
@@ -437,15 +474,17 @@ _contacts = crud.make_crud(
     model=EmergencyContact,
     form_class=EmergencyContactForm,
     columns=[
-        {'field': 'name', 'label': 'Contact'},
-        {'field': 'owner_label', 'label': 'Owner'},
+        {'field': 'name', 'label': 'Contact', 'truncate': 38, 'nowrap': True},
+        {'field': 'owner_label', 'label': 'Owner', 'truncate': 26,
+         'nowrap': True},
         {'field': 'type_label', 'label': 'Type', 'badge': _contact_type_badge,
          'raw_field': 'type_key'},
-        {'field': 'location_label', 'label': 'Location'},
+        {'field': 'location_label', 'label': 'Location', 'truncate': 30,
+         'nowrap': True},
         {'field': 'visibility_label', 'label': 'Shown to OFWs',
          'badge': _contact_visibility_badge, 'raw_field': 'visibility'},
-        {'field': 'phone', 'label': 'Phone'},
-        {'field': 'email', 'label': 'Email'},
+        {'field': 'phone', 'label': 'Phone', 'nowrap': True},
+        {'field': 'email', 'label': 'Email', 'truncate': 30, 'nowrap': True},
     ],
     search_fields=['name', 'country', 'city', 'phone', 'email'],
     title='Emergency Contacts',
@@ -454,6 +493,7 @@ _contacts = crud.make_crud(
     search_placeholder='Search by name, country, city, or phone...',
     row_actions=_contact_row_actions,
     filters={'contact_type': ('contact_type__in', crud.csv_list)},
+    filter_fields=_contact_filter_fields,
     allow_delete_all=False,
     page_help=[
         'Public hotlines (Emergency, Embassy, POLO, OWWA, DMW, Police, Fire, '
@@ -577,6 +617,7 @@ def concern_detail(request, pk):
         'status_badge': _concern_status_badge.get(
             concern.status, 'bg-secondary-lt text-secondary'
         ),
+        'status_choices': Concern.Status.choices,
     }
     return render(request, 'ofw/concern_detail.html', context)
 
@@ -616,13 +657,20 @@ def concern_status_ajax(request, pk):
         return JsonResponse({'error': 'Invalid status.'}, status=400)
     if concern.status == new_status:
         return JsonResponse({
-            'status': 'ok', 'status_display': concern.get_status_display(),
+            'status': 'ok',
+            'status_display': concern.get_status_display(),
+            'status_class': _concern_status_badge.get(
+                concern.status, 'bg-secondary-lt text-secondary'
+            ),
         })
     old_status = concern.status
     concern.status = new_status
-    if new_status == Concern.Status.RESOLVED and not concern.resolved_date:
-        from django.utils import timezone
-        concern.resolved_date = timezone.localdate()
+    if new_status == Concern.Status.RESOLVED:
+        if not concern.resolved_date:
+            concern.resolved_date = timezone.localdate()
+    else:
+        # Reopening a concern must not leave a stale resolution date behind.
+        concern.resolved_date = None
     concern.save(update_fields=['status', 'resolved_date', 'updated_at'])
 
     from .notifications import notify
@@ -655,6 +703,9 @@ def concern_status_ajax(request, pk):
     return JsonResponse({
         'status': 'ok',
         'status_display': concern.get_status_display(),
+        'status_class': _concern_status_badge.get(
+            concern.status, 'bg-secondary-lt text-secondary'
+        ),
         'old_status': old_status,
     })
 

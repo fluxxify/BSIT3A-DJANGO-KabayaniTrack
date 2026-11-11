@@ -61,7 +61,7 @@
       </div>
     </form>
 
-    <div class="d-flex gap-2 mt-n4">
+    <div class="d-flex gap-2 flex-wrap">
       <a href="{{ request.path }}ajax/export/{% if querystring %}?{{ querystring }}{% endif %}"
          class="btn btn-outline-success">
         <i class="fas fa-file-excel me-2"></i> Export Excel
@@ -83,12 +83,17 @@
     {% for f in filter_fields %}
     <div>
       <label class="form-label small mb-1" for="crud-filter-{{ f.name }}">{{ f.label }}</label>
+      {% if f.type == 'date' %}
+      <input type="date" name="{{ f.name }}" id="crud-filter-{{ f.name }}"
+             value="{{ f.selected }}" class="form-control form-control-sm">
+      {% else %}
       <select name="{{ f.name }}" id="crud-filter-{{ f.name }}" class="form-select form-select-sm">
         <option value="">All</option>
         {% for value, label in f.choices %}
         <option value="{{ value }}" {% if f.selected == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
+      {% endif %}
     </div>
     {% endfor %}
     <button type="submit" class="btn btn-sm btn-primary">Apply</button>
@@ -96,7 +101,7 @@
   </form>
   {% endif %}
 
-  {% if filter_items %}
+  {% if hidden_filter_items %}
   <div class="alert alert-info alert-dismissible d-flex align-items-center py-2">
     <i class="ti ti-filter me-2"></i>
     <div>Filtered view.</div>
