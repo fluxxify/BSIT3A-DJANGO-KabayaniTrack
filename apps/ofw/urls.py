@@ -143,4 +143,5 @@ urlpatterns = [
 
     # Administrator audit trail
     path('audit-log/', views.audit_log_page, name='audit_log'),
+    path('all-activity/', views.all_activity_page, name='all_activity'),
 ]

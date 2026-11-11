@@ -14,6 +14,12 @@ from .models import Notification
 
 User = get_user_model()
 
+# Events at these levels need an immediate management response (SOS, a
+# distressed check-in, a critical concern, a police escalation).  They are
+# also delivered to administrators and legacy global staff so nobody misses
+# an emergency.  Routine events stay inside the responsible agency.
+HIGH_PRIORITY_LEVELS = (Notification.Level.WARNING, Notification.Level.DANGER)
+
 
 def notify(user, title, message='', url='', level=Notification.Level.INFO):
     """Create a notification for a single user (no-op for anonymous users)."""
@@ -30,18 +36,26 @@ def notify(user, title, message='', url='', level=Notification.Level.INFO):
 
 def notify_managers(title, message='', url='', level=Notification.Level.INFO,
                     exclude_user=None, agency=None):
-    """Notify the relevant agency staff.
+    """Notify the relevant agency staff, plus administrators for emergencies.
 
-    When ``agency`` is supplied, only that agency's staff are notified.
-    Without an agency, all staff are notified (legacy/global behaviour).
-    Superusers are intentionally excluded from agency-scoped notifications so
-    that an OFW's agency is the only one that sees alerts about their OFWs.
+    When ``agency`` is supplied, routine events go only to that agency's
+    staff.  High-priority events (warning/danger) also reach superusers and
+    legacy staff without an agency, because those accounts can see every
+    OFW's records and must not miss an SOS, a distressed check-in, or a
+    critical concern.  Without an agency, all staff are notified
+    (legacy/global behaviour).
     """
     if agency is not None:
+        recipient_filter = Q(agency_staff__agency=agency)
+        if level in HIGH_PRIORITY_LEVELS:
+            recipient_filter |= (
+                Q(is_superuser=True)
+                | Q(is_staff=True, agency_staff__isnull=True)
+            )
         recipients = User.objects.filter(
-            agency_staff__agency=agency,
+            recipient_filter,
             is_active=True,
-        )
+        ).distinct()
     else:
         recipients = User.objects.filter(
             Q(is_staff=True) | Q(is_superuser=True),

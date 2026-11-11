@@ -2823,3 +2823,195 @@ def audit_log_page(request):
         'page_title': 'Audit Log',
         'page_pretitle': 'Administration',
     })
+
+
+# ---------------------------------------------------------------------------
+# All Activity feed (administrators)
+# ---------------------------------------------------------------------------
+
+ACTIVITY_PER_PAGE = 30
+# The combined timeline merges two tables.  Each source contributes at most
+# this many of its most recent rows, keeping the page fast while the
+# per-source tabs still paginate through the complete history.
+ACTIVITY_MERGE_LIMIT = 500
+
+_ACTIVITY_LEVEL_BADGES = {
+    Notification.Level.INFO: 'bg-azure-lt text-azure',
+    Notification.Level.SUCCESS: 'bg-success-lt text-success',
+    Notification.Level.WARNING: 'bg-warning-lt text-warning',
+    Notification.Level.DANGER: 'bg-danger-lt text-danger',
+}
+
+_ACTIVITY_ACTION_BADGES = {
+    AuditLog.Action.CREATE: 'bg-success-lt text-success',
+    AuditLog.Action.UPDATE: 'bg-blue-lt text-blue',
+    AuditLog.Action.DELETE: 'bg-danger-lt text-danger',
+    AuditLog.Action.DELETE_ALL: 'bg-danger-lt text-danger',
+    AuditLog.Action.EXPORT: 'bg-secondary-lt text-secondary',
+}
+
+
+def _activity_person(user):
+    """Display name for a notification recipient or audit actor."""
+    if user is None:
+        return 'System'
+    full_name = (user.get_full_name() or '').strip()
+    return full_name or user.username
+
+
+def _notification_activity_row(notification):
+    return {
+        'kind': 'notification',
+        'when': notification.created_at,
+        'title': notification.title,
+        'detail': notification.message,
+        'badge': notification.get_level_display(),
+        'badge_class': _ACTIVITY_LEVEL_BADGES.get(
+            notification.level, 'bg-secondary-lt text-secondary'
+        ),
+        'person_label': 'To',
+        'person': _activity_person(notification.recipient),
+        'url': notification.url,
+        'is_unread': not notification.is_read,
+    }
+
+
+def _audit_activity_row(log):
+    detail = ' · '.join(
+        part for part in (log.model_name, log.change_summary()) if part
+    )
+    return {
+        'kind': 'audit',
+        'when': log.created_at,
+        'title': log.object_repr or log.model_name or str(log),
+        'detail': detail,
+        'badge': log.get_action_display(),
+        'badge_class': _ACTIVITY_ACTION_BADGES.get(
+            log.action, 'bg-secondary-lt text-secondary'
+        ),
+        'person_label': 'By',
+        'person': _activity_person(log.user),
+        'url': '',
+        'is_unread': False,
+    }
+
+
+@login_required(login_url='login')
+def all_activity_page(request):
+    """Administrator timeline of every notification and management action.
+
+    The notification bell stays focused on each account's own alerts.  This
+    page gives administrators one place to see all system activity, including
+    routine events that were intentionally kept inside an agency.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Administrators only.')
+
+    source = (request.GET.get('source') or 'all').strip()
+    if source not in ('all', 'notifications', 'audit'):
+        source = 'all'
+    query = (request.GET.get('q') or '').strip()
+    level = (request.GET.get('level') or '').strip()
+    if level not in Notification.Level.values:
+        level = ''
+
+    notifications_qs = Notification.objects.select_related(
+        'recipient'
+    ).order_by('-created_at', '-id')
+    if level:
+        notifications_qs = notifications_qs.filter(level=level)
+    if query:
+        notifications_qs = notifications_qs.filter(
+            Q(title__icontains=query)
+            | Q(message__icontains=query)
+            | Q(recipient__username__icontains=query)
+            | Q(recipient__first_name__icontains=query)
+            | Q(recipient__last_name__icontains=query)
+        )
+
+    audit_qs = AuditLog.objects.select_related('user').order_by(
+        '-created_at', '-id'
+    )
+    if query:
+        audit_qs = audit_qs.filter(
+            Q(object_repr__icontains=query)
+            | Q(model_name__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__first_name__icontains=query)
+            | Q(user__last_name__icontains=query)
+        )
+
+    notification_count = notifications_qs.count()
+    audit_count = audit_qs.count()
+
+    truncated = False
+    if source == 'notifications':
+        paginator = Paginator(notifications_qs, ACTIVITY_PER_PAGE)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        rows = [
+            _notification_activity_row(item)
+            for item in page_obj.object_list
+        ]
+    elif source == 'audit':
+        paginator = Paginator(audit_qs, ACTIVITY_PER_PAGE)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        rows = [_audit_activity_row(item) for item in page_obj.object_list]
+    else:
+        truncated = (
+            notification_count > ACTIVITY_MERGE_LIMIT
+            or audit_count > ACTIVITY_MERGE_LIMIT
+        )
+        rows = [
+            _notification_activity_row(item)
+            for item in notifications_qs[:ACTIVITY_MERGE_LIMIT]
+        ] + [
+            _audit_activity_row(item)
+            for item in audit_qs[:ACTIVITY_MERGE_LIMIT]
+        ]
+        rows.sort(key=lambda row: row['when'], reverse=True)
+        paginator = Paginator(rows, ACTIVITY_PER_PAGE)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        rows = list(page_obj.object_list)
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    querystring = params.urlencode()
+
+    source_counts = {
+        'all': notification_count + audit_count,
+        'notifications': notification_count,
+        'audit': audit_count,
+    }
+    source_tabs = []
+    for value, label in (
+        ('all', 'All activity'),
+        ('notifications', 'Notifications'),
+        ('audit', 'Management actions'),
+    ):
+        tab_params = params.copy()
+        if value == 'all':
+            tab_params.pop('source', None)
+        else:
+            tab_params['source'] = value
+        source_tabs.append({
+            'value': value,
+            'label': label,
+            'count': source_counts[value],
+            'active': source == value,
+            'querystring': tab_params.urlencode(),
+        })
+
+    return render(request, 'ofw/all_activity.html', {
+        'page_obj': page_obj,
+        'rows': rows,
+        'query': query,
+        'level': level,
+        'source': source,
+        'source_tabs': source_tabs,
+        'level_choices': Notification.Level.choices,
+        'querystring': querystring,
+        'truncated': truncated,
+        'merge_limit': ACTIVITY_MERGE_LIMIT,
+        'page_title': 'All Activity',
+        'page_pretitle': 'Administration',
+    })

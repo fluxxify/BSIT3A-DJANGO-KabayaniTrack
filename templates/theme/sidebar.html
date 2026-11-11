@@ -134,6 +134,14 @@
 
         {% if user.is_superuser %}
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'all_activity' %}active{% endif %}" href="{% url 'ofw:all_activity' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-wave-square"></i>
+            </span>
+            <span class="nav-link-title">All Activity</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}" href="{% url 'ofw:audit_log' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-clipboard-list"></i>

@@ -1,0 +1,135 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center">
+      <div class="col">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+        <div class="text-muted mt-1">
+          Every notification and management action across all agencies.
+        </div>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
+    {% for tab in source_tabs %}
+    <li class="nav-item">
+      <a class="nav-link text-nowrap {% if tab.active %}active{% endif %}"
+         href="{% url 'ofw:all_activity' %}{% if tab.querystring %}?{{ tab.querystring }}{% endif %}">
+        {{ tab.label }}
+        <span class="badge bg-secondary-lt text-secondary ms-1">{{ tab.count }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <form method="get" class="row g-2 align-items-end mb-3">
+    {% if source != 'all' %}<input type="hidden" name="source" value="{{ source }}">{% endif %}
+    <div class="col-md-5">
+      <label class="form-label" for="activity-search">Search</label>
+      <input type="text" id="activity-search" name="q" value="{{ query }}"
+             class="form-control" placeholder="Event, person, record, or message...">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="activity-level">Priority</label>
+      <select id="activity-level" name="level" class="form-select">
+        <option value="">All priorities</option>
+        {% for value, label in level_choices %}
+        <option value="{{ value }}" {% if level == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-filter me-1"></i> Filter
+      </button>
+      <a href="{% url 'ofw:all_activity' %}" class="btn btn-outline-secondary">Clear</a>
+    </div>
+  </form>
+
+  {% if truncated %}
+  <div class="alert alert-info" role="status">
+    Showing the most recent {{ merge_limit }} notifications and {{ merge_limit }}
+    management actions. Choose a tab to browse the full history.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Activity timeline</h3>
+      <div class="card-actions text-muted small">
+        {{ page_obj.paginator.count }} event{{ page_obj.paginator.count|pluralize }}
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Type</th>
+            <th scope="col">Event</th>
+            <th scope="col">Person</th>
+            <th scope="col">Priority / Action</th>
+            <th scope="col">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="text-muted text-nowrap">
+              <time datetime="{{ row.when|date:'c' }}">{{ row.when|date:"M d, Y H:i" }}</time>
+            </td>
+            <td>
+              {% if row.kind == 'notification' %}
+              <span class="badge bg-azure-lt text-azure">Notification</span>
+              {% else %}
+              <span class="badge bg-secondary-lt text-secondary">Management</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="fw-medium">
+                {% if row.url %}
+                <a href="{{ row.url }}">{{ row.title }}</a>
+                {% else %}
+                {{ row.title }}
+                {% endif %}
+                {% if row.is_unread %}
+                <span class="badge bg-danger-lt text-danger ms-1">Unread</span>
+                {% endif %}
+              </div>
+              {% if row.detail %}
+              <div class="text-muted small">{{ row.detail|truncatechars:160 }}</div>
+              {% endif %}
+            </td>
+            <td class="text-nowrap">
+              <span class="text-muted small">{{ row.person_label }}</span>
+              {{ row.person }}
+            </td>
+            <td>
+              <span class="badge {{ row.badge_class }}">{{ row.badge }}</span>
+            </td>
+            <td class="text-muted small text-nowrap">
+              {% if row.kind == 'audit' %}
+              <a href="{% url 'ofw:audit_log' %}?q={{ row.title|urlencode }}">View audit log</a>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-muted text-center py-4">
+              No activity matches this filter.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'theme/pagination.html' %}
+  </div>
+</div>
+{% endblock %}

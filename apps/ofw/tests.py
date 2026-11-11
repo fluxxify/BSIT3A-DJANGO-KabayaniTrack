@@ -4342,3 +4342,151 @@ class EmergencyContactAgencyIsolationTests(TestCase):
             item.name for item in beta_page.context['page_obj'].object_list
         }
         self.assertIn('Alpha public hotline', beta_names)
+
+
+class ManagerNotificationScopeTests(TestCase):
+    """High-priority alerts reach administrators; routine ones stay agency-local."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        self.alpha = Agency.objects.create(name='Alpha Agency', slug='alpha')
+        self.beta = Agency.objects.create(name='Beta Agency', slug='beta')
+        self.admin = User.objects.create_superuser(
+            username='scope_admin', email='admin@example.com',
+            password='Passw0rd!23',
+        )
+        self.alpha_staff = User.objects.create_user(
+            username='scope_alpha_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.alpha_staff, agency=self.alpha)
+        self.beta_staff = User.objects.create_user(
+            username='scope_beta_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.beta_staff, agency=self.beta)
+        # Legacy global staff account: can see every agency's records.
+        self.global_staff = User.objects.create_user(
+            username='scope_global_staff', password='Passw0rd!23', is_staff=True,
+        )
+
+    def _send(self, level):
+        from apps.ofw.notifications import notify_managers
+
+        notify_managers(
+            title='Scope test',
+            message='A scoped notification',
+            level=level,
+            agency=self.alpha,
+        )
+        return set(
+            Notification.objects.values_list('recipient__username', flat=True)
+        )
+
+    def test_danger_reaches_administrators_and_global_staff(self):
+        recipients = self._send(Notification.Level.DANGER)
+
+        self.assertIn('scope_admin', recipients)
+        self.assertIn('scope_alpha_staff', recipients)
+        self.assertIn('scope_global_staff', recipients)
+        self.assertNotIn('scope_beta_staff', recipients)
+
+    def test_warning_also_reaches_administrators(self):
+        recipients = self._send(Notification.Level.WARNING)
+
+        self.assertIn('scope_admin', recipients)
+        self.assertIn('scope_alpha_staff', recipients)
+        self.assertNotIn('scope_beta_staff', recipients)
+
+    def test_success_stays_inside_the_agency(self):
+        recipients = self._send(Notification.Level.SUCCESS)
+
+        self.assertEqual(recipients, {'scope_alpha_staff'})
+
+    def test_info_stays_inside_the_agency(self):
+        recipients = self._send(Notification.Level.INFO)
+
+        self.assertEqual(recipients, {'scope_alpha_staff'})
+
+
+class AllActivityTests(TestCase):
+    """The administrator feed shows every notification and management action."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='activity_admin', email='activity@example.com',
+            password='Passw0rd!23',
+        )
+        self.staff = User.objects.create_user(
+            username='activity_staff', password='Passw0rd!23', is_staff=True,
+        )
+        self.ofw_user = User.objects.create_user(
+            username='activity_ofw', password='Passw0rd!23',
+        )
+        Notification.objects.create(
+            recipient=self.staff,
+            title='Agency staff alert',
+            message='Needs follow up',
+            level=Notification.Level.WARNING,
+        )
+        Notification.objects.create(
+            recipient=self.ofw_user,
+            title='OFW welcome',
+            message='Complete your profile',
+            level=Notification.Level.INFO,
+        )
+        AuditLog.objects.create(
+            user=self.admin,
+            action=AuditLog.Action.CREATE,
+            model_name='OFWProfile',
+            object_repr='Maria Santos',
+            changes='{"first_name": "Maria"}',
+        )
+
+    def test_superuser_sees_every_notification_and_action(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('ofw:all_activity'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agency staff alert')
+        self.assertContains(response, 'OFW welcome')
+        self.assertContains(response, 'Maria Santos')
+
+    def test_non_superusers_are_forbidden(self):
+        for user in (self.staff, self.ofw_user):
+            self.client.force_login(user)
+            response = self.client.get(reverse('ofw:all_activity'))
+            self.assertEqual(response.status_code, 403)
+
+    def test_level_filter_limits_notifications(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('ofw:all_activity'),
+            {'source': 'notifications', 'level': 'warning'},
+        )
+
+        self.assertContains(response, 'Agency staff alert')
+        self.assertNotContains(response, 'OFW welcome')
+
+    def test_search_matches_notifications_and_management_actions(self):
+        self.client.force_login(self.admin)
+
+        by_message = self.client.get(
+            reverse('ofw:all_activity'), {'q': 'follow up'}
+        )
+        self.assertContains(by_message, 'Agency staff alert')
+        self.assertNotContains(by_message, 'Maria Santos')
+
+        by_record = self.client.get(
+            reverse('ofw:all_activity'), {'q': 'Maria'}
+        )
+        self.assertContains(by_record, 'Maria Santos')
+        self.assertNotContains(by_record, 'Agency staff alert')
+
+    def test_sidebar_link_is_visible_only_to_superusers(self):
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.get(reverse('dashboard')), 'All Activity')
+
+        self.client.force_login(self.staff)
+        self.assertNotContains(
+            self.client.get(reverse('dashboard')), 'All Activity'
+        )
