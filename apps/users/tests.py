@@ -383,6 +383,24 @@ class AgencyManagementTests(TestCase):
             first_name='Ben', last_name='Beta', agency_org=self.beta,
         )
 
+    def test_agency_page_has_status_tabs(self):
+        self.beta.is_active = False
+        self.beta.save(update_fields=['is_active'])
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('users:agency_list'))
+
+        tabs = {tab['value']: tab for tab in response.context['status_tabs']}
+        self.assertEqual(tabs['']['count'], 2)
+        self.assertEqual(tabs['active']['count'], 1)
+        self.assertEqual(tabs['inactive']['count'], 1)
+        self.assertTrue(tabs['']['active'])
+
+        inactive = self.client.get(
+            reverse('users:agency_list'), {'status': 'inactive'}
+        )
+        self.assertContains(inactive, 'Beta Agency')
+        self.assertNotContains(inactive, 'Alpha Agency')
+
     def test_admin_can_list_agencies_with_counts(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse('users:agency_list'))
@@ -568,6 +586,59 @@ class AgencyUserManagementTests(TestCase):
             {user.username for user in inactive_filter.context['users']},
             {'alpha_user'},
         )
+
+    def test_users_page_separates_account_types_with_tabs(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('users:user_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Agency users')
+        self.assertContains(response, 'OFW accounts')
+        self.assertContains(response, 'Management staff')
+        self.assertContains(response, 'Administrators')
+        tabs = {tab['value']: tab for tab in response.context['role_tabs']}
+        self.assertEqual(tabs['']['count'], 4)
+        self.assertEqual(tabs['agency']['count'], 2)
+        self.assertEqual(tabs['ofw']['count'], 1)
+        self.assertEqual(tabs['staff']['count'], 0)
+        self.assertEqual(tabs['admin']['count'], 1)
+
+    def test_account_type_tabs_filter_the_table(self):
+        self.client.force_login(self.admin)
+        ofw_page = self.client.get(
+            reverse('users:user_list'), {'role': 'ofw'}
+        )
+        agency_page = self.client.get(
+            reverse('users:user_list'), {'role': 'agency'}
+        )
+        admin_page = self.client.get(
+            reverse('users:user_list'), {'role': 'admin'}
+        )
+
+        self.assertEqual(
+            {user.username for user in ofw_page.context['users']},
+            {'ofw_user'},
+        )
+        self.assertEqual(
+            {user.username for user in agency_page.context['users']},
+            {'alpha_user', 'beta_user'},
+        )
+        self.assertEqual(
+            {user.username for user in admin_page.context['users']},
+            {'users_admin'},
+        )
+
+    def test_account_type_tabs_preserve_other_filters(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('users:user_list'),
+            {'role': 'agency', 'agency': self.alpha.pk},
+        )
+
+        tabs = {tab['value']: tab for tab in response.context['role_tabs']}
+        self.assertIn(f'agency={self.alpha.pk}', tabs['ofw']['querystring'])
+        self.assertIn('role=ofw', tabs['ofw']['querystring'])
+        self.assertTrue(tabs['agency']['active'])
 
     def test_admin_can_create_agency_staff(self):
         from apps.ofw.models import AuditLog

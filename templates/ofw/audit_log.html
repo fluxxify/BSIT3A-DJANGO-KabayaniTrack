@@ -11,6 +11,18 @@
   </div>
   <br>
 
+  <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
+    {% for tab in category_tabs %}
+    <li class="nav-item">
+      <a class="nav-link text-nowrap {% if tab.active %}active{% endif %}"
+         href="{% url 'ofw:audit_log' %}{% if tab.querystring %}?{{ tab.querystring }}{% endif %}">
+        {{ tab.label }}
+        <span class="badge bg-secondary-lt text-secondary ms-1">{{ tab.count }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+
   <form method="get" class="row g-2 align-items-end mb-3">
     <div class="col-md-5">
       <label class="form-label" for="audit-search">Search</label>

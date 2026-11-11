@@ -2758,10 +2758,17 @@ def audit_log_page(request):
 
     query = request.GET.get('q', '').strip()
     action = request.GET.get('action', '').strip()
+    category = request.GET.get('category', '').strip()
 
     logs = AuditLog.objects.select_related('user')
     if action in AuditLog.Action.values:
         logs = logs.filter(action=action)
+    if category == 'users':
+        logs = logs.filter(model_name='User')
+    elif category == 'agencies':
+        logs = logs.filter(model_name='Agency')
+    elif category == 'ofw':
+        logs = logs.exclude(model_name__in=['User', 'Agency'])
     if query:
         logs = logs.filter(
             Q(object_repr__icontains=query)
@@ -2777,11 +2784,41 @@ def audit_log_page(request):
     params = request.GET.copy()
     params.pop('page', None)
 
+    category_counts = {
+        '': AuditLog.objects.count(),
+        'users': AuditLog.objects.filter(model_name='User').count(),
+        'agencies': AuditLog.objects.filter(model_name='Agency').count(),
+        'ofw': AuditLog.objects.exclude(
+            model_name__in=['User', 'Agency']
+        ).count(),
+    }
+    category_tabs = []
+    for value, label in (
+        ('', 'All entries'),
+        ('users', 'User accounts'),
+        ('agencies', 'Agencies'),
+        ('ofw', 'OFW records'),
+    ):
+        tab_params = params.copy()
+        if value:
+            tab_params['category'] = value
+        else:
+            tab_params.pop('category', None)
+        category_tabs.append({
+            'value': value,
+            'label': label,
+            'count': category_counts[value],
+            'active': category == value,
+            'querystring': tab_params.urlencode(),
+        })
+
     return render(request, 'ofw/audit_log.html', {
         'page_obj': page_obj,
         'query': query,
         'action': action,
+        'category': category,
         'action_choices': AuditLog.Action.choices,
+        'category_tabs': category_tabs,
         'querystring': params.urlencode(),
         'page_title': 'Audit Log',
         'page_pretitle': 'Administration',

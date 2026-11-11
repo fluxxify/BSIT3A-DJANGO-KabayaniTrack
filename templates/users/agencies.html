@@ -60,6 +60,18 @@
     </div>
   </div>
 
+  <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto">
+    {% for tab in status_tabs %}
+    <li class="nav-item">
+      <a class="nav-link text-nowrap {% if tab.active %}active{% endif %}"
+         href="{% url 'users:agency_list' %}{% if tab.querystring %}?{{ tab.querystring }}{% endif %}">
+        {{ tab.label }}
+        <span class="badge bg-secondary-lt text-secondary ms-1">{{ tab.count }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+
   <form method="GET" class="card card-sm mb-3">
     <div class="card-body">
       <div class="row g-2 align-items-end">

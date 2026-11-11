@@ -1106,6 +1106,46 @@ class AuditLogTests(TestCase):
         self.assertContains(response, 'Deleted record')
         self.assertNotContains(response, 'Created record')
 
+    def test_audit_log_separates_account_and_ofw_entries(self):
+        AuditLog.objects.create(
+            user=self.staff, action=AuditLog.Action.CREATE,
+            model_name='User', object_repr='new_user',
+        )
+        AuditLog.objects.create(
+            user=self.staff, action=AuditLog.Action.UPDATE,
+            model_name='Agency', object_repr='Alpha Agency',
+        )
+        AuditLog.objects.create(
+            user=self.staff, action=AuditLog.Action.UPDATE,
+            model_name='OFW profile', object_repr='Lina Reyes',
+        )
+        self.client.force_login(self.admin)
+
+        users_page = self.client.get(
+            reverse('ofw:audit_log'), {'category': 'users'}
+        )
+        self.assertContains(users_page, 'new_user')
+        self.assertNotContains(users_page, 'Alpha Agency')
+        self.assertNotContains(users_page, 'Lina Reyes')
+
+        agencies_page = self.client.get(
+            reverse('ofw:audit_log'), {'category': 'agencies'}
+        )
+        self.assertContains(agencies_page, 'Alpha Agency')
+        self.assertNotContains(agencies_page, 'new_user')
+
+        ofw_page = self.client.get(
+            reverse('ofw:audit_log'), {'category': 'ofw'}
+        )
+        self.assertContains(ofw_page, 'Lina Reyes')
+        self.assertNotContains(ofw_page, 'new_user')
+
+        tabs = {tab['value']: tab for tab in users_page.context['category_tabs']}
+        self.assertEqual(tabs['users']['count'], 1)
+        self.assertEqual(tabs['agencies']['count'], 1)
+        self.assertEqual(tabs['ofw']['count'], 1)
+        self.assertTrue(tabs['users']['active'])
+
     def test_audit_log_link_only_for_superusers(self):
         self.client.force_login(self.staff)
         staff_response = self.client.get(reverse('dashboard'))

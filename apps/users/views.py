@@ -155,7 +155,39 @@ def _filter_users(queryset, params):
     return queryset.distinct().order_by(*order)
 
 
-def _filter_context(params):
+def _role_tabs(params, summary):
+    """Build the account-type tabs shown above the Users table.
+
+    The tabs are a friendlier version of the role filter: they keep the other
+    active filters (search, agency, status, sort) and only swap ``role``.
+    """
+    current = (params.get('role') or '').strip()
+    tabs = (
+        ('', 'All accounts', summary['accounts_total']),
+        ('agency', 'Agency users', summary['agency_staff_total']),
+        ('ofw', 'OFW accounts', summary['ofw_total']),
+        ('staff', 'Management staff', summary['unassigned_staff_total']),
+        ('admin', 'Administrators', summary['admin_total']),
+    )
+    result = []
+    for value, label, count in tabs:
+        query = params.copy()
+        query.pop('page', None)
+        if value:
+            query['role'] = value
+        else:
+            query.pop('role', None)
+        result.append({
+            'value': value,
+            'label': label,
+            'count': count,
+            'active': current == value,
+            'querystring': query.urlencode(),
+        })
+    return result
+
+
+def _filter_context(params, summary=None):
     querystring = params.copy()
     querystring.pop('page', None)
     return {
@@ -168,6 +200,7 @@ def _filter_context(params):
         'status_filter': (params.get('status') or '').strip(),
         'sort_filter': (params.get('sort') or 'joined').strip(),
         'querystring': querystring.urlencode(),
+        'role_tabs': _role_tabs(params, summary) if summary else [],
     }
 
 
@@ -175,9 +208,15 @@ def _user_counts():
     staff = User.objects.filter(is_staff=True, is_superuser=False)
     return {
         'accounts_total': User.objects.count(),
-        'agency_staff_total': staff.filter(agency_staff__isnull=False).count(),
+        'agency_staff_total': staff.filter(
+            agency_staff__isnull=False
+        ).distinct().count(),
         'unassigned_staff_total': staff.filter(agency_staff__isnull=True).count(),
         'inactive_accounts_total': User.objects.filter(is_active=False).count(),
+        'ofw_total': User.objects.filter(
+            is_staff=False, is_superuser=False
+        ).count(),
+        'admin_total': User.objects.filter(is_superuser=True).count(),
     }
 
 
@@ -207,10 +246,11 @@ def user_list_page(request):
     paginator = Paginator(users_list, USER_PER_PAGE)
     users = paginator.get_page(request.GET.get('page', 1))
 
+    summary = _user_counts()
     context = {
         'users': users,
-        'summary': _user_counts(),
-        **_filter_context(request.GET),
+        'summary': summary,
+        **_filter_context(request.GET, summary),
     }
     return render(request, 'users/list.html', context)
 
@@ -549,6 +589,32 @@ def user_delete_ajax(request, pk):
 # ---------------------------------------------------------------------------
 
 
+def _agency_status_tabs(params, summary):
+    """Build the All / Active / Inactive tabs for the Agencies page."""
+    current = (params.get('status') or '').strip()
+    tabs = (
+        ('', 'All agencies', summary['agencies_total']),
+        ('active', 'Active', summary['agencies_active']),
+        ('inactive', 'Inactive', summary['agencies_inactive']),
+    )
+    result = []
+    for value, label, count in tabs:
+        query = params.copy()
+        query.pop('page', None)
+        if value:
+            query['status'] = value
+        else:
+            query.pop('status', None)
+        result.append({
+            'value': value,
+            'label': label,
+            'count': count,
+            'active': current == value,
+            'querystring': query.urlencode(),
+        })
+    return result
+
+
 @login_required(login_url='login')
 @user_passes_test(_is_admin, login_url='dashboard')
 def agency_list_page(request):
@@ -587,19 +653,23 @@ def agency_list_page(request):
     params.pop('page', None)
 
     staff = User.objects.filter(is_staff=True, is_superuser=False)
+    summary = {
+        'agencies_total': Agency.objects.count(),
+        'agencies_active': Agency.objects.filter(is_active=True).count(),
+        'agencies_inactive': Agency.objects.filter(is_active=False).count(),
+        'assigned_staff': staff.filter(
+            agency_staff__isnull=False
+        ).distinct().count(),
+        'unassigned_staff': staff.filter(agency_staff__isnull=True).count(),
+    }
     return render(request, 'users/agencies.html', {
         'page_obj': page_obj,
         'query': query,
         'status_filter': status,
         'sort_filter': sort,
         'querystring': params.urlencode(),
-        'summary': {
-            'agencies_total': Agency.objects.count(),
-            'agencies_active': Agency.objects.filter(is_active=True).count(),
-            'agencies_inactive': Agency.objects.filter(is_active=False).count(),
-            'assigned_staff': staff.filter(agency_staff__isnull=False).count(),
-            'unassigned_staff': staff.filter(agency_staff__isnull=True).count(),
-        },
+        'summary': summary,
+        'status_tabs': _agency_status_tabs(params, summary),
         'page_title': 'Agencies',
         'page_pretitle': 'Administration',
     })
