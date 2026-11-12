@@ -55,7 +55,10 @@
               <div class="text-muted small"><i class="fas fa-phone me-1"></i>{{ alert.ofw.contact_number }}</div>
               {% endif %}
               {% if alert.message %}
-              <div class="text-muted small mt-1">{{ alert.message|truncatechars:160 }}</div>
+              <details class="mt-1">
+                <summary class="text-muted small">Details and timeline</summary>
+                <div class="text-muted small mt-1">{{ alert.message|linebreaksbr }}</div>
+              </details>
               {% endif %}
               {% if alert.police_report_id %}
               <a href="{% url 'ofw:police_reports' %}" class="small">Police report on file</a>
@@ -106,7 +109,10 @@
               {% if alert.ofw.agency_org %} · {{ alert.ofw.agency_org.name }}{% endif %}
             </div>
             {% if alert.message %}
-            <div class="text-muted small mt-1">{{ alert.message|truncatechars:160 }}</div>
+            <details class="mt-1">
+              <summary class="text-muted small">Details and timeline</summary>
+              <div class="text-muted small mt-1">{{ alert.message|linebreaksbr }}</div>
+            </details>
             {% endif %}
             {% if alert.police_report_id %}
             <a href="{% url 'ofw:police_reports' %}" class="small">Police report on file</a>
