@@ -7,7 +7,7 @@
         <div class="page-pretitle">{{ page_pretitle }}</div>
         <h2 class="page-title mb-0">{{ page_title }}</h2>
         <div class="text-muted small mt-1">
-          This is the same login clock your agency uses for welfare checks.
+          This is the same activity clock your agency uses for welfare checks.
         </div>
       </div>
       <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
@@ -24,6 +24,24 @@
   </div>
   <br>
 
+  {% if offline_notice_active %}
+  <div class="alert alert-info">
+    <div>
+      <i class="fas fa-plane-departure me-1"></i>
+      <strong>Offline notice active until {{ activity.offline_notice_until|date:"M d, Y" }}.</strong>
+      Welfare warnings are paused until then{% if activity.offline_notice_note %} — {{ activity.offline_notice_note }}{% endif %}.
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="resume_now">
+        <input type="hidden" name="until" value="{{ activity.offline_notice_until|date:'Y-m-d' }}">
+        <button type="submit" class="btn btn-sm btn-outline-primary ms-2">
+          <i class="fas fa-rotate-left me-1"></i>I'm back online
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row row-deck row-cards">
     <div class="col-md-6 col-lg-3">
       <div class="card">
@@ -31,10 +49,10 @@
           <div class="subheader">Account status</div>
           {% if is_inactive %}
           <div class="h3 mb-0 text-warning">{{ warning_label }}</div>
-          <div class="text-muted small mt-1">No successful login for {{ days_inactive }} days.</div>
+          <div class="text-muted small mt-1">No login or portal activity for {{ days_inactive }} days.</div>
           {% else %}
           <div class="h3 mb-0 text-success">Active</div>
-          <div class="text-muted small mt-1">You are within the {{ threshold_days }}-day login window.</div>
+          <div class="text-muted small mt-1">You are within the {{ threshold_days }}-day activity window.</div>
           {% endif %}
         </div>
       </div>
@@ -59,6 +77,23 @@
     <div class="col-md-6 col-lg-3">
       <div class="card">
         <div class="card-body">
+          <div class="subheader">Last portal activity</div>
+          <div class="h4 mb-0">
+            {% if activity.last_seen_at %}
+            {{ activity.last_seen_at|date:"M d, Y" }}
+            {% else %}
+            None yet
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-1">
+            {% if activity.last_seen_at %}{{ activity.last_seen_at|timesince }} ago{% else %}Opening portal pages counts as activity.{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
           <div class="subheader">Last check-in</div>
           <div class="h4 mb-0">
             {% if last_checkin %}{{ last_checkin.checkin_date|date:"M d, Y" }}{% else %}None yet{% endif %}
@@ -69,24 +104,16 @@
         </div>
       </div>
     </div>
-    <div class="col-md-6 col-lg-3">
-      <div class="card">
-        <div class="card-body">
-          <div class="subheader">Warning messages</div>
-          <div class="h4 mb-0">{{ warning_notifications|length }}</div>
-          <div class="text-muted small mt-1">Messages from your agency about your account.</div>
-        </div>
-      </div>
-    </div>
   </div>
 
-  {% if is_inactive %}
+  {% if is_inactive and not offline_notice_active %}
   <div class="alert alert-warning mt-3">
     <i class="fas fa-clock text-warning me-2"></i>
     <strong>Your account has been inactive for {{ days_inactive }} day{{ days_inactive|pluralize }}.</strong>
-    Your agency may call you for a welfare check. Log a check-in or update your profile so they know you are safe.
-    {% if days_inactive > 5 %}
-    <div class="mt-2 small">After six days without contact, management can escalate your case to the police.</div>
+    Your agency may call you for a welfare check. Log a check-in or set an
+    offline notice if you know you will be unreachable.
+    {% if days_inactive >= followup_days %}
+    <div class="mt-2 small">After {{ followup_days }} days without contact, management can escalate your case to the police.</div>
     {% endif %}
   </div>
   {% endif %}
@@ -95,7 +122,23 @@
     <div class="col-lg-7">
       <div class="card h-100">
         <div class="card-header">
-          <h3 class="card-title"><i class="fas fa-bell text-warning me-2"></i>Warning messages</h3>
+          <h3 class="card-title">
+            <i class="fas fa-bell text-warning me-2"></i>Warning messages
+            {% if unread_warning_count %}
+            <span class="badge bg-warning-lt text-warning ms-1">{{ unread_warning_count }} new</span>
+            {% endif %}
+          </h3>
+          {% if warning_notifications %}
+          <div class="card-actions">
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="mark_warnings_read">
+              <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-check-double me-1"></i>Mark as read
+              </button>
+            </form>
+          </div>
+          {% endif %}
         </div>
         {% if warning_notifications %}
         <div class="list-group list-group-flush">
@@ -106,6 +149,7 @@
                 <div class="fw-medium">
                   <span class="badge bg-{{ notification.level }}-lt text-{{ notification.level }} me-1">{{ notification.get_level_display }}</span>
                   {{ notification.title }}
+                  {% if not notification.is_read %}<span class="badge bg-primary ms-1">New</span>{% endif %}
                 </div>
                 <div class="text-muted small mt-1">{{ notification.message }}</div>
               </div>
@@ -129,26 +173,79 @@
     <div class="col-lg-5">
       <div class="card h-100">
         <div class="card-header">
-          <h3 class="card-title"><i class="fas fa-circle-info text-primary me-2"></i>How login warnings work</h3>
+          <h3 class="card-title"><i class="fas fa-plane-departure text-primary me-2"></i>Going offline?</h3>
         </div>
         <div class="card-body">
-          <ol class="ps-3 mb-3">
-            <li class="mb-2"><strong>Day 3:</strong> your agency is warned that you have not logged in and may call you.</li>
-            <li class="mb-2"><strong>Day 6+:</strong> a follow-up warning is sent to management.</li>
-            <li><strong>No contact:</strong> management can escalate to the police and file a report.</li>
-          </ol>
-          <div class="text-muted small">
-            A successful login or a check-in resets the clock. Opening this page counts as activity on your account.
-          </div>
-          <div class="d-grid gap-2 mt-3">
-            <a href="{% url 'ofw:portal_checkins' %}" class="btn btn-primary">
-              <i class="fas fa-clipboard-check me-1"></i>I am safe — log a check-in
-            </a>
-            <a href="{% url 'ofw:portal_profile' %}" class="btn btn-outline-secondary">
-              <i class="fas fa-id-card me-1"></i>Update my profile
-            </a>
-          </div>
+          <p class="text-muted small">
+            If you will have no signal — at sea, on a remote site, or during
+            travel — tell your agency in advance. Warnings pause until the date
+            you choose, so nobody escalates a planned absence.
+          </p>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="set_offline_notice">
+            <div class="mb-3">
+              <label class="form-label" for="{{ offline_form.until.id_for_label }}">{{ offline_form.until.label }}</label>
+              {{ offline_form.until }}
+              {% if offline_form.until.errors %}<div class="text-danger small mt-1">{{ offline_form.until.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ offline_form.note.id_for_label }}">{{ offline_form.note.label }}</label>
+              {{ offline_form.note }}
+              {% if offline_form.note.errors %}<div class="text-danger small mt-1">{{ offline_form.note.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-clock me-1"></i>Pause warnings
+              </button>
+            </div>
+          </form>
+          {% if offline_notice_active %}
+          <form method="post" class="mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear_offline_notice">
+            <button type="submit" class="btn btn-outline-secondary w-100">
+              <i class="fas fa-xmark me-1"></i>Clear offline notice
+            </button>
+          </form>
+          {% endif %}
         </div>
+      </div>
+    </div>
+  </div>
+
+  {% if warning_history %}
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-clock-rotate-left text-muted me-2"></i>Warning history</h3>
+      <div class="card-actions text-muted small">Kept even after your clock resets</div>
+    </div>
+    <div class="list-group list-group-flush">
+      {% for entry in warning_history %}
+      <div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <div class="fw-medium">{{ entry.change_summary|default:"Activity check" }}</div>
+          <div class="text-muted small">{{ entry.object_repr }}</div>
+        </div>
+        <div class="text-muted small text-nowrap">{{ entry.created_at|date:"M d, Y H:i" }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <h3 class="card-title"><i class="fas fa-circle-info text-primary me-2"></i>How login warnings work</h3>
+      <ol class="ps-3 mb-3">
+        <li class="mb-2"><strong>Day {{ threshold_days }}:</strong> your agency is warned that you have not logged in or used the portal, and may call you.</li>
+        <li class="mb-2"><strong>Day {{ followup_days }}+:</strong> a follow-up warning is sent to management.</li>
+        <li><strong>No contact:</strong> management can escalate to the police and file a report.</li>
+      </ol>
+      <div class="text-muted small">
+        Signing in, opening a portal page, updating your profile and logging a
+        check-in all count as activity. A planned offline notice pauses the
+        warnings without hiding the gap from your agency.
       </div>
     </div>
   </div>

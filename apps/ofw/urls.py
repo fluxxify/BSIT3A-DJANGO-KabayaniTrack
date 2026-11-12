@@ -131,7 +131,10 @@ urlpatterns = [
     path('portal/emergency-sos/cancel/', views.cancel_sos, name='portal_cancel_sos'),
     path('portal/suggest-safe-place/', portal_views.portal_suggest_safe_place, name='portal_suggest_safe_place'),
     path('portal/emergency-alerts/', portal_views.portal_emergency_alerts, name='portal_emergency_alerts'),
+    path('portal/emergency-alerts/<int:pk>/respond/', portal_views.portal_alert_respond, name='portal_alert_respond'),
     path('portal/police-reports/', portal_views.portal_police_reports, name='portal_police_reports'),
+    path('portal/police-reports/request/', portal_views.portal_request_police, name='portal_request_police'),
+    path('portal/police-reports/<int:pk>/', portal_views.portal_police_report_detail, name='portal_police_report_detail'),
 
     # Safe location suggestions (management review)
     path('safe-location-suggestions/', views.safe_location_suggestions_page, name='safe_location_suggestions'),

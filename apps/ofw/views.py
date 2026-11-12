@@ -729,7 +729,13 @@ def police_report_status_ajax(request, pk):
         })
     old_status = report.status
     report.status = new_status
-    report.save(update_fields=['status', 'updated_at'])
+    update_fields = ['status', 'updated_at']
+    if new_status == PoliceReport.Status.CLOSED:
+        note = (request.POST.get('resolution_note') or '').strip()
+        if note:
+            report.resolution_note = note
+            update_fields.append('resolution_note')
+    report.save(update_fields=update_fields)
 
     from .notifications import notify, notify_managers
     if new_status == PoliceReport.Status.RESPONDED:
@@ -1283,8 +1289,12 @@ def inactive_ofws_page(request):
 
     return render(request, 'ofw/inactive_ofws.html', {
         'inactive_rows': inactive_rows,
+        'offline_count': sum(
+            1 for row in inactive_rows
+            if row['activity'].offline_notice_active
+        ),
         'page_title': 'Inactive OFWs',
-        'page_pretitle': 'No successful login for 3 or more days',
+        'page_pretitle': 'No login or portal activity for 3 or more days',
     })
 
 
@@ -1639,6 +1649,7 @@ def police_reports_page(request):
 
     return render(request, 'ofw/police_reports.html', {
         'reports': reports_qs.order_by('-reported_at'),
+        'status_choices': PoliceReport.Status.choices,
         'page_title': 'Police Escalation',
         'page_pretitle': 'Escalate Unresponsive OFWs to Police',
     })
@@ -1660,7 +1671,27 @@ def police_report_submit(request, pk):
         messages.error(request, 'Enter the police station before recording contact.')
         return redirect('ofw:police_reports')
     report.police_contact = request.POST.get('police_contact', '').strip()
-    report.save(update_fields=['status', 'police_station', 'police_contact', 'updated_at'])
+    report.report_number = request.POST.get('report_number', '').strip()
+    report.officer_name = request.POST.get('officer_name', '').strip()
+    follow_up = request.POST.get('follow_up_on', '').strip()
+    if follow_up:
+        from django.utils.dateparse import parse_date
+
+        report.follow_up_on = parse_date(follow_up)
+    report.save(update_fields=[
+        'status', 'police_station', 'police_contact', 'report_number',
+        'officer_name', 'follow_up_on', 'updated_at',
+    ])
+
+    notify(
+        report.ofw.user,
+        'Police contact recorded for your report',
+        f'Your agency recorded contact with {report.police_station}. '
+        f'Case number: {report.report_number or "not provided"}. '
+        f'This app does not transmit reports to the police.',
+        url=reverse('ofw:portal_police_report_detail', args=[report.pk]),
+        level=Notification.Level.INFO,
+    )
 
     messages.success(
         request,
@@ -1707,11 +1738,38 @@ def safe_locations_page(request):
 
     countries = SafeLocation.objects.filter(is_active=True).values_list('country', flat=True).distinct().order_by('country')
 
+    # Staff-only coverage check: a country where the agency has OFWs but no
+    # embassy / POLO / OWWA office is a real gap during an emergency. The
+    # portal can only show what has been registered.
+    coverage_gaps = []
+    if not near_me:
+        deployed = {
+            canonical_country(country)
+            for country in _management_scope(request.user)
+            .exclude(country='')
+            .values_list('country', flat=True)
+            if canonical_country(country)
+        }
+        covered = {
+            canonical_country(country)
+            for country in SafeLocation.objects.filter(
+                is_active=True,
+                location_type__in=[
+                    SafeLocation.LocationType.EMBASSY,
+                    SafeLocation.LocationType.POLO,
+                    SafeLocation.LocationType.OWWA,
+                ],
+            ).values_list('country', flat=True)
+            if canonical_country(country)
+        }
+        coverage_gaps = sorted(deployed - covered)
+
     return render(request, 'ofw/safe_locations.html', {
         'locations': locations,
         'countries': countries,
         'country_filter': country_filter,
         'near_me': near_me,
+        'coverage_gaps': coverage_gaps,
         'page_title': 'Safe Place Guide',
         'page_pretitle': 'Guide OFW to Nearest Safe Place',
     })
@@ -2568,18 +2626,20 @@ def cancel_sos(request):
         messages.error(request, 'Complete your profile before cancelling an alert.')
         return redirect('ofw:portal_profile')
 
-    alert = (
-        EmergencyAlert.objects
-        .filter(
-            ofw=profile,
-            status__in=[
-                EmergencyAlert.Status.OPEN,
-                EmergencyAlert.Status.ACKNOWLEDGED,
-            ],
-        )
-        .order_by('-created_at')
-        .first()
-    )
+    alert_id = (request.POST.get('alert_id') or '').strip()
+    alerts = EmergencyAlert.objects.filter(
+        ofw=profile,
+        status__in=[
+            EmergencyAlert.Status.OPEN,
+            EmergencyAlert.Status.ACKNOWLEDGED,
+        ],
+    ).order_by('-created_at')
+    if alert_id.isdigit():
+        # The alerts list has one Cancel button per alert; without the id every
+        # button cancelled the newest alert instead of the one that was clicked.
+        alert = alerts.filter(pk=int(alert_id)).first()
+    else:
+        alert = alerts.first()
     if alert is None:
         if request.headers.get('Accept') == 'application/json':
             return JsonResponse({'error': 'No open emergency alert to cancel.'}, status=400)

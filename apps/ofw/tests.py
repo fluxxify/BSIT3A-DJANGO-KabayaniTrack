@@ -3490,12 +3490,12 @@ class OFWConnectedSafetyPagesTests(TestCase):
         self.user.save(update_fields=['last_login'])
         OFWActivity.objects.update_or_create(
             user=self.user,
-            defaults={'last_login_at': old_login},
+            defaults={'last_login_at': old_login, 'last_activity_at': None},
         )
         response = self.client.get(reverse('ofw:portal_login_warnings'))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'ofw/portal/login_warnings.html')
-        self.assertContains(response, 'No successful login for 4 days')
+        self.assertContains(response, 'No login or portal activity for 4 days')
         self.assertContains(response, 'Welfare check needed')
 
     def test_login_warnings_page_lists_warning_message(self):
@@ -4809,3 +4809,449 @@ class EmergencyContactDuplicateTests(TestCase):
         second = self._form(phone='09179876543')
 
         self.assertTrue(second.is_valid(), second.errors)
+
+
+
+class OFWSafetyGapFixTests(TestCase):
+    """Coverage for the safety gap fixes: activity, offline notices, alerts,
+    police requests and guidance snapshots."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        cache.clear()
+        self.agency = Agency.objects.create(
+            name='Gulf Manpower', slug='gulf-manpower', phone='+971 4 111 2222',
+        )
+        self.user = User.objects.create_user(
+            username='gap_ofw', password='Passw0rd!23',
+            email='gap_ofw@example.com',
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user, first_name='Mila', last_name='Santos',
+            country='United Arab Emirates', city_abroad='Dubai',
+            agency_org=self.agency, agency=self.agency.name,
+        )
+        self.other_user = User.objects.create_user(
+            username='gap_other_ofw', password='Passw0rd!23'
+        )
+        self.other_profile = OFWProfile.objects.create(
+            user=self.other_user, first_name='Ben', last_name='Cruz',
+            country='Qatar', city_abroad='Doha',
+        )
+        self.staff = User.objects.create_user(
+            username='gap_staff', password='Passw0rd!23', is_staff=True
+        )
+        AgencyStaff.objects.create(user=self.staff, agency=self.agency)
+        self.admin = User.objects.create_superuser(
+            username='gap_admin', password='Passw0rd!23',
+            email='gap_admin@example.com',
+        )
+        self.police = SafeLocation.objects.create(
+            name='Dubai Police Station',
+            location_type=SafeLocation.LocationType.POLICE_STATION,
+            country='United Arab Emirates', city='Dubai',
+            address='Al Barsha', phone='+971 4 999 9999',
+            latitude='25.204800', longitude='55.270800',
+        )
+
+    def _activity(self, **defaults):
+        activity, _ = OFWActivity.objects.get_or_create(user=self.user)
+        for key, value in defaults.items():
+            setattr(activity, key, value)
+        activity.save()
+        return activity
+
+    # --- activity middleware ------------------------------------------------
+
+    def test_portal_visit_records_activity(self):
+        from apps.ofw.middleware import OFWActivityMiddleware
+
+        activity = self._activity(
+            last_activity_at=timezone.now() - timedelta(minutes=30)
+        )
+        self.client.force_login(self.user)
+        OFWActivityMiddleware.record_activity(
+            SimpleNamespace(
+                user=self.user, method='GET', path='/ofw/portal/',
+            )
+        )
+        activity.refresh_from_db()
+        self.assertGreater(
+            activity.last_activity_at,
+            timezone.now() - timedelta(minutes=1),
+        )
+
+    def test_activity_is_throttled_to_five_minutes(self):
+        from apps.ofw.middleware import OFWActivityMiddleware
+
+        recent = timezone.now() - timedelta(minutes=1)
+        activity = self._activity(last_activity_at=recent)
+        OFWActivityMiddleware.record_activity(
+            SimpleNamespace(
+                user=self.user, method='GET', path='/ofw/portal/',
+            )
+        )
+        activity.refresh_from_db()
+        self.assertEqual(activity.last_activity_at, recent)
+
+    def test_non_portal_and_staff_requests_are_ignored(self):
+        from apps.ofw.middleware import OFWActivityMiddleware
+
+        OFWActivityMiddleware.record_activity(
+            SimpleNamespace(user=self.staff, method='GET', path='/ofw/portal/')
+        )
+        OFWActivityMiddleware.record_activity(
+            SimpleNamespace(user=self.user, method='GET', path='/ofw/profile/1/')
+        )
+        activity = OFWActivity.objects.get(user=self.user)
+        self.assertIsNone(activity.last_activity_at)
+        self.assertFalse(
+            OFWActivity.objects.filter(user=self.staff).exists()
+        )
+
+    # --- offline notice -----------------------------------------------------
+
+    def test_offline_notice_pauses_inactivity_warning(self):
+        until = timezone.localdate() + timedelta(days=3)
+        self._activity(
+            last_login_at=timezone.now() - timedelta(days=5),
+            last_activity_at=None,
+            offline_notice_until=until,
+            offline_notice_note='At sea',
+        )
+        call_command('check_ofw_inactivity', stdout=open(os.devnull, 'w'))
+
+        self.assertFalse(
+            Notification.objects.filter(
+                title__icontains='login warning',
+            ).exists()
+        )
+        activity = OFWActivity.objects.get(user=self.user)
+        self.assertTrue(activity.offline_notice_active)
+        self.assertIsNone(activity.warning_sent_at)
+
+    def test_offline_notice_can_be_set_from_the_portal(self):
+        self.client.force_login(self.user)
+        until = timezone.localdate() + timedelta(days=2)
+        response = self.client.post(
+            reverse('ofw:portal_login_warnings'),
+            {
+                'action': 'set_offline_notice',
+                'until': until.isoformat(),
+                'note': 'Remote site',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        activity = OFWActivity.objects.get(user=self.user)
+        self.assertEqual(activity.offline_notice_until, until)
+        self.assertEqual(activity.offline_notice_note, 'Remote site')
+
+    def test_offline_notice_rejects_dates_beyond_thirty_days(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse('ofw:portal_login_warnings'),
+            {
+                'action': 'set_offline_notice',
+                'until': (
+                    timezone.localdate() + timedelta(days=45)
+                ).isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        activity = OFWActivity.objects.get(user=self.user)
+        self.assertIsNone(activity.offline_notice_until)
+
+    def test_clearing_the_offline_notice_resumes_warnings(self):
+        self._activity(
+            offline_notice_until=timezone.localdate() + timedelta(days=2),
+            offline_notice_note='At sea',
+        )
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse('ofw:portal_login_warnings'),
+            {'action': 'clear_offline_notice'},
+        )
+        activity = OFWActivity.objects.get(user=self.user)
+        self.assertIsNone(activity.offline_notice_until)
+        self.assertEqual(activity.offline_notice_note, '')
+
+    # --- warning email ------------------------------------------------------
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'
+    )
+    def test_warning_email_is_sent_when_address_exists(self):
+        from django.core import mail
+
+        from apps.ofw.activity import send_ofw_warning_email
+
+        sent = send_ofw_warning_email(
+            self.user, 'Subject', 'Body',
+        )
+        self.assertTrue(sent)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['gap_ofw@example.com'])
+
+    def test_warning_email_is_skipped_without_address(self):
+        from apps.ofw.activity import send_ofw_warning_email
+
+        self.user.email = ''
+        self.user.save(update_fields=['email'])
+        self.assertFalse(send_ofw_warning_email(self.user, 'Subject', 'Body'))
+
+    # --- alert responses ----------------------------------------------------
+
+    def _alert(self, **overrides):
+        defaults = {
+            'ofw': self.profile,
+            'title': 'Welfare check needed',
+            'message': 'No activity for four days.',
+            'level': EmergencyAlert.Level.WARNING,
+        }
+        defaults.update(overrides)
+        return EmergencyAlert.objects.create(**defaults)
+
+    def test_ofw_marks_alert_safe(self):
+        alert = self._alert()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse('ofw:portal_alert_respond', args=[alert.pk]),
+            {'action': 'safe', 'note': 'At the hospital, all good.'},
+        )
+        self.assertEqual(response.status_code, 302)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.RESOLVED)
+        self.assertIn('At the hospital', alert.message)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='marked safe',
+            ).exists()
+        )
+
+    def test_ofw_asks_for_continued_help(self):
+        alert = self._alert()
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse('ofw:portal_alert_respond', args=[alert.pk]),
+            {'action': 'need_help', 'note': 'Still locked out.'},
+        )
+        alert.refresh_from_db()
+        self.assertEqual(alert.level, EmergencyAlert.Level.DANGER)
+        self.assertIn('Still locked out', alert.message)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='still needs help',
+            ).exists()
+        )
+
+    def test_ofw_cannot_respond_to_another_ofw_alert(self):
+        alert = self._alert(ofw=self.other_profile)
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse('ofw:portal_alert_respond', args=[alert.pk]),
+            {'action': 'safe'},
+        )
+        self.assertEqual(response.status_code, 404)
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, EmergencyAlert.Status.OPEN)
+
+    def test_cancel_sos_targets_the_requested_alert(self):
+        older = self._alert(title='Older alert')
+        newer = self._alert(title='Newer alert')
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse('ofw:portal_cancel_sos'), {'alert_id': older.pk},
+        )
+        self.assertEqual(response.status_code, 302)
+        older.refresh_from_db()
+        newer.refresh_from_db()
+        self.assertEqual(older.status, EmergencyAlert.Status.RESOLVED)
+        self.assertEqual(newer.status, EmergencyAlert.Status.OPEN)
+
+    # --- police requests ----------------------------------------------------
+
+    def test_ofw_can_request_police_assistance(self):
+        alert = self._alert()
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse('ofw:portal_request_police'),
+            {'message': 'My employer took my passport and I am afraid.'},
+        )
+        self.assertEqual(response.status_code, 302)
+        report = PoliceReport.objects.get(ofw=self.profile)
+        self.assertTrue(report.requested_by_ofw)
+        self.assertEqual(report.status, PoliceReport.Status.DRAFT)
+        self.assertEqual(report.reported_by, self.user)
+        alert.refresh_from_db()
+        self.assertEqual(alert.police_report_id, report.pk)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                title__icontains='Police help requested',
+            ).exists()
+        )
+
+    def test_short_police_request_is_rejected(self):
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse('ofw:portal_request_police'), {'message': 'help'},
+        )
+        self.assertFalse(
+            PoliceReport.objects.filter(ofw=self.profile).exists()
+        )
+
+    def test_duplicate_open_police_request_is_blocked(self):
+        PoliceReport.objects.create(
+            ofw=self.profile, title='Existing request',
+            status=PoliceReport.Status.DRAFT, reported_by=self.user,
+            requested_by_ofw=True,
+        )
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse('ofw:portal_request_police'),
+            {'message': 'A second request with enough detail.'},
+        )
+        self.assertEqual(
+            PoliceReport.objects.filter(ofw=self.profile).count(), 1,
+        )
+
+    def test_police_report_detail_is_private_to_the_ofw(self):
+        report = PoliceReport.objects.create(
+            ofw=self.other_profile, title='Other OFW report',
+            status=PoliceReport.Status.DRAFT, reported_by=self.staff,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse('ofw:portal_police_report_detail', args=[report.pk])
+        )
+        self.assertEqual(response.status_code, 404)
+
+    # --- management police flow --------------------------------------------
+
+    def test_recording_police_contact_saves_details_and_notifies_ofw(self):
+        report = PoliceReport.objects.create(
+            ofw=self.profile, title='Missing OFW follow-up',
+            status=PoliceReport.Status.DRAFT, reported_by=self.staff,
+        )
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('ofw:police_report_submit', args=[report.pk]),
+            {
+                'police_station': 'Dubai Police Station',
+                'police_contact': '+971 4 999 9999',
+                'report_number': '2026-004512',
+                'officer_name': 'Officer Karim',
+                'follow_up_on': '2026-12-01',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        report.refresh_from_db()
+        self.assertEqual(report.status, PoliceReport.Status.SUBMITTED)
+        self.assertEqual(report.report_number, '2026-004512')
+        self.assertEqual(report.officer_name, 'Officer Karim')
+        self.assertEqual(report.follow_up_on.isoformat(), '2026-12-01')
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.user,
+                title__icontains='Police contact recorded',
+            ).exists()
+        )
+
+    def test_closing_a_report_stores_the_resolution_note(self):
+        report = PoliceReport.objects.create(
+            ofw=self.profile, title='Missing OFW follow-up',
+            status=PoliceReport.Status.SUBMITTED, reported_by=self.staff,
+        )
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('ofw:police_report_status_ajax', args=[report.pk]),
+            {'status': 'closed', 'resolution_note': 'OFW contacted, safe.'},
+        )
+        self.assertEqual(response.status_code, 200)
+        report.refresh_from_db()
+        self.assertEqual(report.status, PoliceReport.Status.CLOSED)
+        self.assertEqual(report.resolution_note, 'OFW contacted, safe.')
+
+    # --- guidance and coverage ---------------------------------------------
+
+    def test_guidance_page_includes_offline_snapshot_and_police_card(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_emergency_guidance'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'guidanceSnapshot')
+        self.assertContains(response, 'Save offline copy')
+        self.assertContains(response, 'Nearest police station')
+        self.assertContains(response, 'Dubai Police Station')
+
+    def test_guidance_flags_missing_embassy_office(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_emergency_guidance'))
+        self.assertContains(response, 'No embassy / POLO / OWWA office yet')
+
+    def test_safe_locations_page_lists_coverage_gaps_for_staff(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:safe_locations'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Missing embassy / POLO / OWWA office')
+        self.assertContains(response, 'United Arab Emirates')
+
+    def test_inactive_page_shows_offline_badge(self):
+        self._activity(
+            last_login_at=timezone.now() - timedelta(days=4),
+            last_activity_at=None,
+            days_inactive=4,
+            is_account_active=False,
+            offline_notice_until=timezone.localdate() + timedelta(days=2),
+            offline_notice_note='At sea',
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:inactive_ofws'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Offline until')
+        self.assertContains(response, 'At sea')
+
+    def test_login_warning_page_keeps_history_after_reset(self):
+        AuditLog.objects.create(
+            user=None, action=AuditLog.Action.UPDATE,
+            model_name='OFW activity', object_id=str(self.user.pk),
+            object_repr='Mila Santos',
+            changes='{"stage": "warning", "days_inactive": 4}',
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_login_warnings'))
+        self.assertContains(response, 'Warning history')
+        self.assertContains(response, 'Mila Santos')
+    def test_management_police_page_renders_status_controls(self):
+        PoliceReport.objects.create(
+            ofw=self.profile, title='Missing OFW follow-up',
+            status=PoliceReport.Status.DRAFT, reported_by=self.staff,
+            requested_by_ofw=True,
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('ofw:police_reports'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'status-select')
+        self.assertContains(response, 'OFW requested')
+        self.assertContains(response, 'Record contact')
+
+    def test_ofw_sees_the_full_report_detail(self):
+        report = PoliceReport.objects.create(
+            ofw=self.profile, title='Missing OFW follow-up',
+            description='Agency cannot reach the OFW.',
+            police_station='Dubai Police Station',
+            report_number='2026-004512',
+            officer_name='Officer Karim',
+            status=PoliceReport.Status.SUBMITTED,
+            reported_by=self.staff,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse('ofw:portal_police_report_detail', args=[report.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Case / blotter number')
+        self.assertContains(response, '2026-004512')
+        self.assertContains(response, 'Officer Karim')

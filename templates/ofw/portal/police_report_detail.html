@@ -1,0 +1,121 @@
+{% extends "theme/base.html" %}
+{% block content %}
+<div class="container-xl">
+  <div class="page-header d-print-none" aria-label="Page header">
+    <div class="row align-items-center g-2">
+      <div class="col-12 col-md">
+        <div class="page-pretitle">{{ page_pretitle }}</div>
+        <h2 class="page-title mb-0">{{ page_title }}</h2>
+        <div class="text-muted small mt-1">
+          Full details of the report filed about your case.
+        </div>
+      </div>
+      <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
+        <a href="{% url 'ofw:portal_police_reports' %}" class="btn btn-sm btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i>Back to police contact
+        </a>
+      </div>
+    </div>
+  </div>
+  <br>
+
+  <div class="row row-cards">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{{ report.title }}</h3>
+          <div class="card-actions">
+            <span class="badge bg-{% if report.status == 'submitted' %}warning{% elif report.status == 'responded' %}success{% elif report.status == 'closed' %}secondary{% else %}secondary{% endif %}-lt text-{% if report.status == 'submitted' %}warning{% elif report.status == 'responded' %}success{% elif report.status == 'closed' %}secondary{% else %}secondary{% endif %}">
+              {{ report.get_status_display }}
+            </span>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if report.requested_by_ofw %}
+          <div class="alert alert-info py-2">
+            <div><i class="fas fa-user me-1"></i>You asked your agency to contact the police for this case.</div>
+          </div>
+          {% endif %}
+          <div class="text-muted small">Description</div>
+          <p class="mb-3">{{ report.description|default:"No additional details."|linebreaksbr }}</p>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="text-muted small">Police station</div>
+              <div class="fw-medium">{{ report.police_station|default:"Not set yet" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-muted small">Case / blotter number</div>
+              <div class="fw-medium">{{ report.report_number|default:"Not provided" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-muted small">Officer</div>
+              <div class="fw-medium">{{ report.officer_name|default:"Not provided" }}</div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-muted small">Next follow-up</div>
+              <div class="fw-medium">{{ report.follow_up_on|date:"M d, Y"|default:"Not scheduled" }}</div>
+            </div>
+          </div>
+
+          {% if report.resolution_note %}
+          <hr>
+          <div class="text-muted small">Outcome</div>
+          <p class="mb-0">{{ report.resolution_note|linebreaksbr }}</p>
+          {% endif %}
+        </div>
+        <div class="card-footer d-flex flex-wrap gap-2">
+          {% if report.police_contact %}
+          <a href="tel:{{ report.police_contact }}" class="btn btn-success">
+            <i class="fas fa-phone me-1"></i>Call {{ report.police_contact }}
+          </a>
+          {% endif %}
+          <a href="{% url 'ofw:portal_emergency_guidance' %}" class="btn btn-outline-danger">
+            <i class="fas fa-headset me-1"></i>Emergency guidance
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-clock-rotate-left text-muted me-2"></i>Timeline</h3>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="fw-medium">Report created</div>
+            <div class="text-muted small">{{ report.reported_at|date:"M d, Y H:i" }}</div>
+          </div>
+          <div class="mb-3">
+            <div class="fw-medium">Filed by</div>
+            <div class="text-muted small">
+              {{ report.reported_by.get_full_name|default:report.reported_by.username }}
+            </div>
+          </div>
+          {% if report.status == 'submitted' %}
+          <div class="mb-3">
+            <div class="fw-medium">Police contact recorded</div>
+            <div class="text-muted small">Updated {{ report.updated_at|date:"M d, Y H:i" }}</div>
+          </div>
+          {% elif report.status == 'responded' %}
+          <div class="mb-3">
+            <div class="fw-medium">Police responded</div>
+            <div class="text-muted small">Updated {{ report.updated_at|date:"M d, Y H:i" }}</div>
+          </div>
+          {% elif report.status == 'closed' %}
+          <div class="mb-3">
+            <div class="fw-medium">Report closed</div>
+            <div class="text-muted small">Updated {{ report.updated_at|date:"M d, Y H:i" }}</div>
+          </div>
+          {% endif %}
+          <div class="text-muted small">
+            This page records what your agency did. It does not send anything to
+            the police automatically.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

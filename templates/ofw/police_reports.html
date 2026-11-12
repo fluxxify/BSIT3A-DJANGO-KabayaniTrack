@@ -17,8 +17,9 @@
     <i class="fas fa-file-alt me-2"></i>
     <div>
       Police reports are created when an unresponsive OFW cannot be reached after
-      an inactivity warning. Contact the local police station directly, then
-      record that contact here. KabayaniTrack does not send reports to police.
+      an inactivity warning, or when an OFW asks for police help from the portal.
+      Contact the local police station directly, then record that contact here.
+      KabayaniTrack does not send reports to police.
     </div>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
@@ -32,7 +33,7 @@
             <th>OFW</th>
             <th>Reported By</th>
             <th class="w-1">Status</th>
-            <th class="text-end w-1">Reported</th>
+            <th>Station / Officer</th>
             <th class="w-1">Action</th>
           </tr>
         </thead>
@@ -44,61 +45,105 @@
                 {{ report.ofw.full_name }}
               </a>
               <div class="text-muted small">{{ report.ofw.country|default:"Not set" }} / {{ report.ofw.city_abroad|default:"-" }}</div>
+              {% if report.description %}
+              <div class="text-muted small mt-1">{{ report.description|truncatechars:160 }}</div>
+              {% endif %}
+              {% if report.requested_by_ofw %}
+              <span class="badge bg-info-lt text-info mt-1">OFW requested</span>
+              {% endif %}
             </td>
-            <td class="text-muted">{{ report.reported_by.username }}</td>
+            <td class="text-muted">
+              {{ report.reported_by.username }}
+              <div class="small">{{ report.reported_at|date:"M d, Y H:i" }}</div>
+            </td>
             <td>
-              <span class="badge bg-{% if report.status == 'submitted' %}success{% elif report.status == 'responded' %}info{% else %}warning{% endif %}-lt text-{% if report.status == 'submitted' %}success{% elif report.status == 'responded' %}info{% else %}warning{% endif %}">
+              <span class="badge bg-{% if report.status == 'submitted' %}success{% elif report.status == 'responded' %}info{% elif report.status == 'closed' %}secondary{% else %}warning{% endif %}-lt text-{% if report.status == 'submitted' %}success{% elif report.status == 'responded' %}info{% elif report.status == 'closed' %}secondary{% else %}warning{% endif %}">
                 {{ report.get_status_display }}
               </span>
+              {% if report.report_number %}
+              <div class="text-muted small mt-1">Case {{ report.report_number }}</div>
+              {% endif %}
+              {% if report.follow_up_on %}
+              <div class="text-muted small">Follow-up {{ report.follow_up_on|date:"M d" }}</div>
+              {% endif %}
             </td>
-            <td class="text-end text-muted">{{ report.reported_at|date:"M d, Y H:i" }}</td>
+            <td class="text-muted">
+              {% if report.police_station %}{{ report.police_station }}<br>{% endif %}
+              {% if report.officer_name %}<span class="small">Officer {{ report.officer_name }}</span>{% endif %}
+              {% if not report.police_station and not report.officer_name %}—{% endif %}
+            </td>
             <td class="text-end">
               {% if report.status == 'draft' %}
               <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#submitModal{{ report.pk }}">
                 <i class="fas fa-phone"></i> Record contact
               </button>
-              {% else %}
-              <span class="badge bg-secondary-lt text-secondary">{{ report.get_status_display }}</span>
               {% endif %}
+              <select class="form-select form-select-sm mt-1 status-select"
+                      data-status-url="{% url 'ofw:police_report_status_ajax' report.pk %}"
+                      aria-label="Update report status">
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if report.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
             </td>
           </tr>
-
-          <div class="modal modal-blur fade" id="submitModal{{ report.pk }}" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-              <div class="modal-content">
-                <div class="modal-header">
-                  <h5 class="modal-title">Record police contact</h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                  <form method="post" action="{% url 'ofw:police_report_submit' report.pk %}">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                      <label class="form-label">Police Station <span class="text-danger">*</span></label>
-                      <input type="text" name="police_station" class="form-control" placeholder="e.g. Riyadh Central Police Station" required>
-                    </div>
-                    <div class="mb-3">
-                      <label class="form-label">Police Contact Number</label>
-                      <input type="text" name="police_contact" class="form-control" placeholder="+966 11 000 0000">
-                    </div>
-                    <div class="mb-3 text-muted small">
-                      This records the contact in KabayaniTrack. It does not send
-                      the report to police or notify the OFW's emergency contacts.
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button type="submit" class="btn btn-primary">Record contact</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
+
+  {# Modals live outside the table so the browser does not foster-parent them. #}
+  {% for report in reports %}
+  {% if report.status == 'draft' %}
+  <div class="modal modal-blur fade" id="submitModal{{ report.pk }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Record police contact</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form method="post" action="{% url 'ofw:police_report_submit' report.pk %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">Police Station <span class="text-danger">*</span></label>
+              <input type="text" name="police_station" class="form-control" placeholder="e.g. Riyadh Central Police Station" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Police Contact Number</label>
+              <input type="text" name="police_contact" class="form-control" placeholder="+966 11 000 0000">
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Case / blotter number</label>
+                <input type="text" name="report_number" class="form-control" placeholder="e.g. 2026-004512">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Officer</label>
+                <input type="text" name="officer_name" class="form-control" placeholder="Officer name">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Next follow-up</label>
+              <input type="date" name="follow_up_on" class="form-control">
+            </div>
+            <div class="mb-3 text-muted small">
+              This records the contact in KabayaniTrack and notifies the
+              OFW that the police contact was recorded. It does not send the
+              report to police or notify the OFW's emergency contacts.
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Record contact</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endfor %}
 
   {% else %}
   <div class="text-muted text-center py-5">
@@ -107,4 +152,40 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  function csrfToken() {
+    var input = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    if (input && input.value) { return input.value; }
+    return '{{ csrf_token }}';
+  }
+  document.addEventListener('change', function (event) {
+    var select = event.target.closest('.status-select');
+    if (!select) { return; }
+    var url = select.getAttribute('data-status-url');
+    var body = new FormData();
+    body.append('status', select.value);
+    if (select.value === 'closed') {
+      var note = window.prompt('Outcome note (optional):', '');
+      if (note) { body.append('resolution_note', note); }
+    }
+    select.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken() },
+      body: body,
+      credentials: 'same-origin'
+    }).then(function (response) {
+      if (!response.ok) { throw new Error('HTTP ' + response.status); }
+      window.location.reload();
+    }).catch(function () {
+      select.disabled = false;
+      window.alert('Could not update the status. Please try again.');
+    });
+  });
+})();
+</script>
 {% endblock %}

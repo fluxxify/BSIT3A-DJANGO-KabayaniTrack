@@ -53,6 +53,7 @@
     <p class="text-muted small mb-3">Mark this as a false alarm to notify management that you are safe.</p>
     <form method="post" action="{% url 'ofw:portal_cancel_sos' %}" class="d-inline">
       {% csrf_token %}
+      {% if open_alert %}<input type="hidden" name="alert_id" value="{{ open_alert.pk }}">{% endif %}
       <button type="submit" class="btn btn-danger btn-lg" onclick="return confirm('Cancel this emergency alert? Management will be notified that you are safe.');">
         <i class="fas fa-times me-2"></i>Cancel SOS
       </button>

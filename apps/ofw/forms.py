@@ -607,3 +607,53 @@ class SafeLocationSuggestionForm(StyledModelForm):
             'name', 'location_type', 'country', 'city', 'address',
             'phone', 'latitude', 'longitude', 'notes',
         ]
+
+
+class OFWOfflineNoticeForm(forms.Form):
+    """Declare a short offline window so warnings do not become false alarms."""
+
+    until = forms.DateField(
+        label='Offline until',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        help_text='Up to 30 days ahead. Warnings pause until this date.',
+    )
+    note = forms.CharField(
+        label='Reason (optional)',
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. At sea, no signal until Friday',
+        }),
+    )
+
+    def clean_until(self):
+        from datetime import timedelta
+
+        until = self.cleaned_data['until']
+        today = timezone.localdate()
+        if until < today:
+            raise ValidationError('Choose today or a future date.')
+        if until > today + timedelta(days=30):
+            raise ValidationError('Choose a date within the next 30 days.')
+        return until
+
+
+class OFWPoliceRequestForm(forms.Form):
+    """A short message from an OFW asking the agency to contact police."""
+
+    message = forms.CharField(
+        label='What happened?',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Briefly describe the situation so your agency can act.',
+        }),
+        max_length=1000,
+    )
+
+    def clean_message(self):
+        message = (self.cleaned_data['message'] or '').strip()
+        if len(message) < 10:
+            raise ValidationError('Add a little more detail (at least 10 characters).')
+        return message

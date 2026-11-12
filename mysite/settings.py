@@ -53,6 +53,12 @@ elif not DEBUG:
 # Origins trusted for CSRF-protected POSTs (login, register, forms). When served
 # behind an HTTPS tunnel or hosting provider the public origin must be listed
 # here explicitly.
+# Public base URL used in outbound email (login warnings, alerts). Override with
+# SITE_BASE_URL when deploying somewhere other than PythonAnywhere.
+SITE_BASE_URL = os.environ.get(
+    'SITE_BASE_URL', 'https://Fluxxify.pythonanywhere.com'
+).rstrip('/')
+
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
@@ -96,6 +102,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.ofw.middleware.OFWActivityMiddleware',
     'mysite.security.SecurityHeadersMiddleware',
 ]
 

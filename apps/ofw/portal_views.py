@@ -7,6 +7,8 @@ check-ins, assessments and concerns logged by management against an OFW's
 profile are surfaced back here because they are linked through the profile.
 """
 
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -21,6 +23,8 @@ from apps.users.models import Agency
 from .activity import refresh_activity_for_user
 from .forms import (
     FamilyContactForm,
+    OFWOfflineNoticeForm,
+    OFWPoliceRequestForm,
     OFWPortalProfileForm,
     OFWSelfCheckInForm,
     OFWSelfConcernForm,
@@ -34,6 +38,7 @@ from .locations import (
     cities_for_country,
 )
 from .models import (
+    AuditLog,
     CheckIn,
     Concern,
     ConcernProof,
@@ -70,6 +75,11 @@ def _guard(request):
     return redirect('dashboard')
 
 
+# Safe-place details older than this are flagged so an OFW knows to verify the
+# phone number before relying on it in an emergency.
+SAFE_PLACE_STALE_DAYS = 180
+
+
 def _profile_for(user):
     return OFWProfile.objects.filter(user=user).order_by('id').first()
 
@@ -104,6 +114,7 @@ def _country_places(profile):
 def _place_row(place):
     """A template-friendly safe-place row (with coordinates when available)."""
     has_coords = place.has_coords
+    updated_at = getattr(place, 'updated_at', None)
     return {
         'id': place.pk,
         'name': place.name,
@@ -113,6 +124,11 @@ def _place_row(place):
         'country': place.country,
         'address': place.address,
         'phone': place.phone,
+        'updated_at': updated_at,
+        'stale': bool(
+            updated_at
+            and (timezone.now() - updated_at).days > SAFE_PLACE_STALE_DAYS
+        ),
         'tel': ''.join(
             char for char in (place.phone or '') if char.isdigit() or char == '+'
         ),
@@ -430,6 +446,56 @@ def portal_emergency_guidance(request):
         .exclude(contact_type__in=EmergencyContact.PUBLIC_TYPES)
         .order_by('contact_type', 'name')[:4]
     )
+    nearest_police_station = _nearest_police_station(
+        profile, latest_ping=latest_ping
+    )
+    has_local_office = SafeLocation.objects.filter(
+        is_active=True,
+        country__iexact=country,
+        location_type__in=[
+            SafeLocation.LocationType.EMBASSY,
+            SafeLocation.LocationType.POLO,
+            SafeLocation.LocationType.OWWA,
+        ],
+    ).exists() if country else False
+
+    # A compact snapshot the page can cache in localStorage, so the numbers and
+    # addresses are still readable when the OFW has no data connection.
+    snapshot = {
+        'country': country,
+        'city': city,
+        'police': (
+            {
+                'name': police_hotline.name,
+                'phone': police_hotline.phone,
+                'dial': police_hotline.dial_number,
+            }
+            if police_hotline is not None else None
+        ),
+        'hotlines': [
+            {
+                'name': contact.name,
+                'phone': contact.phone,
+                'dial': contact.dial_number,
+                'type': contact.get_contact_type_display(),
+            }
+            for contact in (
+                list(local_hotlines) + list(national_hotlines)
+            )[:10]
+        ],
+        'places': [
+            {
+                'name': place['name'],
+                'type': place['type'],
+                'phone': place['phone'],
+                'address': place['address'],
+                'city': place['city'],
+                'country': place['country'],
+                'maps_url': place['maps_url'],
+            }
+            for place in nearest_places
+        ],
+    }
 
     return render(request, 'ofw/portal/emergency_guidance.html', {
         'profile': profile,
@@ -437,6 +503,9 @@ def portal_emergency_guidance(request):
         'location_city': city,
         'latest_ping': latest_ping,
         'nearest_places': nearest_places,
+        'nearest_police_station': nearest_police_station,
+        'has_local_office': has_local_office,
+        'guidance_snapshot': snapshot,
         'alerts': alerts[:10],
         'active_alert_count': active_alerts.count(),
         'open_alert': open_alert,
@@ -444,6 +513,7 @@ def portal_emergency_guidance(request):
         'national_hotlines': national_hotlines,
         'police_hotline': police_hotline,
         'family_contacts': family_contacts,
+        'safe_place_stale_days': SAFE_PLACE_STALE_DAYS,
         'agency_phone': (
             profile.agency_org.phone
             if profile.agency_org_id and profile.agency_org.phone else ''
@@ -458,8 +528,9 @@ def portal_login_warnings(request):
     """OFW counterpart of the management Login Warnings console.
 
     The OFW sees the same activity clock that management uses: last successful
-    login, days inactive, the 3-day warning stage and the 6-day follow-up
-    stage, plus any warning messages received from their agency.
+    login, last portal activity, days inactive, the 3-day warning stage and the
+    6-day follow-up stage, plus any warning messages received from their
+    agency. The OFW can also pause warnings while they expect to be offline.
     """
     guard = _guard(request)
     if guard:
@@ -467,9 +538,61 @@ def portal_login_warnings(request):
 
     profile = _profile_for(request.user)
     activity = refresh_activity_for_user(request.user)
+
+    offline_form = OFWOfflineNoticeForm()
+
+    if request.method == 'POST':
+        action = (request.POST.get('action') or '').strip()
+        if action == 'mark_warnings_read':
+            Notification.objects.filter(
+                recipient=request.user, is_read=False,
+            ).update(is_read=True)
+            messages.success(request, 'Warning messages marked as read.')
+            return redirect('ofw:portal_login_warnings')
+        if action == 'clear_offline_notice':
+            activity.offline_notice_until = None
+            activity.offline_notice_note = ''
+            activity.offline_notice_set_at = None
+            activity.save(update_fields=[
+                'offline_notice_until', 'offline_notice_note',
+                'offline_notice_set_at', 'updated_at',
+            ])
+            messages.info(request, 'Offline notice cleared. Welfare warnings resumed.')
+            return redirect('ofw:portal_login_warnings')
+        if action == 'resume_now':
+            activity.offline_notice_until = None
+            activity.offline_notice_note = ''
+            activity.offline_notice_set_at = None
+            activity.last_activity_at = timezone.now()
+            activity.save(update_fields=[
+                'offline_notice_until', 'offline_notice_note',
+                'offline_notice_set_at', 'last_activity_at', 'updated_at',
+            ])
+            activity = refresh_activity_for_user(request.user)
+            messages.success(request, 'Welcome back. Your activity clock is reset.')
+            return redirect('ofw:portal_login_warnings')
+        if action == 'set_offline_notice':
+            offline_form = OFWOfflineNoticeForm(request.POST)
+            if offline_form.is_valid():
+                activity.offline_notice_until = offline_form.cleaned_data['until']
+                activity.offline_notice_note = (
+                    offline_form.cleaned_data.get('note') or ''
+                ).strip()
+                activity.offline_notice_set_at = timezone.now()
+                activity.save(update_fields=[
+                    'offline_notice_until', 'offline_notice_note',
+                    'offline_notice_set_at', 'updated_at',
+                ])
+                messages.success(
+                    request,
+                    'Offline notice saved. Warnings pause until '
+                    f'{activity.offline_notice_until:%B %d, %Y}.',
+                )
+                return redirect('ofw:portal_login_warnings')
+
     days_inactive = activity.days_inactive
-    is_inactive = days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
-    if days_inactive > 5:
+    is_inactive = days_inactive >= OFWActivity.WARNING_DAYS
+    if days_inactive >= OFWActivity.FOLLOWUP_DAYS:
         warning_stage = 'followup'
         warning_label = 'Follow-up overdue'
     elif is_inactive:
@@ -479,10 +602,16 @@ def portal_login_warnings(request):
         warning_stage = 'active'
         warning_label = 'Account active'
 
-    warning_notifications = Notification.objects.filter(
+    warning_qs = Notification.objects.filter(
         recipient=request.user,
         level__in=[Notification.Level.WARNING, Notification.Level.DANGER],
-    ).order_by('-created_at')[:20]
+    ).order_by('-created_at')
+    # Count before slicing: a sliced queryset cannot be filtered again.
+    unread_warning_count = warning_qs.filter(is_read=False).count()
+    warning_notifications = list(warning_qs[:20])
+    warning_history = AuditLog.objects.filter(
+        model_name='OFW activity', object_id=str(request.user.pk),
+    ).order_by('-created_at')[:10]
     last_checkin = (
         CheckIn.objects.filter(ofw__user=request.user)
         .order_by('-checkin_date')
@@ -501,9 +630,14 @@ def portal_login_warnings(request):
         'warning_stage': warning_stage,
         'warning_label': warning_label,
         'warning_notifications': warning_notifications,
+        'unread_warning_count': unread_warning_count,
+        'warning_history': warning_history,
         'last_checkin': last_checkin,
         'agency_phone': agency_phone,
-        'threshold_days': OFWActivity.INACTIVE_THRESHOLD_DAYS,
+        'offline_form': offline_form,
+        'offline_notice_active': activity.offline_notice_active,
+        'threshold_days': OFWActivity.WARNING_DAYS,
+        'followup_days': OFWActivity.FOLLOWUP_DAYS,
         'page_title': 'Login Warnings',
         'page_pretitle': 'Account Activity',
     })
@@ -941,7 +1075,7 @@ def portal_suggest_safe_place(request):
 
 @login_required(login_url='login')
 def portal_emergency_alerts(request):
-    """OFW views their own emergency alerts."""
+    """OFW views their own emergency alerts with a per-alert timeline."""
     guard = _guard(request)
     if guard:
         return guard
@@ -951,19 +1085,124 @@ def portal_emergency_alerts(request):
         messages.info(request, 'Please complete your profile first.')
         return redirect('ofw:portal_profile')
 
-    alerts = EmergencyAlert.objects.filter(ofw=profile).order_by('-created_at')
-    active_alerts = alerts.exclude(status=EmergencyAlert.Status.RESOLVED)
+    alerts_qs = EmergencyAlert.objects.filter(ofw=profile).select_related(
+        'acknowledged_by', 'police_report',
+    ).order_by('-created_at')
+    active_alerts = alerts_qs.exclude(status=EmergencyAlert.Status.RESOLVED)
     latest_ping = _latest_ping(profile)
-    nearest_places = _safety_places(profile, latest_ping=latest_ping, limit=3)
+
+    paginator = Paginator(alerts_qs, 10)
+    page = paginator.get_page(request.GET.get('page'))
+    page.object_list = list(page.object_list)
+
+    status_labels = {
+        EmergencyAlert.Status.OPEN: 'Waiting for your agency',
+        EmergencyAlert.Status.ACKNOWLEDGED: 'Your agency is responding',
+        EmergencyAlert.Status.ESCALATED: 'Escalated to police',
+        EmergencyAlert.Status.RESOLVED: 'Closed',
+    }
+    for alert in page.object_list:
+        alert.friendly_status = status_labels.get(
+            alert.status, alert.get_status_display()
+        )
+
+    agency_phone = (
+        profile.agency_org.phone
+        if profile.agency_org_id and profile.agency_org.phone else ''
+    )
 
     return render(request, 'ofw/portal/emergency_alerts.html', {
         'profile': profile,
-        'alerts': alerts,
+        'alerts': page,
+        'page_obj': page,
+        'alerts_total': paginator.count,
         'active_alert_count': active_alerts.count(),
         'open_alert': active_alerts.first(),
-        'nearest_places': nearest_places,
+        'nearest_places': _safety_places(
+            profile, latest_ping=latest_ping, limit=3
+        ),
+        'latest_ping': latest_ping,
+        'agency_phone': agency_phone,
+        'status_labels': status_labels,
         'page_title': 'My Emergency Alerts',
     })
+
+
+@login_required(login_url='login')
+@require_POST
+@rate_limit('alert-respond', 12, 60)
+def portal_alert_respond(request, pk):
+    """OFW marks an alert safe, or asks for continued help with a note."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Please complete your profile first.')
+        return redirect('ofw:portal_profile')
+
+    alert = get_object_or_404(EmergencyAlert, pk=pk, ofw=profile)
+    action = (request.POST.get('action') or '').strip()
+    note = (request.POST.get('note') or '').strip()[:500]
+
+    if alert.status == EmergencyAlert.Status.RESOLVED:
+        messages.info(request, 'This alert is already closed.')
+        return redirect('ofw:portal_emergency_alerts')
+
+    stamp = timezone.localtime().strftime('%b %d, %Y %H:%M')
+
+    if action == 'safe':
+        alert.status = EmergencyAlert.Status.RESOLVED
+        alert.message = (
+            f'{alert.message}\n\nOFW marked themselves safe on {stamp}.'
+            f'{(" Note: " + note) if note else ""}'
+        )
+        alert.save(update_fields=['status', 'message', 'updated_at'])
+        notify_managers(
+            title=f'OFW marked safe: {profile.full_name}',
+            message=(
+                f'{profile.full_name} closed their emergency alert and marked '
+                f'themselves safe from the portal.'
+                f'{(" Note: " + note) if note else ""}'
+            ),
+            url=reverse('ofw:profile_detail', args=[profile.pk]),
+            level=Notification.Level.SUCCESS,
+            agency=profile.agency_org,
+        )
+        notify(
+            request.user,
+            'You marked yourself safe',
+            'Your agency has been notified that you are safe and the alert is closed.',
+            url=reverse('ofw:portal_emergency_alerts'),
+            level=Notification.Level.SUCCESS,
+        )
+        messages.success(request, 'Alert closed. Your agency knows you are safe.')
+    elif action == 'need_help':
+        alert.level = EmergencyAlert.Level.DANGER
+        alert.message = (
+            f'{alert.message}\n\nOFW asked for continued help on {stamp}.'
+            f'{(" Note: " + note) if note else ""}'
+        )
+        alert.save(update_fields=['level', 'message', 'updated_at'])
+        notify_managers(
+            title=f'OFW still needs help: {profile.full_name}',
+            message=(
+                f'{profile.full_name} asked for continued help from the portal.'
+                f'{(" Note: " + note) if note else ""}'
+            ),
+            url=reverse('ofw:profile_detail', args=[profile.pk]),
+            level=Notification.Level.DANGER,
+            agency=profile.agency_org,
+        )
+        messages.warning(
+            request,
+            'Your agency has been told you still need help. Keep your phone reachable.',
+        )
+    else:
+        messages.error(request, 'Choose an action first.')
+
+    return redirect('ofw:portal_emergency_alerts')
 
 
 @login_required(login_url='login')
@@ -978,7 +1217,9 @@ def portal_police_reports(request):
         messages.info(request, 'Please complete your profile first.')
         return redirect('ofw:portal_profile')
 
-    reports = PoliceReport.objects.filter(ofw=profile).order_by('-reported_at')
+    reports_qs = PoliceReport.objects.filter(ofw=profile).select_related(
+        'reported_by'
+    ).order_by('-reported_at')
     latest_ping = _latest_ping(profile)
     country = canonical_country(profile.country) if profile.country else ''
     local_hotlines, national_hotlines = _hotlines_for(country)
@@ -989,15 +1230,134 @@ def portal_police_reports(request):
         if profile.agency_org_id and profile.agency_org.phone else ''
     )
 
+    pending_request = reports_qs.filter(
+        requested_by_ofw=True,
+        status__in=[
+            PoliceReport.Status.DRAFT,
+            PoliceReport.Status.SUBMITTED,
+            PoliceReport.Status.RESPONDED,
+        ],
+    ).first()
+
+    paginator = Paginator(reports_qs, 8)
+    page = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'ofw/portal/police_reports.html', {
         'profile': profile,
-        'reports': reports,
-        'latest_report': reports.first(),
+        'reports': page,
+        'page_obj': page,
+        'reports_total': paginator.count,
+        'latest_report': reports_qs.first(),
         'latest_ping': latest_ping,
         'police_hotline': police_hotline,
         'nearest_station': nearest_station,
         'agency_phone': agency_phone,
         'location_country': country,
+        'request_form': OFWPoliceRequestForm(),
+        'pending_request': pending_request,
         'page_title': 'Police Contact',
+        'page_pretitle': 'OFW Portal',
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+@rate_limit('police-request', 5, 300)
+def portal_request_police(request):
+    """Let the OFW ask their agency to contact the police for them."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Please complete your profile first.')
+        return redirect('ofw:portal_profile')
+
+    recent = PoliceReport.objects.filter(
+        ofw=profile,
+        requested_by_ofw=True,
+        reported_at__gte=timezone.now() - timedelta(days=1),
+        status__in=[
+            PoliceReport.Status.DRAFT,
+            PoliceReport.Status.SUBMITTED,
+            PoliceReport.Status.RESPONDED,
+        ],
+    ).exists()
+    if recent:
+        messages.info(
+            request,
+            'You already have an open police assistance request. '
+            'Your agency is working on it.',
+        )
+        return redirect('ofw:portal_police_reports')
+
+    form = OFWPoliceRequestForm(request.POST)
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+        return redirect('ofw:portal_police_reports')
+
+    report = PoliceReport.objects.create(
+        ofw=profile,
+        title=f'Police assistance requested — {profile.full_name}',
+        description=form.cleaned_data['message'],
+        status=PoliceReport.Status.DRAFT,
+        reported_by=request.user,
+        requested_by_ofw=True,
+    )
+
+    open_alert = EmergencyAlert.objects.filter(
+        ofw=profile,
+    ).exclude(status=EmergencyAlert.Status.RESOLVED).order_by('-created_at').first()
+    if open_alert is not None and open_alert.police_report_id is None:
+        open_alert.police_report = report
+        open_alert.save(update_fields=['police_report', 'updated_at'])
+
+    notify_managers(
+        title=f'Police help requested: {profile.full_name}',
+        message=(
+            f'{profile.full_name} asked for police assistance from the OFW '
+            f'portal. Review the request and contact the nearest station.'
+        ),
+        url=reverse('ofw:police_reports'),
+        level=Notification.Level.DANGER,
+        agency=profile.agency_org,
+        exclude_user=request.user,
+    )
+    notify(
+        request.user,
+        'Police assistance request sent',
+        'Your agency has been asked to contact the police for you. '
+        'If you are in danger right now, call the police number on this page.',
+        url=reverse('ofw:portal_police_reports'),
+        level=Notification.Level.INFO,
+    )
+    messages.success(
+        request,
+        'Your request was sent to your agency. If you are in danger, call the '
+        'police now using the number on this page.',
+    )
+    return redirect('ofw:portal_police_reports')
+
+
+@login_required(login_url='login')
+def portal_police_report_detail(request, pk):
+    """Full report details for the OFW, including the follow-up timeline."""
+    guard = _guard(request)
+    if guard:
+        return guard
+
+    profile = _profile_for(request.user)
+    if profile is None:
+        messages.info(request, 'Please complete your profile first.')
+        return redirect('ofw:portal_profile')
+
+    report = get_object_or_404(PoliceReport, pk=pk, ofw=profile)
+    return render(request, 'ofw/portal/police_report_detail.html', {
+        'profile': profile,
+        'report': report,
+        'page_title': 'Police Report Details',
         'page_pretitle': 'OFW Portal',
     })

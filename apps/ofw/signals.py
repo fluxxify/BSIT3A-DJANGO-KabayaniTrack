@@ -156,12 +156,17 @@ def ensure_ofw_activity(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=OFWProfile)
-def update_activity_on_profile_change(sender, instance, **kwargs):
-    """Record profile edits without treating them as a successful login."""
-    if instance.user_id:
-        activity, _ = OFWActivity.objects.get_or_create(user_id=instance.user_id)
-        activity.last_activity_at = timezone.now()
-        activity.save(update_fields=['last_activity_at', 'updated_at'])
+def update_activity_on_profile_change(sender, instance, created=False, **kwargs):
+    """Record profile edits without treating them as a successful login.
+
+    A brand-new profile is not activity: the row is created with an empty
+    activity clock so a freshly imported OFW still gets a fair 3-day window.
+    """
+    if created or not instance.user_id:
+        return
+    activity, _ = OFWActivity.objects.get_or_create(user_id=instance.user_id)
+    activity.last_activity_at = timezone.now()
+    activity.save(update_fields=['last_activity_at', 'updated_at'])
 
 
 @receiver(user_logged_in)
@@ -203,3 +208,10 @@ def sync_welfare_status_from_assessment(sender, instance, **kwargs):
 def sync_welfare_status_from_checkin(sender, instance, **kwargs):
     from .welfare import sync_from_checkin
     sync_from_checkin(instance)
+    # A check-in is the strongest sign that the OFW is reachable, so it also
+    # resets the portal activity clock used by the login-warning page.
+    if instance.user_id and not getattr(instance.user, 'is_staff', False):
+        OFWActivity.objects.filter(user_id=instance.user_id).update(
+            last_activity_at=instance.checkin_date or timezone.now(),
+            updated_at=timezone.now(),
+        )

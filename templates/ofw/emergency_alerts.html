@@ -54,6 +54,12 @@
               {% if alert.ofw.contact_number %}
               <div class="text-muted small"><i class="fas fa-phone me-1"></i>{{ alert.ofw.contact_number }}</div>
               {% endif %}
+              {% if alert.message %}
+              <div class="text-muted small mt-1">{{ alert.message|truncatechars:160 }}</div>
+              {% endif %}
+              {% if alert.police_report_id %}
+              <a href="{% url 'ofw:police_reports' %}" class="small">Police report on file</a>
+              {% endif %}
             </td>
             <td>
               {% if alert.ofw.agency_org %}{{ alert.ofw.agency_org.name }}{% else %}<span class="text-muted">—</span>{% endif %}
@@ -99,6 +105,12 @@
               {{ alert.ofw.country|default:"Not set" }}
               {% if alert.ofw.agency_org %} · {{ alert.ofw.agency_org.name }}{% endif %}
             </div>
+            {% if alert.message %}
+            <div class="text-muted small mt-1">{{ alert.message|truncatechars:160 }}</div>
+            {% endif %}
+            {% if alert.police_report_id %}
+            <a href="{% url 'ofw:police_reports' %}" class="small">Police report on file</a>
+            {% endif %}
           </div>
           <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
             <span class="badge bg-{% if alert.level == 'danger' or alert.level == 'critical' %}danger{% else %}warning{% endif %}-lt text-{% if alert.level == 'danger' or alert.level == 'critical' %}danger{% else %}warning{% endif %}">

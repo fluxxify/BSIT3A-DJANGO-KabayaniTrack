@@ -54,12 +54,19 @@
           <div class="text-muted small mt-1">
             {% if nearest_station.address %}{{ nearest_station.address }}<br>{% endif %}
             {% if nearest_station.city %}{{ nearest_station.city }}, {% endif %}{{ nearest_station.country }}
+            {% if nearest_station.updated_at %}
+            <br><span class="text-muted">Updated {{ nearest_station.updated_at|date:"M d, Y" }}</span>
+            {% endif %}
           </div>
           <div class="d-flex flex-wrap gap-2 mt-3">
             {% if nearest_station.phone %}
             <a href="tel:{{ nearest_station.tel|default:nearest_station.phone }}" class="btn btn-sm btn-success">
               <i class="fas fa-phone me-1"></i>Call station
             </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-copy="{{ nearest_station.phone }}">
+              <i class="fas fa-copy me-1"></i>Copy number
+            </button>
             {% endif %}
             {% if nearest_station.maps_url %}
             <a href="{{ nearest_station.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
@@ -97,6 +104,9 @@
               {{ latest_report.get_status_display }}
             </span>
           </div>
+          {% if latest_report.requested_by_ofw %}
+          <div class="badge bg-info-lt text-info mt-1">You requested police help</div>
+          {% endif %}
           <div class="text-muted small mt-1">{{ latest_report.description|default:"No additional details." }}</div>
           <div class="text-muted small mt-2">
             Filed {{ latest_report.reported_at|date:"M d, Y H:i" }} by
@@ -105,16 +115,30 @@
           {% if latest_report.police_station %}
           <div class="text-muted small mt-1">Station: {{ latest_report.police_station }}</div>
           {% endif %}
-          {% if latest_report.police_contact %}
-          <a href="tel:{{ latest_report.police_contact }}" class="btn btn-sm btn-success mt-3">
-            <i class="fas fa-phone me-1"></i>Call recorded police contact
-          </a>
+          {% if latest_report.report_number %}
+          <div class="text-muted small mt-1">Case number: {{ latest_report.report_number }}</div>
           {% endif %}
+          {% if latest_report.officer_name %}
+          <div class="text-muted small mt-1">Officer: {{ latest_report.officer_name }}</div>
+          {% endif %}
+          {% if latest_report.follow_up_on %}
+          <div class="text-muted small mt-1">Follow-up: {{ latest_report.follow_up_on|date:"M d, Y" }}</div>
+          {% endif %}
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            {% if latest_report.police_contact %}
+            <a href="tel:{{ latest_report.police_contact }}" class="btn btn-sm btn-success">
+              <i class="fas fa-phone me-1"></i>Call recorded police contact
+            </a>
+            {% endif %}
+            <a href="{% url 'ofw:portal_police_report_detail' latest_report.pk %}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-eye me-1"></i>View details
+            </a>
+          </div>
           {% else %}
           <div class="text-muted text-center py-4">
             <i class="fas fa-file-shield fa-2x mb-2"></i>
             <p class="mb-1">No police report has been filed for you.</p>
-            <p class="small mb-0">A report is only created when management cannot reach you after an inactivity warning.</p>
+            <p class="small mb-0">A report is created when management cannot reach you after an inactivity warning, or when you ask for police help below.</p>
           </div>
           {% endif %}
         </div>
@@ -124,7 +148,48 @@
 
   <div class="card mt-3">
     <div class="card-header">
+      <h3 class="card-title"><i class="fas fa-hand-holding-heart text-danger me-2"></i>Ask my agency to contact the police</h3>
+    </div>
+    <div class="card-body">
+      {% if pending_request %}
+      <div class="alert alert-info mb-0">
+        <div>
+          <i class="fas fa-hourglass-half me-1"></i>
+          You already have an open request from
+          {{ pending_request.reported_at|date:"M d, Y H:i" }}.
+          <a href="{% url 'ofw:portal_police_report_detail' pending_request.pk %}">View its status</a>.
+          Call the police directly if you are in danger now.
+        </div>
+      </div>
+      {% else %}
+      <p class="text-muted small">
+        This does not call the police for you. It creates a priority request for
+        your agency and notifies them to contact the nearest station. If you are
+        in danger right now, use the police number above.
+      </p>
+      <form method="post" action="{% url 'ofw:portal_request_police' %}">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ request_form.message.id_for_label }}">{{ request_form.message.label }}</label>
+          {{ request_form.message }}
+          {% if request_form.message.errors %}
+          <div class="text-danger small mt-1">{{ request_form.message.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+        <button type="submit" class="btn btn-danger">
+          <i class="fas fa-bullhorn me-1"></i>Send police help request
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
       <h3 class="card-title"><i class="fas fa-list text-muted me-2"></i>Report history</h3>
+      {% if reports_total %}
+      <div class="card-actions text-muted small">{{ reports_total }} report{{ reports_total|pluralize }}</div>
+      {% endif %}
     </div>
     {% if reports %}
     <div class="list-group list-group-flush">
@@ -132,7 +197,12 @@
       <div class="list-group-item">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
           <div class="min-w-0">
-            <div class="fw-medium">{{ report.title }}</div>
+            <div class="fw-medium">
+              <a href="{% url 'ofw:portal_police_report_detail' report.pk %}" class="text-decoration-none">
+                {{ report.title }}
+              </a>
+              {% if report.requested_by_ofw %}<span class="badge bg-info-lt text-info ms-1">Your request</span>{% endif %}
+            </div>
             <div class="text-muted small">{{ report.description|truncatechars:140 }}</div>
             <div class="text-muted small mt-1">
               <i class="fas fa-building-shield me-1"></i>{{ report.police_station|default:"Station not set" }}
@@ -140,6 +210,7 @@
               <i class="fas fa-calendar me-1"></i>{{ report.reported_at|date:"M d, Y H:i" }}
               <span class="mx-1">·</span>
               by {{ report.reported_by.get_full_name|default:report.reported_by.username }}
+              {% if report.report_number %}<span class="mx-1">·</span>Case {{ report.report_number }}{% endif %}
             </div>
           </div>
           <span class="badge bg-{% if report.status == 'submitted' %}warning{% elif report.status == 'responded' %}success{% elif report.status == 'closed' %}secondary{% else %}secondary{% endif %}-lt text-{% if report.status == 'submitted' %}warning{% elif report.status == 'responded' %}success{% elif report.status == 'closed' %}secondary{% else %}secondary{% endif %}">
@@ -149,6 +220,19 @@
       </div>
       {% endfor %}
     </div>
+    {% if page_obj.has_other_pages %}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <div class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+      <div class="btn-group">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-sm btn-outline-secondary">Newer</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="btn btn-sm btn-outline-secondary">Older</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
     {% else %}
     <div class="card-body text-muted text-center py-4">
       No police reports yet.
@@ -169,7 +253,7 @@
         <div class="col-md-4">
           <div class="border rounded p-2 h-100">
             <span class="badge bg-warning-lt text-warning">Police contact recorded</span>
-            <div class="small text-muted mt-1">The station and contact number are on file. Keep your phone reachable.</div>
+            <div class="small text-muted mt-1">The station, case number and contact are on file. Keep your phone reachable.</div>
           </div>
         </div>
         <div class="col-md-4">
@@ -182,4 +266,27 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('[data-copy]');
+    if (!button) { return; }
+    var value = button.getAttribute('data-copy') || '';
+    if (!value) { return; }
+    var done = function () {
+      var original = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-check me-1"></i>Copied';
+      window.setTimeout(function () { button.innerHTML = original; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(done, done);
+    } else {
+      done();
+    }
+  });
+})();
+</script>
 {% endblock %}

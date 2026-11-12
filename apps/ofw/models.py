@@ -635,6 +635,8 @@ class OFWActivity(models.Model):
     """
 
     INACTIVE_THRESHOLD_DAYS = 3
+    WARNING_DAYS = INACTIVE_THRESHOLD_DAYS
+    FOLLOWUP_DAYS = 6
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -643,14 +645,19 @@ class OFWActivity(models.Model):
     )
     last_login_at = models.DateTimeField(null=True, blank=True)
     last_activity_at = models.DateTimeField(null=True, blank=True, db_index=True,
-        help_text='Most recent recorded login or profile update.')
+        help_text='Most recent portal use, profile update, or check-in.')
     is_account_active = models.BooleanField(default=True)
     days_inactive = models.PositiveIntegerField(default=0)
     warning_sent_at = models.DateTimeField(null=True, blank=True,
         help_text='When the inactivity warning was last sent to management.')
     followup_sent_at = models.DateTimeField(null=True, blank=True,
-        help_text='When the 6-day inactivity follow-up was sent to management.')
+        help_text='When the inactivity follow-up was last sent to management.')
     escalated_to_police_at = models.DateTimeField(null=True, blank=True)
+    offline_notice_until = models.DateField(null=True, blank=True,
+        help_text='The OFW expects to be offline until this date.')
+    offline_notice_note = models.CharField(max_length=200, blank=True,
+        help_text='Short reason shown to agency staff (for example, "at sea").')
+    offline_notice_set_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -671,12 +678,31 @@ class OFWActivity(models.Model):
 
     @property
     def is_escalation_due(self):
-        """True when inactive past threshold, warned, but not yet escalated."""
+        """True when inactive past the follow-up day, warned, not escalated."""
         if self.is_account_active:
             return False
         if self.escalated_to_police_at is not None:
             return False
-        return self.warning_sent_at is not None and self.days_inactive > 5
+        return (
+            self.warning_sent_at is not None
+            and self.days_inactive >= self.FOLLOWUP_DAYS
+        )
+
+    @property
+    def last_seen_at(self):
+        """The most recent sign of life: login or any portal activity."""
+        values = [
+            value for value in (self.last_login_at, self.last_activity_at)
+            if value is not None
+        ]
+        return max(values) if values else None
+
+    @property
+    def offline_notice_active(self):
+        """True while the OFW's declared offline window is still running."""
+        if self.offline_notice_until is None:
+            return False
+        return self.offline_notice_until >= timezone.localdate()
 
 
 class EmergencyAlert(models.Model):
@@ -749,6 +775,16 @@ class PoliceReport(models.Model):
     police_station = models.CharField(max_length=200, blank=True,
         help_text='Name of the police station near the OFW location.')
     police_contact = models.CharField(max_length=60, blank=True)
+    report_number = models.CharField(max_length=60, blank=True,
+        help_text='Blotter or case number given by the police.')
+    officer_name = models.CharField(max_length=120, blank=True,
+        help_text='Officer handling the report, when known.')
+    follow_up_on = models.DateField(null=True, blank=True,
+        help_text='Next date the agency should follow up with the police.')
+    resolution_note = models.TextField(blank=True,
+        help_text='Outcome recorded when the report is closed.')
+    requested_by_ofw = models.BooleanField(default=False,
+        help_text='True when the OFW asked for police help from the portal.')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
     reported_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

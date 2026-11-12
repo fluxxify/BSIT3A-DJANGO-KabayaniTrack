@@ -19,6 +19,9 @@
         <a href="{% url 'ofw:portal_emergency_sos' %}" class="btn btn-danger btn-sm">
           <i class="fas fa-location-crosshairs me-1"></i>Open live SOS
         </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="saveOfflineGuide">
+          <i class="fas fa-download me-1"></i>Save offline copy
+        </button>
       </div>
     </div>
   </div>
@@ -36,6 +39,19 @@
     </a>
     {% endif %}
   </div>
+
+  <div id="offlineGuideBanner" class="alert alert-warning d-none">
+    <div>
+      <i class="fas fa-wifi me-1"></i>
+      <strong>You are offline.</strong>
+      Showing your saved copy from <span id="offlineGuideSavedAt">this device</span>.
+      Numbers may be out of date — call anyway if you are in danger.
+      <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="clearOfflineGuide">Clear copy</button>
+    </div>
+  </div>
+  <div id="offlineGuideContent" class="d-none"></div>
+
+  {{ guidance_snapshot|json_script:"guidanceSnapshot" }}
 
   {% if open_alert %}
   <div class="card border-danger mb-3">
@@ -65,6 +81,22 @@
           <i class="fas fa-list me-1"></i>All my alerts
         </a>
       </div>
+      <form method="post" action="{% url 'ofw:portal_alert_respond' open_alert.pk %}" class="mt-3">
+        {% csrf_token %}
+        <label class="form-label small" for="guidanceNote">Add a short note (optional)</label>
+        <textarea id="guidanceNote" name="note" rows="2" maxlength="500"
+                  class="form-control mb-2"
+                  placeholder="Where you are or what you need."></textarea>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="submit" name="action" value="safe" class="btn btn-sm btn-success"
+                  onclick="return confirm('Mark this alert as safe? Your agency will be notified.');">
+            <i class="fas fa-circle-check me-1"></i>I'm safe
+          </button>
+          <button type="submit" name="action" value="need_help" class="btn btn-sm btn-danger">
+            <i class="fas fa-hand-holding-heart me-1"></i>I still need help
+          </button>
+        </div>
+      </form>
     </div>
   </div>
   {% else %}
@@ -109,6 +141,11 @@
                     <div class="fw-medium">{{ place.name }}</div>
                     <span class="badge bg-secondary-lt text-secondary">{{ place.type }}</span>
                   </div>
+                  {% if place.stale %}
+                  <div class="badge bg-warning-lt text-warning mt-1">
+                    <i class="fas fa-triangle-exclamation me-1"></i>Verify this number
+                  </div>
+                  {% endif %}
                   {% if place.distance_text %}
                   <div class="text-danger small fw-medium mt-1">
                     {{ place.distance_text }}{% if place.direction %} · {{ place.direction }}{% endif %}{% if place.walking_minutes %} · {{ place.walking_minutes }} min walk{% endif %}
@@ -117,6 +154,9 @@
                   <div class="text-muted small mt-1">
                     {% if place.address %}{{ place.address }}<br>{% endif %}
                     {% if place.city %}{{ place.city }}, {% endif %}{{ place.country }}
+                    {% if place.updated_at %}
+                    <br><span class="text-muted">Updated {{ place.updated_at|date:"M d, Y" }}</span>
+                    {% endif %}
                   </div>
                 </div>
                 <div class="card-footer d-flex gap-2">
@@ -197,5 +237,222 @@
     </div>
   </div>
   {% endif %}
+
+  <div class="row row-cards mt-1">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-building-shield text-danger me-2"></i>Nearest police station</h3>
+        </div>
+        <div class="card-body">
+          {% if nearest_police_station %}
+          <div class="fw-medium">{{ nearest_police_station.name }}</div>
+          {% if nearest_police_station.distance_text %}
+          <div class="text-danger small fw-medium mt-1">
+            {{ nearest_police_station.distance_text }}{% if nearest_police_station.direction %} · {{ nearest_police_station.direction }}{% endif %}
+          </div>
+          {% endif %}
+          <div class="text-muted small mt-1">
+            {% if nearest_police_station.address %}{{ nearest_police_station.address }}<br>{% endif %}
+            {% if nearest_police_station.city %}{{ nearest_police_station.city }}, {% endif %}{{ nearest_police_station.country }}
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            {% if nearest_police_station.phone %}
+            <a href="tel:{{ nearest_police_station.tel|default:nearest_police_station.phone }}" class="btn btn-sm btn-success">
+              <i class="fas fa-phone me-1"></i>Call station
+            </a>
+            {% endif %}
+            {% if nearest_police_station.maps_url %}
+            <a href="{{ nearest_police_station.maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+              <i class="fas fa-map-marker-alt me-1"></i>Directions
+            </a>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="text-muted small">
+            No police station is registered for {{ location_country|default:"your area" }} yet.
+            Call the police number above and ask your agency to add the station.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column justify-content-center">
+          {% if has_local_office %}
+          <div class="fw-medium"><i class="fas fa-building-columns text-primary me-1"></i>Embassy / POLO / OWWA on file</div>
+          <div class="text-muted small mt-1">
+            Your agency has registered at least one local office for
+            {{ location_country|default:"your country" }}. It appears in the safe places list above.
+          </div>
+          {% else %}
+          <div class="fw-medium"><i class="fas fa-building-columns text-warning me-1"></i>No embassy / POLO / OWWA office yet</div>
+          <div class="text-muted small mt-1">
+            Only police, hospital and emergency numbers are available for
+            {{ location_country|default:"your country" }}. Ask your agency to add
+            your embassy or POLO office, or
+            <a href="{% url 'ofw:portal_suggest_safe_place' %}">suggest a safe place</a>.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var KEY = 'kabayani.guidance.v1';
+  var banner = document.getElementById('offlineGuideBanner');
+  var content = document.getElementById('offlineGuideContent');
+  var savedAt = document.getElementById('offlineGuideSavedAt');
+  var saveBtn = document.getElementById('saveOfflineGuide');
+  var clearBtn = document.getElementById('clearOfflineGuide');
+  var snapshotNode = document.getElementById('guidanceSnapshot');
+  if (!snapshotNode) { return; }
+  var snapshot = {};
+  try { snapshot = JSON.parse(snapshotNode.textContent || '{}'); } catch (e) { snapshot = {}; }
+
+  function readSaved() {
+    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+  }
+
+  function line(label, value) {
+    var row = document.createElement('div');
+    row.className = 'mb-2';
+    if (value) {
+      var strong = document.createElement('div');
+      strong.className = 'fw-medium';
+      strong.textContent = label;
+      row.appendChild(strong);
+      var small = document.createElement('div');
+      small.className = 'text-muted small';
+      small.textContent = value;
+      row.appendChild(small);
+    }
+    return row;
+  }
+
+  function linkRow(label, phone, kind) {
+    var row = document.createElement('div');
+    row.className = 'mb-2';
+    var strong = document.createElement('div');
+    strong.className = 'fw-medium';
+    strong.textContent = label;
+    row.appendChild(strong);
+    if (phone) {
+      var dial = String(phone).replace(/[^0-9+]/g, '');
+      var a = document.createElement('a');
+      a.className = 'btn btn-sm btn-danger mt-1';
+      a.href = 'tel:' + dial;
+      a.textContent = 'Call ' + phone;
+      row.appendChild(a);
+    }
+    if (kind) {
+      var badge = document.createElement('span');
+      badge.className = 'badge bg-secondary-lt text-secondary ms-2';
+      badge.textContent = kind;
+      row.appendChild(badge);
+    }
+    return row;
+  }
+
+  function renderOffline(saved) {
+    if (!banner || !content) { return; }
+    var data = saved.data || {};
+    content.innerHTML = '';
+    var card = document.createElement('div');
+    card.className = 'card mb-3 border-warning';
+    var body = document.createElement('div');
+    body.className = 'card-body';
+    var title = document.createElement('h3');
+    title.className = 'card-title';
+    title.textContent = 'Saved emergency copy';
+    body.appendChild(title);
+
+    if (data.police) {
+      body.appendChild(linkRow(
+        data.police.name || 'Police',
+        data.police.phone || data.police.dial,
+        'Police'
+      ));
+    }
+    (data.hotlines || []).forEach(function (item) {
+      body.appendChild(linkRow(item.name, item.phone, item.type));
+    });
+    (data.places || []).forEach(function (place) {
+      var row = line(place.name, [place.address, place.city, place.country].filter(Boolean).join(', '));
+      if (place.phone) {
+        var dial = String(place.phone).replace(/[^0-9+]/g, '');
+        var a = document.createElement('a');
+        a.className = 'btn btn-sm btn-outline-success me-1';
+        a.href = 'tel:' + dial;
+        a.textContent = 'Call ' + place.phone;
+        row.appendChild(a);
+      }
+      if (place.maps_url) {
+        var maps = document.createElement('a');
+        maps.className = 'btn btn-sm btn-outline-primary';
+        maps.href = place.maps_url;
+        maps.target = '_blank';
+        maps.rel = 'noopener';
+        maps.textContent = 'Directions';
+        row.appendChild(maps);
+      }
+      body.appendChild(row);
+    });
+
+    card.appendChild(body);
+    content.appendChild(card);
+    content.classList.remove('d-none');
+    banner.classList.remove('d-none');
+    if (savedAt) {
+      savedAt.textContent = saved.savedAt ? new Date(saved.savedAt).toLocaleString() : 'this device';
+    }
+  }
+
+  function hideOffline() {
+    if (content) { content.classList.add('d-none'); }
+    if (banner) { banner.classList.add('d-none'); }
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function () {
+      var saved = { savedAt: new Date().toISOString(), data: snapshot };
+      try {
+        localStorage.setItem(KEY, JSON.stringify(saved));
+        saveBtn.innerHTML = '<i class="fas fa-check me-1"></i>Saved offline';
+        saveBtn.classList.remove('btn-outline-secondary');
+        saveBtn.classList.add('btn-outline-success');
+      } catch (e) {
+        window.alert('Your browser could not save the offline copy.');
+      }
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      hideOffline();
+    });
+  }
+
+  var savedCopy = readSaved();
+  if (!navigator.onLine && savedCopy) {
+    renderOffline(savedCopy);
+  }
+  window.addEventListener('offline', function () {
+    var latest = readSaved();
+    if (latest) {
+      renderOffline(latest);
+    } else if (banner) {
+      banner.classList.remove('d-none');
+    }
+  });
+  window.addEventListener('online', hideOffline);
+})();
+</script>
 {% endblock %}
