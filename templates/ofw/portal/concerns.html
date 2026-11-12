@@ -28,6 +28,12 @@
   </div>
   <br>
 
+  <div class="alert alert-info">
+    <i class="fas fa-circle-info me-2"></i>
+    Your agency sees every concern and its proof. The <strong>Agency update</strong>
+    column shows when they first opened it, so you know it was received.
+  </div>
+
   <div class="row row-deck row-cards">
     <div class="col-lg-5">
       <div class="card">
@@ -79,16 +85,28 @@
         <div class="card-header"><h3 class="card-title">My Reported Concerns</h3></div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
-            <thead><tr><th>Concern</th><th>Severity</th><th>Status</th><th>Proof</th><th>Reported</th></tr></thead>
+            <thead><tr><th>Concern</th><th>Severity</th><th>Status</th><th>Agency update</th><th>Proof</th><th>Reported</th></tr></thead>
             <tbody>
               {% for row in concern_rows %}
               <tr>
                 <td>
-                  <span class="text-nowrap" title="{{ row.obj.title }}">{{ row.obj.title|truncatechars:70 }}</span>
+                  <span class="text-nowrap" title="{{ row.obj.description|default:row.obj.title }}">{{ row.obj.title|truncatechars:70 }}</span>
                   <div class="text-muted small">{{ row.obj.get_category_display }}</div>
                 </td>
                 <td><span class="badge {{ row.severity_badge }}">{{ row.obj.get_severity_display }}</span></td>
                 <td><span class="badge {{ row.status_badge }}">{{ row.obj.get_status_display }}</span></td>
+                <td class="text-muted small">
+                  {% if row.obj.read_by_management_at %}
+                  <span class="text-success">
+                    <i class="fas fa-check me-1"></i>{{ row.obj.read_by_management_at|date:"M d, H:i" }}
+                  </span>
+                  {% else %}
+                  <span class="text-warning">Not opened yet</span>
+                  {% endif %}
+                  {% if row.obj.resolved_date %}
+                  <div>Resolved {{ row.obj.resolved_date|date:"M d, Y" }}</div>
+                  {% endif %}
+                </td>
                 <td>
                   {% with proofs=row.obj.proofs.all %}
                   {% if proofs %}
@@ -114,7 +132,7 @@
                 <td class="text-muted">{{ row.obj.reported_date|date:"M d, Y" }}</td>
               </tr>
               {% empty %}
-              <tr><td colspan="5" class="text-muted text-center">No concerns reported yet.</td></tr>
+              <tr><td colspan="6" class="text-muted text-center">No concerns reported yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>

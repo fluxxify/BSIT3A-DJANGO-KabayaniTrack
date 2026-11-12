@@ -5255,3 +5255,169 @@ class OFWSafetyGapFixTests(TestCase):
         self.assertContains(response, 'Case / blotter number')
         self.assertContains(response, '2026-004512')
         self.assertContains(response, 'Officer Karim')
+
+class OFWPortalFeatureGapTests(TestCase):
+    """Coverage for the seven OFW portal pages and the connected staff view."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        cache.clear()
+        self.agency = Agency.objects.create(
+            name='Pacific Manpower', slug='pacific-manpower',
+            phone='+971 4 555 0100', email='help@pacific.example',
+            address='Deira, Dubai',
+        )
+        self.user = User.objects.create_user(
+            username='gap_portal_ofw', password='Passw0rd!23',
+            email='gap_portal@example.com',
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.user, first_name='Liza', last_name='Ramos',
+            country='United Arab Emirates', city_abroad='Dubai',
+            agency_org=self.agency, agency=self.agency.name,
+        )
+        self.staff = User.objects.create_user(
+            username='gap_portal_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.staff, agency=self.agency)
+
+    def test_home_explains_activity_clock_and_links_notifications(self):
+        OFWActivity.objects.update_or_create(
+            user=self.user,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=2),
+                'last_activity_at': timezone.now() - timedelta(minutes=5),
+            },
+        )
+        Notification.objects.create(
+            recipient=self.user, title='Agency message',
+            message='Please confirm your address.', level=Notification.Level.INFO,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal'))
+        self.assertContains(response, 'Last activity')
+        self.assertContains(response, 'successful sign-ins and pages you open')
+        self.assertContains(response, reverse('ofw:notifications'))
+        self.assertContains(response, 'Agency message')
+
+    def test_home_offline_notice_pauses_the_inactive_banner(self):
+        OFWActivity.objects.update_or_create(
+            user=self.user,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=5),
+                'last_activity_at': None,
+                'days_inactive': 5,
+                'is_account_active': False,
+                'offline_notice_until': timezone.localdate() + timedelta(days=3),
+                'offline_notice_note': 'At sea',
+            },
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal'))
+        self.assertContains(response, 'Offline notice active')
+        self.assertContains(response, 'Warnings paused until')
+        self.assertNotContains(response, 'Your account has been inactive')
+
+    def test_profile_shows_agency_account_and_missing_details(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_profile'))
+        self.assertContains(response, 'Pacific Manpower')
+        self.assertContains(response, 'My Account')
+        self.assertContains(response, reverse('password_reset'))
+        self.assertContains(response, 'Add at least one family emergency contact')
+        self.assertContains(response, 'Missing:')
+
+    def test_checkins_distinguish_self_and_agency_entries(self):
+        CheckIn.objects.create(
+            ofw=self.profile, user=self.user, checkin_date=timezone.now(),
+            method=CheckIn.Method.APP, condition=CheckIn.Condition.SAFE,
+        )
+        CheckIn.objects.create(
+            ofw=self.profile, user=self.staff,
+            checkin_date=timezone.now() - timedelta(days=1),
+            method=CheckIn.Method.CALL, condition=CheckIn.Condition.SAFE,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_checkins'))
+        self.assertContains(response, 'Logged by')
+        self.assertContains(response, 'Your agency')
+        self.assertContains(response, 'You')
+
+    def test_concerns_show_when_the_agency_opened_them(self):
+        opened = Concern.objects.create(
+            ofw=self.profile, user=self.user, title='Unpaid salary',
+            category=Concern.Category.SALARY, severity=Concern.Severity.HIGH,
+            reported_date=timezone.localdate(),
+            read_by_management_at=timezone.now(),
+        )
+        Concern.objects.create(
+            ofw=self.profile, user=self.user, title='Passport withheld',
+            category=Concern.Category.DOCUMENTS,
+            reported_date=timezone.localdate(),
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_concerns'))
+        self.assertContains(response, 'Agency update')
+        self.assertContains(response, opened.read_by_management_at.strftime('%b %d'))
+        self.assertContains(response, 'Not opened yet')
+
+    def test_contacts_show_the_agency_and_real_local_hotline(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_contacts'))
+        self.assertContains(response, 'My agency')
+        self.assertContains(response, 'Pacific Manpower')
+        self.assertContains(response, '+971 4 555 0100')
+        self.assertContains(response, 'Only you and')
+        self.assertContains(response, 'United Arab Emirates police')
+
+    def test_location_page_lists_recent_positions(self):
+        LocationTracker.objects.create(
+            ofw=self.profile, latitude='25.204800', longitude='55.270800',
+            accuracy_meters=12,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('ofw:portal_location_sharing'))
+        self.assertContains(response, 'Recent shared positions')
+        self.assertContains(response, '25.204800')
+        self.assertContains(response, 'Only your agency and administrators')
+
+    def test_management_profile_shows_connected_safety_details(self):
+        EmergencyContact.objects.create(
+            user=self.user, name='Mama Ramos', contact_type='family',
+            relationship='Mother', phone='+63 917 000 1111',
+        )
+        LocationTracker.objects.create(
+            ofw=self.profile, latitude='25.204800', longitude='55.270800',
+        )
+        EmergencyAlert.objects.create(
+            ofw=self.profile, title='Welfare check needed',
+            message='No activity.', level=EmergencyAlert.Level.WARNING,
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse('ofw:profile_detail', args=[self.profile.pk])
+        )
+        self.assertContains(response, 'Connected Safety Overview')
+        self.assertContains(response, 'Emergency Contacts')
+        self.assertContains(response, 'Mama Ramos')
+        self.assertContains(response, 'Location history')
+        self.assertContains(response, '1 open alert')
+        self.assertContains(response, reverse('ofw:ofw_location_history', args=[self.profile.pk]))
+
+    def test_management_profile_hides_another_agencys_contacts(self):
+        from apps.users.models import Agency
+
+        other = Agency.objects.create(name='Other Agency', slug='other-agency')
+        self.profile.agency_org = other
+        self.profile.agency = other.name
+        self.profile.save(update_fields=['agency_org', 'agency'])
+        EmergencyContact.objects.create(
+            user=self.user, name='Other Agency Contact', contact_type='family',
+            phone='+63 917 000 2222',
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse('ofw:profile_detail', args=[self.profile.pk])
+        )
+        self.assertEqual(response.status_code, 404)

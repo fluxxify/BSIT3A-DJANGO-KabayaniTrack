@@ -35,17 +35,17 @@
         </div>
       </div>
       <span class="badge {% if row.activity.days_inactive <= 5 %}bg-warning-lt text-warning{% else %}bg-danger-lt text-danger{% endif %}">
-        No login for {{ row.activity.days_inactive }} days
+        No activity for {{ row.activity.days_inactive }} days
       </span>
     </div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-5">
-          <div class="subheader">Last successful login</div>
-          {% if row.activity.last_login_at %}
-          <div>{{ row.activity.last_login_at|date:"F j, Y, g:i A" }}</div>
+          <div class="subheader">Last activity</div>
+          {% if row.activity.last_seen_at %}
+          <div>{{ row.activity.last_seen_at|date:"F j, Y, g:i A" }}</div>
           {% else %}
-          <div>Never logged in</div>
+          <div>No activity yet</div>
           {% endif %}
           <div class="subheader mt-3">Last known location</div>
           <div>{{ row.last_location_label }}</div>

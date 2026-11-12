@@ -18,19 +18,38 @@
     <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
       <div>
         <div class="subheader">Account Activity</div>
-        <div class="fw-medium">Last successful login</div>
-        <div class="text-muted">
-          {% if has_ever_logged_in %}
-          {{ last_login_at|date:"F j, Y, g:i A" }}
+        <div class="fw-medium">
+          {% if last_seen_at %}
+          Last activity {{ last_seen_at|timesince }} ago
           {% else %}
-          Never logged in (account created {{ user.date_joined|date:"F j, Y, g:i A" }})
+          No portal activity yet
+          {% endif %}
+        </div>
+        <div class="text-muted small">
+          {% if last_activity_at %}
+          Last portal visit: {{ last_activity_at|date:"F j, Y, g:i A" }}
+          {% elif has_ever_logged_in %}
+          Last sign-in: {{ last_login_at|date:"F j, Y, g:i A" }}
+          {% else %}
+          Account created {{ user.date_joined|date:"F j, Y, g:i A" }}
+          {% endif %}
+          {% if has_ever_logged_in and last_activity_at %}
+          <br>Last sign-in: {{ last_login_at|date:"F j, Y, g:i A" }}
           {% endif %}
         </div>
       </div>
       <span class="badge {% if is_inactive %}bg-warning-lt text-warning{% else %}bg-success-lt text-success{% endif %}">
-        {% if is_inactive %}No login for {{ inactive_days }} days{% else %}Active{% endif %}
+        {% if is_inactive %}No activity for {{ inactive_days }} days{% elif offline_notice_active %}Offline notice active{% else %}Active{% endif %}
       </span>
-      <div class="text-muted small w-100">Inactivity is based on successful sign-ins, not live online presence.</div>
+      <div class="text-muted small w-100">
+        Inactivity counts successful sign-ins and pages you open in the portal.
+        {% if offline_notice_active %}
+        <span class="text-info">
+          <i class="fas fa-plane-departure me-1"></i>Warnings paused until
+          {{ offline_notice_until|date:"M d, Y" }}{% if offline_notice_note %} ({{ offline_notice_note }}){% endif %}.
+        </span>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -55,7 +74,7 @@
   <div class="alert alert-warning alert-dismissible fade show">
     <i class="fas fa-clock text-warning me-2"></i>
     <strong>Your account has been inactive for {{ inactive_days }} day{{ inactive_days|pluralize }}.</strong>
-    Please log a check-in so management knows you are safe.
+    Open the portal, log a check-in or update your profile so management knows you are safe.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
   {% endif %}
@@ -187,12 +206,14 @@
       <div class="card h-100">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between">
-            <div class="subheader">Login Warnings</div>
+            <div class="subheader">Welfare Check</div>
             <i class="fas fa-clock {% if is_inactive %}text-warning{% else %}text-muted{% endif %}"></i>
           </div>
           <div class="mt-2">
             {% if is_inactive %}
-            <span class="badge bg-warning-lt text-warning">No login for {{ inactive_days }} days</span>
+            <span class="badge bg-warning-lt text-warning">No activity for {{ inactive_days }} days</span>
+            {% elif offline_notice_active %}
+            <span class="badge bg-info-lt text-info">Offline notice active</span>
             {% else %}
             <span class="badge bg-success-lt text-success">Active</span>
             {% endif %}
@@ -207,10 +228,15 @@
             {% endif %}
           </div>
         </div>
-        <div class="card-footer">
+        <div class="card-footer d-flex gap-2 flex-wrap">
           <a href="{% url 'ofw:portal_login_warnings' %}" class="btn btn-sm btn-outline-warning">
             <i class="fas fa-clock-rotate-left me-1"></i>View warnings
           </a>
+          {% if unread_notifications_count %}
+          <a href="{% url 'ofw:notifications' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="far fa-bell me-1"></i>{{ unread_notifications_count }} new
+          </a>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -257,13 +283,16 @@
             <i class="fas fa-tower-broadcast me-2"></i>Emergency? Get help fast.
           </div>
           <div class="text-muted small">
-            One page with your embassy, OWWA hotlines and family numbers — call or
-            message with a single tap.
+            Start a live SOS so your agency sees your position, or open the
+            one-tap numbers for your embassy, OWWA and family.
           </div>
         </div>
         <div class="col-12 col-md-4">
-          <a href="{% url 'ofw:portal_sos' %}" class="btn btn-danger btn-lg w-100">
-            <i class="fas fa-phone-volume me-2"></i>Emergency Numbers
+          <a href="{% url 'ofw:portal_emergency_sos' %}" class="btn btn-danger btn-lg w-100">
+            <i class="fas fa-phone-volume me-2"></i>Start Live SOS
+          </a>
+          <a href="{% url 'ofw:portal_sos' %}" class="btn btn-sm btn-outline-danger w-100 mt-1">
+            Emergency numbers
           </a>
         </div>
       </div>

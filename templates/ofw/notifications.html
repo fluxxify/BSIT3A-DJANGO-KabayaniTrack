@@ -51,7 +51,7 @@
           <span class="dh-notif-icon {{ row.background }} {{ row.icon_class }}">
             <i class="{{ row.icon }}"></i>
           </span>
-          <div class="flex-grow-1 min-w-0">
+          <div class="flex-grow-1">
             <div class="d-flex align-items-start gap-2">
               <a href="{% url 'ofw:notification_open' row.obj.pk %}" class="fw-semibold text-body text-decoration-none flex-grow-1">
                 {{ row.obj.title }}

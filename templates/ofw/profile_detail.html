@@ -115,7 +115,86 @@
   </div>
 
   <div class="card mt-3">
-    <div class="card-header"><h3 class="card-title">Remarks</h3></div>
+    <div class="card-header">
+      <h3 class="card-title">Connected Safety Overview</h3>
+      <div class="card-actions">
+        <span class="text-muted small">Only data connected to this OFW is shown.</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6 col-xl-3">
+          <div class="subheader">Account activity</div>
+          {% if activity %}
+          {% if activity.last_seen_at %}
+          <div class="fw-medium">{{ activity.last_seen_at|timesince }} ago</div>
+          <div class="text-muted small">Last sign-in or portal visit</div>
+          {% else %}
+          <div class="fw-medium text-muted">No activity yet</div>
+          {% endif %}
+          <div class="mt-1">
+            {% if activity.days_inactive >= activity.INACTIVE_THRESHOLD_DAYS %}
+            <span class="badge bg-warning-lt text-warning">Inactive {{ activity.days_inactive }} days</span>
+            {% else %}
+            <span class="badge bg-success-lt text-success">Active</span>
+            {% endif %}
+            {% if activity.offline_notice_active %}
+            <span class="badge bg-info-lt text-info">Offline until {{ activity.offline_notice_until|date:"M d" }}</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="fw-medium text-muted">No portal account linked</div>
+          <div class="text-muted small">This profile was added by staff.</div>
+          {% endif %}
+          <a href="{% url 'ofw:ofw_activity' %}" class="small">Activity log</a>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="subheader">Live location</div>
+          {% if sharing and sharing.is_enabled %}
+          <div class="fw-medium text-success">Sharing enabled</div>
+          {% else %}
+          <div class="fw-medium text-muted">Sharing off</div>
+          {% endif %}
+          {% if latest_ping %}
+          <div class="text-muted small">
+            Last ping {{ latest_ping.recorded_at|timesince }} ago
+            {% if latest_ping.is_emergency %}<span class="badge bg-danger-lt text-danger ms-1">Emergency</span>{% endif %}
+          </div>
+          {% else %}
+          <div class="text-muted small">No location shared yet.</div>
+          {% endif %}
+          <a href="{% url 'ofw:ofw_location_history' profile.pk %}" class="small">Location history</a>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="subheader">Emergency alerts</div>
+          {% if open_alert_count %}
+          <div class="fw-medium text-danger">{{ open_alert_count }} open alert{{ open_alert_count|pluralize }}</div>
+          {% if latest_alert %}<div class="text-muted small">{{ latest_alert.title }}</div>{% endif %}
+          {% else %}
+          <div class="fw-medium text-success">No open alert</div>
+          {% endif %}
+          <a href="{% url 'ofw:emergency_alerts' %}" class="small">Open alerts console</a>
+        </div>
+        <div class="col-md-6 col-xl-3">
+          <div class="subheader">Police contact</div>
+          {% with report=police_reports.0 %}
+          {% if report %}
+          <div class="fw-medium">{{ report.get_status_display }}</div>
+          <div class="text-muted small">{{ report.title|truncatechars:40 }}</div>
+          {% else %}
+          <div class="fw-medium text-success">No report filed</div>
+          {% endif %}
+          {% endwith %}
+          <a href="{% url 'ofw:police_reports' %}" class="small">Police reports</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Remarks</h3>
+    </div>
     <div class="card-body text-muted">{{ profile.remarks|default:"—"|linebreaksbr }}</div>
   </div>
 
@@ -168,7 +247,9 @@
   </div>
 
   <div class="card mt-3">
-    <div class="card-header"><h3 class="card-title">Reported Concerns</h3></div>
+    <div class="card-header">
+      <h3 class="card-title">Reported Concerns</h3>
+    </div>
     <div class="table-responsive">
       <table class="table table-vcenter card-table table-sm">
         <thead><tr><th>Concern</th><th>Category</th><th>Severity</th><th>Status</th><th>Reported</th></tr></thead>
@@ -187,6 +268,37 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Emergency Contacts</h3>
+      <div class="card-actions">
+        <span class="badge bg-secondary-lt text-secondary">{{ emergency_contacts|length }} private contact{{ emergency_contacts|length|pluralize }}</span>
+      </div>
+    </div>
+    {% if emergency_contacts %}
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-sm">
+        <thead><tr><th>Name</th><th>Relationship</th><th>Phone</th><th>Address</th></tr></thead>
+        <tbody>
+          {% for contact in emergency_contacts %}
+          <tr>
+            <td>{{ contact.name }}</td>
+            <td>{{ contact.relationship|default:contact.get_contact_type_display }}</td>
+            <td><a href="tel:{{ contact.dial_number }}">{{ contact.phone }}</a></td>
+            <td class="text-muted">{{ contact.address|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-muted small">
+      This OFW has not added a private family contact yet. Public hotlines are
+      visible to every OFW from their own Emergency Contacts page.
+    </div>
+    {% endif %}
   </div>
 
 </div>

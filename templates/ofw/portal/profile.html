@@ -39,6 +39,27 @@
   </div>
   {% endif %}
 
+  {% if missing_fields or not has_family_contact %}
+  <div class="alert alert-warning">
+    <div class="d-flex gap-2">
+      <i class="fas fa-list-check mt-1"></i>
+      <div>
+        <div class="fw-bold">Your profile can still be more complete</div>
+        {% if missing_fields %}
+        <div>Missing: {{ missing_fields|join:", " }}.</div>
+        {% endif %}
+        {% if not has_family_contact %}
+        <div>
+          Add at least one family emergency contact so your agency can reach
+          someone if they cannot contact you.
+          <a href="{% url 'ofw:portal_contacts' %}" class="alert-link">Add a contact</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row row-deck row-cards">
     <div class="col-lg-8">
       <div class="card">
@@ -133,6 +154,66 @@
     </div>
 
     <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">My Agency</h3></div>
+        <div class="card-body">
+          {% if agency %}
+          <div class="fw-bold">{{ agency.name }}</div>
+          {% if agency.address %}<div class="text-muted small">{{ agency.address }}</div>{% endif %}
+          <div class="mt-2 d-grid gap-1">
+            {% if agency.phone %}
+            <a href="tel:{{ agency.phone }}" class="btn btn-sm btn-outline-success">
+              <i class="fas fa-phone me-1"></i>{{ agency.phone }}
+            </a>
+            {% endif %}
+            {% if agency.email %}
+            <a href="mailto:{{ agency.email }}" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-envelope me-1"></i>{{ agency.email }}
+            </a>
+            {% endif %}
+            {% if agency.website %}
+            <a href="{{ agency.website }}" target="_blank" rel="noopener" class="btn btn-sm btn-ghost-secondary">
+              <i class="fas fa-globe me-1"></i>Website
+            </a>
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-2">
+            This is the office that sees your check-ins, concerns and live location.
+          </div>
+          {% else %}
+          <div class="text-muted">
+            You are not linked to an agency yet. Choose one in the form so their
+            team can support you.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">My Account</h3></div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 text-muted">Username</dt>
+            <dd class="col-7">{{ user.username }}</dd>
+            <dt class="col-5 text-muted">Email</dt>
+            <dd class="col-7">{{ user.email|default:"—" }}</dd>
+            <dt class="col-5 text-muted">Joined</dt>
+            <dd class="col-7">{{ user.date_joined|date:"M d, Y" }}</dd>
+            <dt class="col-5 text-muted">Last activity</dt>
+            <dd class="col-7">
+              {% if activity.last_seen_at %}
+              {{ activity.last_seen_at|timesince }} ago
+              {% else %}
+              No activity yet
+              {% endif %}
+            </dd>
+          </dl>
+          <a href="{% url 'password_reset' %}" class="btn btn-sm btn-outline-secondary mt-3">
+            <i class="fas fa-key me-1"></i>Reset password by email
+          </a>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header"><h3 class="card-title">Why keep this updated?</h3></div>
         <div class="card-body text-muted">

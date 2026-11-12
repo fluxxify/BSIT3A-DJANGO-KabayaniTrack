@@ -250,9 +250,13 @@ def portal_home(request):
         .order_by('-assessment_date', '-id')[:5]
     )
 
-    # Keep the OFW's own portal status in sync with the successful login time.
+    # Keep the OFW's own portal status in sync with the latest sign of life
+    # (successful login or any portal page visit).
     activity = refresh_activity_for_user(request.user)
-    is_inactive = activity.days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
+    is_inactive = (
+        activity.days_inactive >= OFWActivity.INACTIVE_THRESHOLD_DAYS
+        and not activity.offline_notice_active
+    )
     inactive_days = activity.days_inactive
 
     # Police report status: any open/submitted police report for this OFW?
@@ -319,7 +323,12 @@ def portal_home(request):
         'is_inactive': is_inactive,
         'inactive_days': inactive_days,
         'last_login_at': activity.last_login_at,
+        'last_activity_at': activity.last_activity_at,
+        'last_seen_at': activity.last_seen_at,
         'has_ever_logged_in': activity.last_login_at is not None,
+        'offline_notice_active': activity.offline_notice_active,
+        'offline_notice_until': activity.offline_notice_until,
+        'offline_notice_note': activity.offline_notice_note,
         'latest_police_report': latest_police_report,
         'latest_ping': latest_ping,
         'latest_alert': latest_alert,
@@ -374,6 +383,7 @@ def portal_location_sharing(request):
         'profile': profile,
         'sharing': sharing,
         'latest_ping': latest_ping,
+        'recent_pings': profile.location_pings.all()[:5],
         'nearest_places': nearest_places,
         'map_places': map_places,
         'map_center': map_center,
@@ -692,6 +702,22 @@ def portal_profile(request):
     else:
         form = OFWPortalProfileForm(instance=profile)
 
+    activity = refresh_activity_for_user(request.user)
+    agency = profile.agency_org if profile and profile.agency_org_id else None
+    missing_fields = []
+    if profile is not None:
+        checks = (
+            ('contact number', profile.contact_number),
+            ('deployment country', profile.country),
+            ('city abroad', profile.city_abroad),
+            ('employer', profile.employer_name),
+            ('occupation', profile.occupation),
+        )
+        missing_fields = [label for label, value in checks if not value]
+    has_family_contact = EmergencyContact.objects.filter(
+        user=request.user,
+    ).exclude(contact_type__in=EmergencyContact.PUBLIC_TYPES).exists()
+
     return render(request, 'ofw/portal/profile.html', {
         'form': form,
         'profile': profile,
@@ -700,6 +726,10 @@ def portal_profile(request):
             if profile else 'bg-secondary-lt text-secondary'
         ),
         'country_options': COUNTRY_CHOICES,
+        'agency': agency,
+        'activity': activity,
+        'missing_fields': missing_fields,
+        'has_family_contact': has_family_contact,
     })
 
 
@@ -917,6 +947,8 @@ def portal_contacts(request):
         if form.is_valid():
             contact = form.save(commit=False)
             contact.user = request.user
+            if not contact.agency_id:
+                contact.agency = profile.agency_org
             contact.save()
             messages.success(
                 request,
@@ -928,6 +960,18 @@ def portal_contacts(request):
 
     local_hotlines, national_hotlines = _hotlines_for(location_country)
 
+    # Three big one-tap buttons: the local emergency line first, then the
+    # always-available OWWA numbers.  Using the real rows avoids showing 911
+    # in countries where the emergency number is different.
+    quick_contacts = [
+        contact for contact in local_hotlines
+        if contact.contact_type in ('emergency', 'police', 'fire', 'hospital')
+    ][:1]
+    for contact in national_hotlines:
+        if contact.dial_number in ('1348', '+63285511545'):
+            quick_contacts.append(contact)
+    quick_contacts = quick_contacts[:3]
+
     my_contacts = (
         EmergencyContact.objects
         .filter(user=request.user)
@@ -937,10 +981,12 @@ def portal_contacts(request):
 
     return render(request, 'ofw/portal/contacts.html', {
         'profile': profile,
+        'agency': profile.agency_org if profile and profile.agency_org_id else None,
         'location_country': location_country,
         'location_city': location_city,
         'local_hotlines': local_hotlines,
         'national_hotlines': national_hotlines,
+        'quick_contacts': quick_contacts,
         'my_contacts': my_contacts,
         'form': form,
     })

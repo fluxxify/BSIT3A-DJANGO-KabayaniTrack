@@ -11,11 +11,28 @@
   </div>
   <br>
 
+  {% if checkin_rows %}
+  {% with latest=checkin_rows.0.obj %}
+  {% if latest.condition == 'distressed' or latest.condition == 'needs_assistance' %}
+  <div class="alert alert-warning">
+    <i class="fas fa-triangle-exclamation me-2"></i>
+    Your latest check-in says <strong>{{ latest.get_condition_display }}</strong>.
+    Your agency sees it immediately. If you are in danger, start a live SOS.
+    <a href="{% url 'ofw:portal_emergency_sos' %}" class="alert-link">Open SOS</a>
+  </div>
+  {% endif %}
+  {% endwith %}
+  {% endif %}
+
   <div class="row row-deck row-cards">
     <div class="col-lg-5">
       <div class="card">
         <div class="card-header"><h3 class="card-title">Log a Check-in</h3></div>
         <div class="card-body">
+          <p class="text-muted small">
+            Your agency sees every check-in. If you report <strong>Distressed</strong>,
+            an emergency alert is raised automatically.
+          </p>
           <form method="post" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}
@@ -46,18 +63,21 @@
         <div class="card-header"><h3 class="card-title">Check-in History</h3></div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
-            <thead><tr><th>Date</th><th>How</th><th>Status</th><th>Contact person</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Date</th><th>Method</th><th>Status</th><th>Logged by</th><th>Contact person</th><th>Notes</th></tr></thead>
             <tbody>
               {% for row in checkin_rows %}
               <tr>
                 <td class="text-muted">{{ row.obj.checkin_date|date:"M d, Y H:i" }}</td>
                 <td>{{ row.obj.get_method_display }}</td>
                 <td><span class="badge {{ row.badge }}">{{ row.obj.get_condition_display }}</span></td>
+                <td class="text-muted">
+                  {% if row.obj.user_id == user.id %}You{% else %}Your agency{% endif %}
+                </td>
                 <td class="text-muted">{{ row.obj.contact_person|default:"—" }}</td>
                 <td class="text-muted">{{ row.obj.notes|default:"—" }}</td>
               </tr>
               {% empty %}
-              <tr><td colspan="5" class="text-muted text-center">No check-ins yet. Use the form to send your first one.</td></tr>
+              <tr><td colspan="6" class="text-muted text-center">No check-ins yet. Use the form to send your first one.</td></tr>
               {% endfor %}
             </tbody>
           </table>

@@ -17,7 +17,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from . import crud, osm_places
-from .activity import refresh_activities_for_profiles
+from .activity import refresh_activities_for_profiles, refresh_activity_for_user
 from .forms import (
     CheckInForm,
     ConcernForm,
@@ -580,6 +580,24 @@ def profile_detail(request, pk):
         latest_assessment is not None
         and latest_assessment.status != profile.welfare_status
     )
+    # Orphaned profiles (created by staff without a portal account) have no
+    # user row, so there is no activity clock to refresh.
+    activity = (
+        refresh_activity_for_user(profile.user) if profile.user_id else None
+    )
+    emergency_contacts = (
+        crud._scoped(request.user, EmergencyContact)
+        .filter(user=profile.user)
+        .exclude(contact_type__in=EmergencyContact.PUBLIC_TYPES)
+        .order_by('contact_type', 'name')
+        if profile.user_id else EmergencyContact.objects.none()
+    )
+    latest_ping = profile.location_pings.first()
+    sharing = OFWLocationSharing.objects.filter(ofw=profile).first()
+    open_alerts = profile.emergency_alerts.exclude(
+        status=EmergencyAlert.Status.RESOLVED
+    )
+    police_reports = profile.police_reports.order_by('-reported_at')[:5]
     context = {
         'profile': profile,
         'welfare_badge': _welfare_badge.get(profile.welfare_status, 'bg-secondary-lt text-secondary'),
@@ -588,6 +606,14 @@ def profile_detail(request, pk):
         'welfare_mismatch': welfare_mismatch,
         'checkins': profile.checkins.all(),
         'concerns': profile.concerns.all(),
+        'activity': activity,
+        'emergency_contacts': emergency_contacts,
+        'latest_ping': latest_ping,
+        'sharing': sharing,
+        'open_alerts': open_alerts,
+        'open_alert_count': open_alerts.count(),
+        'latest_alert': open_alerts.first(),
+        'police_reports': police_reports,
     }
     return render(request, 'ofw/profile_detail.html', context)
 
