@@ -52,7 +52,10 @@
   <br>
 
   <div class="alert alert-info">
-    <strong>Your choice:</strong> location sharing starts only after you turn it on and allow location access in your browser. Keep this page open for live updates. You can turn sharing off here at any time.
+    <strong>Your choice:</strong> location sharing starts only after you turn it on and allow location access in your browser.
+    Once it is on, tracking continues while <strong>any KabayaniTrack page stays open</strong> — you can browse your concerns,
+    check-ins or profile without turning it off and on again. Updates pause when you close the browser or swipe the app away,
+    and resume automatically the next time you open KabayaniTrack. You can turn sharing off here at any time.
   </div>
 
   <div class="card mb-3">
@@ -133,7 +136,12 @@
       {% endif %}
 
       {% if sharing.is_enabled %}
-      <div id="sharingStatus" class="alert alert-secondary py-2" role="status">Connecting to your device location…</div>
+      <div id="liveTrackingStatus" class="alert alert-secondary py-2" role="status">Connecting to your device location…</div>
+      <div id="sharingStatus" class="alert alert-secondary py-2" role="status">Detecting your position for the map…</div>
+      <p class="text-muted small mb-2">
+        The tracker keeps sending while any KabayaniTrack page is open. It stops when the browser is closed,
+        and starts again the next time you open the portal.
+      </p>
       <form method="post" class="d-inline">
         {% csrf_token %}
         <input type="hidden" name="action" value="disable">
@@ -736,94 +744,11 @@
     });
   }
 
-  // --- Opt-in live sharing (send to server) ------------------------------
-  var statusEl = document.getElementById('sharingStatus');
-  if (!statusEl && !sharingStatusEl) { return; }
-  var watchId = null;
-  var refreshTimer = null;
-  var posting = false;
-  var lastSentAt = 0;
-  var lastLat = null;
-  var lastLng = null;
-
-  function setStatus(message, kind) {
-    var el = sharingStatusEl || statusEl;
-    if (!el) return;
-    el.className = 'alert alert-' + kind + ' py-2';
-    el.textContent = message;
-  }
-
-  function distanceMeters(lat1, lng1, lat2, lng2) {
-    var toRad = Math.PI / 180;
-    var dLat = (lat2 - lat1) * toRad;
-    var dLng = (lng2 - lng1) * toRad;
-    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  function sendPosition(position) {
-    var coords = position.coords;
-    var moved = lastLat === null || distanceMeters(coords.latitude, coords.longitude, lastLat, lastLng) >= 30;
-    if (posting || (!moved && Date.now() - lastSentAt < 10000)) return;
-    posting = true;
-    setStatus('Sharing your location…', 'info');
-    fetch('{% url "ofw:portal_location_sharing_ping" %}', {
-      method: 'POST',
-      headers: {
-        'X-CSRFToken': '{{ csrf_token }}',
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: 'latitude=' + encodeURIComponent(coords.latitude.toFixed(6)) +
-        '&longitude=' + encodeURIComponent(coords.longitude.toFixed(6)) +
-        '&accuracy=' + encodeURIComponent(Math.round(coords.accuracy || 0))
-    }).then(function (response) {
-      return response.json().then(function (data) {
-        if (!response.ok) throw new Error(data.error || 'Location update failed.');
-        lastSentAt = Date.now();
-        lastLat = coords.latitude;
-        lastLng = coords.longitude;
-        setStatus('Live location shared · last update ' + new Date(lastSentAt).toLocaleTimeString(), 'success');
-      });
-    }).catch(function (error) {
-      setStatus(error.message || 'Unable to share location. Check your connection and browser permission.', 'danger');
-    }).finally(function () {
-      posting = false;
-    });
-  }
-
-  function locationError(error) {
-    if (error && error.code === 1) {
-      setStatus('Location permission was denied. Allow location access in your browser settings to share.', 'warning');
-    } else {
-      setStatus('Could not get a fresh GPS position. Keep this page open and check your device location setting.', 'warning');
-    }
-  }
-
-  if (!navigator.geolocation) {
-    setStatus('This browser does not support location sharing.', 'danger');
-    return;
-  }
-
-  watchId = navigator.geolocation.watchPosition(sendPosition, locationError, {
-    enableHighAccuracy: true,
-    maximumAge: 5000,
-    timeout: 20000
-  });
-  refreshTimer = window.setInterval(function () {
-    navigator.geolocation.getCurrentPosition(sendPosition, locationError, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 15000
-    });
-  }, 10000);
+  // Sending an OFW's position is handled by the shared tracker in
+  // templates/ofw/portal/_live_location.html. It is loaded on every portal
+  // page (through theme/base.html) so moving to another screen no longer
+  // stops the stream, and it survives short offline gaps with a retry queue.
   window.setInterval(updateLiveAge, 1000);
-
-  window.addEventListener('pagehide', function () {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    if (refreshTimer !== null) window.clearInterval(refreshTimer);
-  });
 })();
 </script>
 {% endblock %}

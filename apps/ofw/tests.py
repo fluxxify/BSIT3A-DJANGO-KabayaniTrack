@@ -2843,6 +2843,67 @@ class LocationTrackerPageTests(TestCase):
         self.assertEqual(data['ofws'][0]['ofw_id'], self.profile.pk)
         self.assertIn('freshness_label', data['ofws'][0])
 
+    def test_live_endpoint_reports_paused_when_last_ping_is_old(self):
+        OFWLocationSharing.objects.create(ofw=self.profile, is_enabled=True)
+        LocationTracker.objects.filter(ofw=self.profile).update(
+            recorded_at=timezone.now() - timedelta(hours=2)
+        )
+
+        data = self.client.get(reverse('ofw:location_tracker_live')).json()
+
+        self.assertEqual(data['live_count'], 0)
+        self.assertEqual(data['sharing_count'], 1)
+        self.assertEqual(data['paused_count'], 1)
+
+
+class LiveLocationTrackerTemplateTests(TestCase):
+    """The OFW tracker follows the account across every portal page."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='liveofw', password='Passw0rd!23'
+        )
+        mark_as_ofw(self.user)
+        self.profile = OFWProfile.objects.create(
+            user=self.user, first_name='Live', last_name='OFW',
+            country='Qatar',
+        )
+        self.client.force_login(self.user)
+
+    def _enable_sharing(self):
+        OFWLocationSharing.objects.create(ofw=self.profile, is_enabled=True)
+
+    def test_tracker_loads_on_every_portal_page_when_sharing_is_on(self):
+        self._enable_sharing()
+        for name in [
+            'ofw:portal',
+            'ofw:portal_concerns',
+            'ofw:portal_checkins',
+            'ofw:portal_profile',
+        ]:
+            with self.subTest(page=name):
+                response = self.client.get(reverse(name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'kabayani.location.queue.v1')
+                # PING_URL is escaped for JS, so check the variable instead of
+                # the raw path (escapejs turns "-" into \u002D).
+                self.assertContains(response, 'var PING_URL')
+
+    def test_tracker_is_absent_when_sharing_is_off(self):
+        response = self.client.get(reverse('ofw:portal'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'kabayani.location.queue.v1')
+
+    def test_tracker_is_absent_on_management_pages(self):
+        self._enable_sharing()
+        staff = User.objects.create_user(
+            username='livestaff', password='Passw0rd!23', is_staff=True
+        )
+        self.client.force_login(staff)
+        response = self.client.get(reverse('ofw:location_tracker'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'kabayani.location.queue.v1')
+
 
 class LocationRetentionCommandTests(TestCase):
     def test_command_previews_then_deletes_only_when_requested(self):

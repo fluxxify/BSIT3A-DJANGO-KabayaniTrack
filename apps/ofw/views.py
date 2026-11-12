@@ -1975,11 +1975,20 @@ def location_tracker_live(request):
 
     live_count = sum(1 for row in results if row['freshness'] == 'live')
     waiting_count = len(sharing - seen)
+    # Sharing is on but the last ping is older than the "live" window: the OFW
+    # closed the browser or lost signal. The admin map shows this as paused
+    # instead of pretending the marker is current.
+    live_sharing = sum(
+        1 for row in results
+        if row['sharing_enabled'] and row['freshness'] == 'live'
+    )
+    paused_count = max(0, len(sharing) - live_sharing)
     return JsonResponse({
         'ofws': results,
         'live_count': live_count,
         'sharing_count': len(sharing),
         'waiting_count': waiting_count,
+        'paused_count': paused_count,
     })
 
 

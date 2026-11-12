@@ -1,0 +1,236 @@
+{% comment %}
+Continuous OFW location sharing for every portal page.
+
+The browser can only read GPS while a KabayaniTrack page is open, so this
+partial is loaded once from ``theme/base.html`` instead of only on the
+location page. That way an OFW can browse concerns, check-ins or their
+profile and their position keeps streaming to the agency. Closing the
+browser (or swiping the app away) still stops updates — no web page can
+keep the GPS alive after it is closed.
+
+Points captured while offline are queued in localStorage and replayed when
+the device reconnects, so a short signal loss does not leave a hole in the
+map.
+{% endcomment %}
+{% if live_location_enabled %}
+<script>
+(function () {
+  'use strict';
+
+  // Guard against a template that includes this partial twice.
+  if (window.__kabayaniLiveLocation) { return; }
+  window.__kabayaniLiveLocation = true;
+
+  var PING_URL = '{{ live_location_ping_url|escapejs }}';
+  var CSRF_TOKEN = '{{ csrf_token }}';
+  var QUEUE_KEY = 'kabayani.location.queue.v1';
+  var MAX_QUEUE = 60;
+  var MIN_MOVE_METRES = 30;
+  var MIN_SEND_GAP_MS = 20000;
+  var HEARTBEAT_MS = 15000;
+  var FLUSH_MS = 30000;
+
+  var statusEl = document.getElementById('liveTrackingStatus');
+  var lastSent = { lat: null, lng: null, at: 0 };
+  var latest = null;
+  var sending = false;
+
+  function setStatus(message, kind) {
+    if (!statusEl) { return; }
+    statusEl.className = 'alert alert-' + kind + ' py-2';
+    statusEl.textContent = message;
+  }
+
+  function stamp() {
+    return new Date().toLocaleTimeString([], {
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  }
+
+  function distanceMeters(lat1, lng1, lat2, lng2) {
+    var toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad;
+    var dLng = (lng2 - lng1) * toRad;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // --- Offline queue ------------------------------------------------------
+  function readQueue() {
+    try {
+      var raw = window.localStorage.getItem(QUEUE_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveQueue(items) {
+    try {
+      window.localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+    } catch (error) {
+      // Private mode or a full quota: live updates still work, only the
+      // offline replay is lost.
+    }
+  }
+
+  function enqueue(item) {
+    var queue = readQueue();
+    var last = queue.length ? queue[queue.length - 1] : null;
+    // Do not stack dozens of points from the same spot.
+    if (last && distanceMeters(item.lat, item.lng, last.lat, last.lng) < 5) {
+      return;
+    }
+    queue.push(item);
+    if (queue.length > MAX_QUEUE) {
+      queue = queue.slice(queue.length - MAX_QUEUE);
+    }
+    saveQueue(queue);
+  }
+
+  function payloadFor(item) {
+    var params = new URLSearchParams();
+    params.append('csrfmiddlewaretoken', CSRF_TOKEN);
+    params.append('latitude', item.lat.toFixed(6));
+    params.append('longitude', item.lng.toFixed(6));
+    params.append('accuracy', String(Math.round(item.acc || 0)));
+    return params;
+  }
+
+  function send(item, queueOnFailure) {
+    if (sending) { return Promise.resolve(false); }
+    sending = true;
+    return fetch(PING_URL, {
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      headers: {
+        'X-CSRFToken': CSRF_TOKEN,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: payloadFor(item).toString()
+    }).then(function (response) {
+      // A logged-out session redirects to the login page, which would look
+      // like a success. Only JSON from the ping endpoint counts.
+      var type = response.headers.get('content-type') || '';
+      if (!response.ok || type.indexOf('application/json') === -1) {
+        throw new Error(response.status === 403 ? 'sharing was turned off' : 'HTTP ' + response.status);
+      }
+      lastSent = { lat: item.lat, lng: item.lng, at: Date.now() };
+      setStatus('Tracking active · last update ' + stamp(), 'success');
+      return true;
+    }).catch(function (error) {
+      if (queueOnFailure !== false) { enqueue(item); }
+      if (String(error.message).indexOf('turned off') !== -1) {
+        setStatus('Live sharing is off. Turn it on again from My Live Location.', 'warning');
+      } else if (!navigator.onLine) {
+        setStatus('Offline — saved and will send when you reconnect.', 'warning');
+      } else {
+        setStatus('Tracking paused (' + error.message + '). Retrying automatically.', 'warning');
+      }
+      return false;
+    }).finally(function () {
+      sending = false;
+    });
+  }
+
+  function flushQueue() {
+    if (!navigator.onLine) { return; }
+    var queue = readQueue();
+    if (!queue.length) { return; }
+    var item = queue.shift();
+    saveQueue(queue);
+    send(item, false).then(function (ok) {
+      if (ok && readQueue().length) { flushQueue(); }
+    });
+  }
+
+  // --- Capture ------------------------------------------------------------
+  function record(position) {
+    var coords = position && position.coords;
+    if (!coords || typeof coords.latitude !== 'number') { return; }
+
+    var item = {
+      lat: coords.latitude,
+      lng: coords.longitude,
+      acc: coords.accuracy || 0,
+      t: Date.now()
+    };
+    latest = item;
+
+    var moved = lastSent.lat === null ||
+      distanceMeters(item.lat, item.lng, lastSent.lat, lastSent.lng) >= MIN_MOVE_METRES;
+    var due = Date.now() - lastSent.at >= MIN_SEND_GAP_MS;
+    if (!moved && !due) { return; }
+
+    if (!navigator.onLine) {
+      enqueue(item);
+      setStatus('Offline — saved and will send when you reconnect.', 'warning');
+      return;
+    }
+    send(item, true);
+  }
+
+  function requestFix() {
+    if (!navigator.geolocation) { return; }
+    navigator.geolocation.getCurrentPosition(record, function () {}, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+  }
+
+  function locationError(error) {
+    if (error && error.code === 1) {
+      setStatus('Location permission is blocked. Allow it in your browser settings to keep sharing.', 'warning');
+    } else if (error && error.code === 3) {
+      setStatus('Waiting for a GPS fix — check that device location is on.', 'warning');
+    } else {
+      setStatus('Could not read GPS right now. Retrying automatically.', 'warning');
+    }
+  }
+
+  if (!navigator.geolocation) {
+    setStatus('This browser cannot share location.', 'danger');
+    return;
+  }
+
+  setStatus('Connecting to your device location…', 'secondary');
+
+  navigator.geolocation.watchPosition(record, locationError, {
+    enableHighAccuracy: true,
+    maximumAge: 5000,
+    timeout: 20000
+  });
+
+  window.setInterval(requestFix, HEARTBEAT_MS);
+  window.setInterval(flushQueue, FLUSH_MS);
+
+  // Coming back from another app or waking the phone: send a fresh fix at
+  // once instead of waiting for the next heartbeat.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      requestFix();
+      flushQueue();
+    }
+  });
+  window.addEventListener('pageshow', requestFix);
+  window.addEventListener('online', function () {
+    setStatus('Back online — sending saved positions…', 'info');
+    flushQueue();
+  });
+
+  // A navigation should not lose the last point. sendBeacon survives unload
+  // and the ping endpoint accepts the CSRF token in the form body.
+  window.addEventListener('pagehide', function () {
+    if (latest && navigator.sendBeacon) {
+      try { navigator.sendBeacon(PING_URL, payloadFor(latest)); } catch (error) {}
+    }
+    flushQueue();
+  });
+})();
+</script>
+{% endif %}

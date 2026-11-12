@@ -116,6 +116,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.ofw.context_processors.notifications',
+                'apps.ofw.context_processors.live_location',
             ],
         },
     },

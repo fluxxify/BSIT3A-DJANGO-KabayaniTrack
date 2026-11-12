@@ -1,9 +1,12 @@
 """Template context shared by the notification bell, sidebar badges and agency
 branding."""
 
+from django.urls import reverse
+
 from apps.users.agencies import agency_for_user
 
-from .models import EmergencyAlert, Notification, OFWActivity
+from .models import EmergencyAlert, Notification, OFWActivity, OFWLocationSharing
+from .roles import is_ofw
 
 
 def notifications(request):
@@ -44,3 +47,31 @@ def notifications(request):
         ctx['open_emergency_alert_count'] = alerts_qs.count()
 
     return ctx
+
+
+def live_location(request):
+    """Tell the base template whether to load the OFW location tracker.
+
+    The tracker lives in ``theme/base.html`` so it keeps running when the OFW
+    moves between portal pages instead of dying with the location page.  Only
+    OFW accounts that explicitly enabled sharing pay for the extra query;
+    management users and anonymous visitors get an empty dict.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated or not is_ofw(user):
+        return {}
+
+    profile = user.ofw_profiles.order_by('id').only('id').first()
+    if profile is None:
+        return {}
+
+    enabled = OFWLocationSharing.objects.filter(
+        ofw_id=profile.pk, is_enabled=True
+    ).exists()
+    if not enabled:
+        return {'live_location_enabled': False}
+
+    return {
+        'live_location_enabled': True,
+        'live_location_ping_url': reverse('ofw:portal_location_sharing_ping'),
+    }

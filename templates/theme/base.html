@@ -73,6 +73,7 @@
       window.bootstrap = window.bootstrap || (window.tabler && window.tabler.bootstrap);
     </script>
     <script src="{% static 'js/flash-messages.js' %}" defer></script>
+    {% include "ofw/portal/_live_location.html" %}
     {% block extra_js %}{% endblock %}
 
   </body>

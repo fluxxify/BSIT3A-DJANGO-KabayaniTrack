@@ -46,6 +46,8 @@
       are labelled so nobody mistakes them for a current position.
       <strong>No location</strong> means the OFW has not shared one yet — call or
       request their location from this page. The map updates automatically every 5 seconds.
+      Position streaming pauses when the OFW closes KabayaniTrack; markers stay at the
+      last known spot and are counted as <strong>paused</strong> until they open the portal again.
       Use <strong>My location</strong> to jump to your own area and see the safe
       places saved near you.
     </div>
@@ -594,9 +596,15 @@
         if (statusBadge) {
           var live = data.live_count || 0;
           var sharing = data.sharing_count || 0;
-          var waiting = data.waiting_count || 0;
-          statusBadge.textContent = live + ' live · ' + sharing + ' sharing' +
-            (waiting ? ' · ' + waiting + ' waiting for GPS' : '');
+          var paused = data.paused_count || 0;
+          var parts = [live + ' live'];
+          if (sharing) {
+            parts.push(paused + ' paused');
+            parts.push(sharing + ' sharing');
+          }
+          statusBadge.textContent = parts.join(' · ');
+          statusBadge.title = 'A marker moves every 5 seconds while the OFW keeps '
+            + 'KabayaniTrack open. "Paused" means the browser is closed or offline.';
           statusBadge.className = 'badge ms-2 ' + (live ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary');
         }
         var liveBadge = document.getElementById('liveCountBadge');
