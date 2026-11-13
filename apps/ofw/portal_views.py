@@ -21,6 +21,7 @@ from django.views.decorators.http import require_POST
 from apps.users.models import Agency
 
 from .activity import refresh_activity_for_user
+from . import crud
 from .forms import (
     FamilyContactForm,
     OFWOfflineNoticeForm,
@@ -1100,6 +1101,23 @@ def portal_suggest_safe_place(request):
             suggestion = form.save(commit=False)
             suggestion.submitted_by = request.user
             suggestion.save()
+            crud._write_audit(
+                request, AuditLog.Action.CREATE, SafeLocationSuggestion,
+                obj=suggestion,
+                changes={'name': suggestion.name, 'country': suggestion.country},
+            )
+            notify_managers(
+                title=f'New safe place suggestion: {suggestion.name}',
+                message=(
+                    f'{profile.full_name} suggested "{suggestion.name}" in '
+                    f'{suggestion.city or suggestion.country}. Review it in '
+                    f'Safe Place Suggestions.'
+                ),
+                url=reverse('ofw:safe_location_suggestions'),
+                level=Notification.Level.INFO,
+                agency=profile.agency_org,
+                exclude_user=request.user,
+            )
             messages.success(
                 request,
                 f'Your suggestion "{suggestion.name}" has been submitted for admin approval.'
@@ -1352,6 +1370,10 @@ def portal_request_police(request):
         status=PoliceReport.Status.DRAFT,
         reported_by=request.user,
         requested_by_ofw=True,
+    )
+    crud._write_audit(
+        request, AuditLog.Action.CREATE, PoliceReport, obj=report,
+        changes={'requested_by_ofw': True, 'status': report.status},
     )
 
     open_alert = EmergencyAlert.objects.filter(

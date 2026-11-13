@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.html import escape
@@ -417,6 +417,10 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
     @login_required(login_url='login')
     def page(request):
+        # Management pages are for staff and administrators.  OFW accounts
+        # keep their own self-service portal and must not open the console.
+        if not (request.user.is_superuser or request.user.is_staff):
+            return redirect('dashboard')
         query = request.GET.get('q', '').strip()
         queryset = _base_queryset(request, query)
 
@@ -492,6 +496,10 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
     @login_required(login_url='login')
     def list_ajax(request):
+        if not (request.user.is_superuser or request.user.is_staff):
+            return JsonResponse(
+                {'error': 'Management accounts only.'}, status=403
+            )
         query = request.GET.get('q', '').strip()
         queryset = _base_queryset(request, query)
 
@@ -508,6 +516,10 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
     @login_required(login_url='login')
     def get_ajax(request, pk):
+        if not (request.user.is_superuser or request.user.is_staff):
+            return JsonResponse(
+                {'error': 'Management accounts only.'}, status=403
+            )
         obj = get_object_or_404(_scoped(request.user, model), pk=pk)
         return JsonResponse({
             name: _serialize(getattr(obj, name, '')) for name in form_field_names
@@ -577,7 +589,15 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
             # An agency officer adding a paper profile should not turn that
             # profile into their own OFW portal account.  Directory contacts
             # are shared entries, so they are not owned by the officer either.
-            if not (
+            # Staff and administrators may deliberately choose a portal
+            # account (or leave it blank for an orphaned profile).
+            chosen_user = (
+                form.cleaned_data.get('user')
+                if 'user' in form.fields else None
+            )
+            if model is OFWProfile and chosen_user is not None:
+                obj.user = chosen_user
+            elif not (
                 agency is not None
                 and model in (OFWProfile, EmergencyContact)
             ):
@@ -614,6 +634,14 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
     def delete_ajax(request, pk):
         if not (request.user.is_superuser or request.user.is_staff):
             return JsonResponse({'error': 'Management accounts only.'}, status=403)
+        if model is OFWProfile and not request.user.is_superuser:
+            # Deleting a profile also deletes its check-ins, concerns, alerts,
+            # location history and police reports.  Keep that destructive
+            # cascade for administrators only.
+            return JsonResponse(
+                {'error': 'Only administrators can delete OFW profiles.'},
+                status=403,
+            )
         obj = get_object_or_404(_scoped(request.user, model), pk=pk)
         label = str(obj)
         _write_audit(request, AuditLog.Action.DELETE, model, obj=obj)
@@ -664,6 +692,10 @@ def make_crud(*, model, form_class, columns, search_fields=(), order_by=None,
 
         CSV remains available for compatibility via ``?format=csv``.
         """
+        if not (request.user.is_superuser or request.user.is_staff):
+            return JsonResponse(
+                {'error': 'Management accounts only.'}, status=403
+            )
         query = request.GET.get('q', '').strip()
         queryset = _base_queryset(request, query, with_prefetch=False)
 

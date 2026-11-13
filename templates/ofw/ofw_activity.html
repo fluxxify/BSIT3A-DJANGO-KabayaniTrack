@@ -74,9 +74,13 @@
             </td>
             <td class="text-end">
               {% if not activity.is_account_active and activity.days_inactive >= 3 %}
-              <a href="{% url 'ofw:request_ofw_location' activity.user.ofw_profiles.first.pk %}" class="btn btn-sm btn-outline-primary" onclick="return confirm('Send a location request to this OFW?');">
-                <i class="fas fa-location-arrow me-1"></i>Request Location
-              </a>
+              <form method="post" action="{% url 'ofw:request_ofw_location' activity.user.ofw_profiles.first.pk %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-primary" onclick="return confirm('Send a location request to this OFW?');">
+                  <i class="fas fa-location-arrow me-1"></i>Request Location
+                </button>
+              </form>
               {% else %}
               <span class="btn btn-sm btn-outline-secondary disabled">—</span>
               {% endif %}

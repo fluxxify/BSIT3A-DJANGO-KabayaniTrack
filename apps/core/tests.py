@@ -439,20 +439,21 @@ class ManagementSidebarTests(TestCase):
             username='sidestaff', password='Str0ngPassw0rd!', is_staff=True
         )
 
-    def test_admin_sidebar_shows_users_without_info_or_reports(self):
+    def test_admin_sidebar_shows_users_and_reports(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse('dashboard'))
         self.assertContains(response, reverse('users:user_list'))
-        self.assertNotContains(response, reverse('info:info_list'))
-        self.assertNotContains(response, reverse('ofw:report_list'))
+        self.assertContains(response, reverse('ofw:report_list'))
+        self.assertContains(response, reverse('ofw:safe_locations'))
+        self.assertContains(response, reverse('ofw:safe_location_suggestions'))
 
-    def test_staff_sidebar_hides_users_and_info(self):
+    def test_staff_sidebar_hides_users(self):
         self.client.force_login(self.staff)
         response = self.client.get(reverse('dashboard'))
         self.assertContains(response, reverse('ofw:profile_list'))
         self.assertContains(response, reverse('ofw:concern_list'))
+        self.assertContains(response, reverse('ofw:report_list'))
         self.assertNotContains(response, reverse('users:user_list'))
-        self.assertNotContains(response, reverse('info:info_list'))
 
     def test_staff_sees_staff_role_label(self):
         self.client.force_login(self.staff)

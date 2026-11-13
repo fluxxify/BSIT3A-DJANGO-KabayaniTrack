@@ -7,6 +7,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.users.agencies import (
@@ -113,9 +114,20 @@ class StyledModelForm(forms.ModelForm):
 
 
 class OFWProfileForm(StyledModelForm):
+    user = forms.ModelChoiceField(
+        queryset=get_user_model().objects.none(),
+        required=False,
+        label='Portal account',
+        help_text=(
+            'Link this profile to an OFW login account. Leave blank for a '
+            'staff-created profile that has no portal account yet.'
+        ),
+    )
+
     class Meta:
         model = OFWProfile
         fields = [
+            'user',
             'first_name', 'middle_name', 'last_name', 'suffix', 'passport_number', 'birth_date', 'age', 'sex',
             'contact_number', 'email', 'permanent_address', 'country',
             'city_abroad', 'employer_name', 'occupation', 'agency_org',
@@ -130,8 +142,24 @@ class OFWProfileForm(StyledModelForm):
         ):
             # An OFW may maintain their own identity/contact fields through the
             # generic endpoint, but case-management fields stay staff-only.
-            for name in ('agency_org', 'welfare_status', 'remarks'):
+            for name in ('user', 'agency_org', 'welfare_status', 'remarks'):
                 self.fields.pop(name, None)
+        elif 'user' in self.fields:
+            # Only real OFW login accounts can own a profile.  Offer unlinked
+            # accounts, plus the currently linked account when editing, so an
+            # orphaned profile can be connected without breaking an edit.
+            accounts = get_user_model().objects.filter(
+                is_active=True, is_staff=False, is_superuser=False,
+            )
+            if self.instance.pk and self.instance.user_id:
+                accounts = accounts.filter(
+                    Q(pk=self.instance.user_id) | Q(ofw_profiles__isnull=True)
+                ).distinct()
+            else:
+                accounts = accounts.filter(ofw_profiles__isnull=True)
+            self.fields['user'].queryset = accounts.order_by(
+                'first_name', 'last_name', 'username',
+            )
         if 'welfare_status' in self.fields:
             self.fields['welfare_status'].help_text = (
                 'Current welfare condition. Stable: no action needed. '
@@ -349,8 +377,36 @@ class MonitoringReportForm(StyledModelForm):
         model = MonitoringReport
         fields = [
             'title', 'report_type', 'period_start', 'period_end', 'country',
-            'summary', 'status', 'attachment',
+            'agency', 'summary', 'status', 'attachment',
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'agency' in self.fields:
+            if is_global_staff(self.user):
+                self.fields['agency'].queryset = Agency.objects.filter(
+                    is_active=True
+                ).order_by('name')
+                self.fields['agency'].empty_label = 'No agency (global report)'
+                self.fields['agency'].help_text = (
+                    'Administrators can file a report for any agency or leave '
+                    'it unassigned for a global report.'
+                )
+            else:
+                agency = (
+                    agency_for_user(self.user)
+                    if self.user is not None else None
+                )
+                self.fields['agency'].queryset = (
+                    Agency.objects.filter(pk=agency.pk)
+                    if agency is not None else Agency.objects.none()
+                )
+                self.fields['agency'].initial = agency
+                self.fields['agency'].help_text = (
+                    'Reports created by an agency account are automatically '
+                    'tagged with that agency.'
+                )
+            self.fields['agency'].required = False
 
     def clean(self):
         cleaned = super().clean()

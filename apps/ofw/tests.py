@@ -118,16 +118,16 @@ class OFWCrudTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['first_name'], 'Juan')
 
-    def test_delete_ajax(self):
+    def test_delete_ajax_is_admin_only_for_profiles(self):
         response = self.client.post(reverse('ofw:profile_delete_ajax', args=[self.ofw.pk]))
-        self.assertEqual(response.json()['status'], 'deleted')
-        self.assertFalse(OFWProfile.objects.filter(pk=self.ofw.pk).exists())
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(OFWProfile.objects.filter(pk=self.ofw.pk).exists())
 
     def test_other_user_cannot_access_record(self):
         other = User.objects.create_user(username='other', password='Passw0rd!23')
         self.client.force_login(other)
         response = self.client.get(reverse('ofw:profile_get_ajax', args=[self.ofw.pk]))
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
 
     def test_create_emergency_contact_via_ajax(self):
         response = self.client.post(reverse('ofw:contact_save_ajax'), {
@@ -374,6 +374,10 @@ class OFWProfilePictureTests(TestCase):
         self.assertFalse(self.profile.profile_picture)
 
     def test_profile_list_shows_profile_picture(self):
+        staff = User.objects.create_user(
+            username='photostaff', password='Passw0rd!23', is_staff=True,
+        )
+        self.client.force_login(staff)
         self.profile.profile_picture.save(
             'me.jpg',
             SimpleUploadedFile('me.jpg', b'\xff\xd8\xff fakejpg', 'image/jpeg'),
@@ -731,7 +735,7 @@ class DashboardDrilldownTests(TestCase):
         self.assertContains(response, reverse('ofw:checkin_list'))
         self.assertContains(response, reverse('ofw:concern_list'))
         self.assertContains(response, reverse('ofw:contact_list'))
-        self.assertNotContains(response, reverse('ofw:report_list'))
+        self.assertContains(response, reverse('ofw:report_list'))
 
     def test_welfare_status_filter_limits_results(self):
         response = self.client.get(
@@ -1013,10 +1017,13 @@ class WelfareStatusAutomationTests(TestCase):
         self.assertFalse(self.profile.welfare_status_is_stale)
 
     def test_stale_filter_limits_profile_list(self):
+        staff = User.objects.create_user(
+            username='autostaff', password='Passw0rd!23', is_staff=True,
+        )
         OFWProfile.objects.filter(pk=self.profile.pk).update(
             welfare_status_updated_at=timezone.now() - timedelta(days=45)
         )
-        self.client.force_login(self.ofw_user)
+        self.client.force_login(staff)
         response = self.client.get(
             reverse('ofw:profile_list'), {'stale': '1'}
         )
@@ -1066,6 +1073,7 @@ class AuditLogTests(TestCase):
 
     def test_deleting_a_record_is_audited(self):
         profile_id = self.ofw.pk
+        self.client.force_login(self.admin)
         response = self.client.post(reverse('ofw:profile_delete_ajax', args=[profile_id]))
         self.assertEqual(response.status_code, 200)
         log = AuditLog.objects.get(action=AuditLog.Action.DELETE)
@@ -5421,3 +5429,187 @@ class OFWPortalFeatureGapTests(TestCase):
             reverse('ofw:profile_detail', args=[self.profile.pk])
         )
         self.assertEqual(response.status_code, 404)
+
+
+class ManagementConsoleGuardTests(TestCase):
+    """P1 guards for console pages, destructive deletes and live locations."""
+
+    def setUp(self):
+        from apps.users.models import Agency, AgencyStaff
+
+        self.agency = Agency.objects.create(
+            name='Alpha Guard Agency', slug='alpha-guard-agency',
+        )
+        self.other_agency = Agency.objects.create(
+            name='Beta Guard Agency', slug='beta-guard-agency',
+        )
+        self.staff = User.objects.create_user(
+            username='guard_staff', password='Passw0rd!23', is_staff=True,
+        )
+        AgencyStaff.objects.create(user=self.staff, agency=self.agency)
+        self.ofw_user = User.objects.create_user(
+            username='guard_ofw', password='Passw0rd!23',
+        )
+        self.profile = OFWProfile.objects.create(
+            user=self.ofw_user, first_name='Ana', last_name='Reyes',
+            country='Qatar', agency_org=self.agency,
+        )
+        self.orphan = OFWProfile.objects.create(
+            first_name='Orphan', last_name='Profile', country='Qatar',
+            agency_org=self.agency,
+        )
+        self.admin = User.objects.create_superuser(
+            username='guard_admin', password='Passw0rd!23',
+            email='guard_admin@example.com',
+        )
+        self.safe = SafeLocation.objects.create(
+            name='Global Safe Place', country='Qatar',
+        )
+
+    def test_ofw_cannot_open_management_pages(self):
+        self.client.force_login(self.ofw_user)
+        for name in ('profile_list', 'report_list', 'contact_list'):
+            with self.subTest(name=name):
+                response = self.client.get(reverse(f'ofw:{name}'))
+                self.assertRedirects(
+                    response, reverse('dashboard'),
+                    fetch_redirect_response=False,
+                )
+
+    def test_ofw_cannot_read_management_ajax_endpoints(self):
+        self.client.force_login(self.ofw_user)
+        response = self.client.get(reverse('ofw:profile_list_ajax'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_agency_staff_cannot_edit_or_delete_safe_locations(self):
+        self.client.force_login(self.staff)
+        edit = self.client.post(reverse('ofw:safe_location_save'), {
+            'id': self.safe.pk,
+            'name': 'Changed by staff',
+            'location_type': 'other',
+            'country': 'Qatar',
+            'is_active': 'on',
+        })
+        self.assertEqual(edit.status_code, 403)
+        delete = self.client.post(
+            reverse('ofw:safe_location_delete', args=[self.safe.pk])
+        )
+        self.assertEqual(delete.status_code, 403)
+        self.safe.refresh_from_db()
+        self.assertEqual(self.safe.name, 'Global Safe Place')
+        self.assertTrue(self.safe.is_active)
+
+    def test_admin_can_edit_safe_locations(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse('ofw:safe_location_save'), {
+            'id': self.safe.pk,
+            'name': 'Admin updated place',
+            'location_type': 'hospital',
+            'country': 'Qatar',
+            'is_active': 'on',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.safe.refresh_from_db()
+        self.assertEqual(self.safe.name, 'Admin updated place')
+        self.assertTrue(
+            AuditLog.objects.filter(model_name='Safe Location').exists()
+        )
+
+    def test_agency_staff_cannot_delete_an_ofw_profile(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('ofw:profile_delete_ajax', args=[self.profile.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(OFWProfile.objects.filter(pk=self.profile.pk).exists())
+
+    def test_admin_can_delete_an_ofw_profile(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('ofw:profile_delete_ajax', args=[self.orphan.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(OFWProfile.objects.filter(pk=self.orphan.pk).exists())
+
+    def test_deactivated_agency_staff_sees_no_live_locations(self):
+        LocationTracker.objects.create(
+            ofw=self.profile, latitude='25.204800', longitude='55.270800',
+        )
+        self.agency.is_active = False
+        self.agency.save(update_fields=['is_active'])
+        self.client.force_login(self.staff)
+
+        live = self.client.get(reverse('ofw:location_tracker_live'))
+        self.assertEqual(live.status_code, 200)
+        self.assertEqual(live.json()['ofws'], [])
+
+        page = self.client.get(reverse('ofw:location_tracker'))
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, 'Ana Reyes')
+
+    def test_request_location_rejects_get_and_accepts_post(self):
+        self.client.force_login(self.staff)
+        url = reverse('ofw:request_ofw_location', args=[self.profile.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.ofw_user,
+                title__icontains='checking on you',
+            ).exists()
+        )
+
+    def test_unlinked_profile_filter(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse('ofw:profile_list'), {'account': 'unlinked'}
+        )
+        self.assertContains(response, 'Orphan')
+        self.assertNotContains(response, 'Ana')
+
+    def test_suggestion_submit_notifies_managers_with_review_link(self):
+        self.client.force_login(self.ofw_user)
+        response = self.client.post(
+            reverse('ofw:portal_suggest_safe_place'), {
+                'name': 'New Community Clinic',
+                'location_type': 'hospital',
+                'country': 'Qatar',
+                'city': 'Doha',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff,
+                url=reverse('ofw:safe_location_suggestions'),
+            ).exists()
+        )
+
+    def test_admin_can_assign_agency_on_a_monitoring_report(self):
+        form = MonitoringReportForm(data={
+            'title': 'Quarterly Report',
+            'report_type': 'quarterly',
+            'period_start': '2026-01-01',
+            'period_end': '2026-03-31',
+            'country': 'Qatar',
+            'agency': self.agency.pk,
+            'status': 'draft',
+        }, user=self.admin)
+        self.assertTrue(form.is_valid(), form.errors)
+        report = form.save()
+        self.assertEqual(report.agency, self.agency)
+
+    def test_dashboard_shows_monitoring_reports_kpi(self):
+        MonitoringReport.objects.create(
+            title='Monthly Report',
+            period_start='2026-01-01',
+            period_end='2026-01-31',
+            agency=self.agency,
+        )
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, 'Monitoring Reports')
+        self.assertContains(response, reverse('ofw:report_list'))
+
+

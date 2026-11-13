@@ -9,12 +9,21 @@
           <h2 class="page-title mb-0">{{ page_title }}</h2>
         </div>
         <div class="col-auto text-end">
-          <a href="?status=all" class="btn btn-sm btn-outline-secondary">{{ status_filter|title }} only → All</a>
+          {% if status_filter != 'all' %}
+          <a href="?status=all" class="btn btn-sm btn-outline-secondary">View all</a>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
   <br>
+
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Pending</a>
+    <a href="?status=approved" class="btn btn-sm {% if status_filter == 'approved' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Approved</a>
+    <a href="?status=rejected" class="btn btn-sm {% if status_filter == 'rejected' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Rejected</a>
+    <a href="?status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+  </div>
 
   <div class="d-flex flex-wrap gap-2 mb-3">
     <div class="badge bg-warning-lt text-warning">
@@ -47,7 +56,7 @@
           {% for suggestion in suggestions %}
           <tr>
             <td>
-              <a href="#" class="text-decoration-none fw-medium">{{ suggestion.name }}</a>
+              <span class="text-decoration-none fw-medium">{{ suggestion.name }}</span>
               <div class="text-muted small">{{ suggestion.address|default:"No address" }}</div>
               {% if suggestion.phone %}
               <div class="text-muted small"><i class="fas fa-phone me-1"></i>{{ suggestion.phone }}</div>
@@ -101,7 +110,13 @@
   {% else %}
   <div class="text-muted text-center py-5">
     <i class="fas fa-clipboard-list fa-3x mb-3"></i>
-    <p>No {{ status_filter }} safe place suggestions.</p>
+    <p>
+      {% if status_filter == 'all' %}
+      No safe place suggestions yet.
+      {% else %}
+      No {{ status_filter }} safe place suggestions.
+      {% endif %}
+    </p>
   </div>
   {% endif %}
 </div>

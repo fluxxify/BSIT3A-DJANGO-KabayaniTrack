@@ -64,7 +64,10 @@
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-truck-medical text-danger"></i>
             </span>
-            <span class="nav-link-title">Emergency Guidance</span>
+            <span class="nav-link-title">Emergency SOS Calls</span>
+            {% if open_emergency_alert_count %}
+            <span class="badge bg-danger ms-auto">{{ open_emergency_alert_count }}</span>
+            {% endif %}
           </a>
         </li>
         <li class="nav-item">
@@ -76,7 +79,7 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'profile_list' %}active{% endif %}" href="{% url 'ofw:profile_list' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'profile_list' or request.resolver_match.url_name == 'profile_detail' %}active{% endif %}" href="{% url 'ofw:profile_list' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-passport"></i>
             </span>
@@ -84,11 +87,22 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if request.resolver_match.url_name == 'inactive_ofws' or request.resolver_match.url_name == 'ofw_activity' %}active{% endif %}" href="{% url 'ofw:inactive_ofws' %}">
+          <a class="nav-link {% if request.resolver_match.url_name == 'inactive_ofws' %}active{% endif %}" href="{% url 'ofw:inactive_ofws' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-clock text-warning"></i>
             </span>
-            <span class="nav-link-title">Login Warnings</span>
+            <span class="nav-link-title">Inactive OFWs</span>
+            {% if inactive_ofw_count %}
+            <span class="badge bg-warning ms-auto">{{ inactive_ofw_count }}</span>
+            {% endif %}
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'ofw_activity' %}active{% endif %}" href="{% url 'ofw:ofw_activity' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-history"></i>
+            </span>
+            <span class="nav-link-title">OFW Activity Log</span>
           </a>
         </li>
         <li class="nav-item">
@@ -96,7 +110,15 @@
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-building-shield text-danger"></i>
             </span>
-            <span class="nav-link-title">Police Contact</span>
+            <span class="nav-link-title">Police Stations Near Inactive OFWs</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'police_reports' %}active{% endif %}" href="{% url 'ofw:police_reports' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-shield-halved"></i>
+            </span>
+            <span class="nav-link-title">Police Escalation</span>
           </a>
         </li>
         <li class="nav-item">
@@ -124,6 +146,14 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'report_list' %}active{% endif %}" href="{% url 'ofw:report_list' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-file-lines"></i>
+            </span>
+            <span class="nav-link-title">Monitoring Reports</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'contact_list' %}active{% endif %}" href="{% url 'ofw:contact_list' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="nav-icon fas fa-address-book"></i>
@@ -131,8 +161,32 @@
             <span class="nav-link-title">Emergency Contacts</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'safe_locations' %}active{% endif %}" href="{% url 'ofw:safe_locations' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-map-location-dot"></i>
+            </span>
+            <span class="nav-link-title">Safe Places</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.resolver_match.url_name == 'safe_location_suggestions' %}active{% endif %}" href="{% url 'ofw:safe_location_suggestions' %}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="nav-icon fas fa-lightbulb"></i>
+            </span>
+            <span class="nav-link-title">Safe Place Suggestions</span>
+            {% if pending_safe_location_suggestions_count %}
+            <span class="badge bg-warning ms-auto">{{ pending_safe_location_suggestions_count }}</span>
+            {% endif %}
+          </a>
+        </li>
 
         {% if user.is_superuser %}
+        <li class="nav-item">
+          <span class="dh-nav-section">
+            Administration
+          </span>
+        </li>
         <li class="nav-item">
           <a class="nav-link {% if request.resolver_match.url_name == 'all_activity' %}active{% endif %}" href="{% url 'ofw:all_activity' %}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">

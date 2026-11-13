@@ -156,6 +156,24 @@
       <div class="card">
         <div class="card-body">
           <div class="d-flex align-items-center">
+            <div class="subheader">Monitoring Reports</div>
+          </div>
+          <div class="d-flex align-items-baseline">
+            <div class="h1 mb-0 me-2">{{ stats.kpi.reports_total }}</div>
+            <i class="fas fa-file-lines text-muted"></i>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="{{ stats.links.reports_total }}" class="text-decoration-none">
+            View reports <i class="ti ti-arrow-right ms-1"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
             <div class="subheader">Emergency Contacts</div>
           </div>
           <div class="d-flex align-items-baseline">

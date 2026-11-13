@@ -9,7 +9,7 @@
       <div class="text-muted small mt-1">Police stations, hospitals, and embassies nearest to you.</div>
     </div>
     <div class="col-auto">
-      {% if user.is_superuser or user.is_staff %}
+      {% if user.is_superuser %}
       <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addLocationModal">
         <i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">Add Safe Location</span><span class="d-sm-none">Add</span>
       </button>
@@ -111,9 +111,9 @@
           {% endif %}
         </div>
       </div>
-      {% if loc.phone or loc.has_coords or user.is_superuser or user.is_staff %}
+      {% if loc.phone or loc.has_coords or user.is_superuser %}
       <div class="card-footer sp-card-actions">
-        {% if user.is_superuser or user.is_staff %}
+        {% if user.is_superuser %}
         <button type="button" class="btn btn-sm btn-outline-primary sp-icon-btn" data-bs-toggle="modal" data-bs-target="#editLocationModal{{ loc.pk }}" title="Edit">
           <i class="fas fa-edit"></i>
         </button>
@@ -165,7 +165,7 @@
   <div class="text-muted text-center py-5">
     <i class="fas fa-map-marker-alt fa-3x mb-3 text-muted"></i>
     <p>No safe places found yet.</p>
-    {% if user.is_superuser or user.is_staff %}
+    {% if user.is_superuser %}
     <p class="text-muted small">Add police stations, hospitals, or embassies near OFW deployment locations.</p>
     {% else %}
     <p class="text-muted small">Ask your agency to add police stations, hospitals, or embassies near your work location.</p>
@@ -174,7 +174,7 @@
   {% endif %}
 
   <!-- Add Location Modal -->
-  {% if user.is_superuser or user.is_staff %}
+  {% if user.is_superuser %}
   <div class="modal modal-blur fade" id="addLocationModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">

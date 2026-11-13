@@ -312,6 +312,7 @@ _profiles = crud.make_crud(
         {'field': 'age', 'label': 'Age'},
         {'field': 'country', 'label': 'Country'},
         {'field': 'agency_org', 'label': 'Agency'},
+        {'field': 'user', 'label': 'Portal account'},
         {'field': 'employer_name', 'label': 'Employer'},
         {'field': 'occupation', 'label': 'Occupation'},
         {'field': 'get_welfare_status_display', 'label': 'Welfare Status',
@@ -330,8 +331,18 @@ _profiles = crud.make_crud(
         'country': ('country__iexact', str),
         'stale': ('welfare_status_updated_at__lt', _stale_profile_filter),
         'agency': ('agency_org_id', int),
+        'account': ('user__isnull', lambda value: value == 'unlinked'),
     },
-    filter_fields=_profile_filter_fields,
+    filter_fields=lambda request: _profile_filter_fields(request) + [
+        {
+            'name': 'account',
+            'label': 'Portal account',
+            'choices': [
+                ('linked', 'Linked to a login'),
+                ('unlinked', 'No portal account'),
+            ],
+        },
+    ],
 )
 
 _assessments = crud.make_crud(
@@ -663,6 +674,10 @@ def concern_proof_delete(request, pk):
 
     proof = get_object_or_404(ConcernProof, pk=pk)
     label = proof.display_name
+    crud._write_audit(
+        request, AuditLog.Action.DELETE, ConcernProof, obj=proof,
+        changes={'file': label},
+    )
     if proof.file:
         proof.file.delete(save=False)
     proof.delete()
@@ -698,6 +713,10 @@ def concern_status_ajax(request, pk):
         # Reopening a concern must not leave a stale resolution date behind.
         concern.resolved_date = None
     concern.save(update_fields=['status', 'resolved_date', 'updated_at'])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, Concern, obj=concern,
+        changes={'status': {'from': old_status, 'to': new_status}},
+    )
 
     from .notifications import notify
     if new_status == Concern.Status.RESOLVED:
@@ -762,6 +781,10 @@ def police_report_status_ajax(request, pk):
             report.resolution_note = note
             update_fields.append('resolution_note')
     report.save(update_fields=update_fields)
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, PoliceReport, obj=report,
+        changes={'status': {'from': old_status, 'to': new_status}},
+    )
 
     from .notifications import notify, notify_managers
     if new_status == PoliceReport.Status.RESPONDED:
@@ -1472,6 +1495,10 @@ def request_ofw_location(request, pk):
         url=reverse('ofw:portal_emergency_sos'),
         level=Notification.Level.WARNING,
     )
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, OFWProfile, obj=profile,
+        changes={'location_request': 'sent'},
+    )
     messages.success(
         request,
         f'Location request sent to {profile.full_name}. They must allow it on their phone.',
@@ -1526,6 +1553,11 @@ def acknowledge_alert(request, pk):
     alert.acknowledged_by = request.user
     alert.acknowledged_at = timezone.now()
     alert.save(update_fields=['status', 'acknowledged_by', 'acknowledged_at', 'updated_at'])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, EmergencyAlert, obj=alert,
+        changes={'status': {'from': EmergencyAlert.Status.OPEN,
+                            'to': EmergencyAlert.Status.ACKNOWLEDGED}},
+    )
 
     notify(
         alert.ofw.user,
@@ -1554,6 +1586,7 @@ def escalate_to_police(request, pk):
         messages.info(request, 'This emergency alert has already been closed or escalated.')
         return redirect('ofw:emergency_alerts')
 
+    previous_status = alert.status
     # Create the police report
     report = PoliceReport.objects.create(
         ofw=alert.ofw,
@@ -1576,6 +1609,15 @@ def escalate_to_police(request, pk):
     alert.escalated_to_police = True
     alert.police_report = report
     alert.save(update_fields=['status', 'escalated_to_police', 'police_report', 'updated_at'])
+    crud._write_audit(
+        request, AuditLog.Action.CREATE, PoliceReport, obj=report,
+        changes={'title': report.title, 'status': report.status},
+    )
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, EmergencyAlert, obj=alert,
+        changes={'status': {'from': previous_status,
+                            'to': EmergencyAlert.Status.ESCALATED}},
+    )
 
     activity = getattr(alert.ofw, 'ofw_activity', None)
     if activity:
@@ -1623,12 +1665,18 @@ def resolve_alert(request, pk):
         messages.info(request, 'This emergency alert is already resolved.')
         return redirect('ofw:emergency_alerts')
 
+    previous_status = alert.status
     alert.status = EmergencyAlert.Status.RESOLVED
     alert.message = (
         f'{alert.message}\n\nResolved by '
         f'{request.user.get_full_name() or request.user.username}: OFW confirmed safe.'
     )
     alert.save(update_fields=['status', 'message', 'updated_at'])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, EmergencyAlert, obj=alert,
+        changes={'status': {'from': previous_status,
+                            'to': EmergencyAlert.Status.RESOLVED}},
+    )
 
     notify(
         alert.ofw.user,
@@ -1708,6 +1756,15 @@ def police_report_submit(request, pk):
         'status', 'police_station', 'police_contact', 'report_number',
         'officer_name', 'follow_up_on', 'updated_at',
     ])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, PoliceReport, obj=report,
+        changes={
+            'status': {'from': PoliceReport.Status.DRAFT,
+                       'to': PoliceReport.Status.SUBMITTED},
+            'police_station': report.police_station,
+            'report_number': report.report_number,
+        },
+    )
 
     notify(
         report.ofw.user,
@@ -1804,9 +1861,9 @@ def safe_locations_page(request):
 @login_required(login_url='login')
 @require_POST
 def safe_location_save(request):
-    """Create or update a safe location entry."""
-    if not (request.user.is_superuser or request.user.is_staff):
-        return redirect('dashboard')
+    """Create or update a safe location entry (administrators only)."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Administrators only.')
 
     loc_id = request.POST.get('id')
     if loc_id:
@@ -1848,6 +1905,17 @@ def safe_location_save(request):
         location.latitude = location.longitude = None
     location.is_active = request.POST.get('is_active') == 'on'
     location.save()
+    crud._write_audit(
+        request,
+        AuditLog.Action.UPDATE if loc_id else AuditLog.Action.CREATE,
+        SafeLocation,
+        obj=location,
+        changes={
+            'name': location.name,
+            'country': location.country,
+            'is_active': location.is_active,
+        },
+    )
 
     return redirect('ofw:safe_locations')
 
@@ -1855,11 +1923,15 @@ def safe_location_save(request):
 @login_required(login_url='login')
 @require_POST
 def safe_location_delete(request, pk):
-    if not (request.user.is_superuser or request.user.is_staff):
-        return HttpResponseForbidden('Management accounts only.')
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Administrators only.')
     location = get_object_or_404(SafeLocation, pk=pk)
     location.is_active = False
     location.save(update_fields=['is_active', 'updated_at'])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, SafeLocation, obj=location,
+        changes={'is_active': {'from': True, 'to': False}},
+    )
     return redirect('ofw:safe_locations')
 
 
@@ -1879,7 +1951,7 @@ def location_tracker_page(request):
     if not (request.user.is_superuser or request.user.is_staff):
         return redirect('dashboard')
 
-    from apps.users.agencies import agency_for_user
+    from apps.users.agencies import agency_for_user, has_agency_assignment
 
     profiles = list(
         _management_scope(request.user).select_related('user', 'agency_org')
@@ -1893,6 +1965,9 @@ def location_tracker_page(request):
         agency = agency_for_user(request.user)
         if agency is not None:
             pings_qs = pings_qs.filter(ofw__agency_org=agency)
+        elif has_agency_assignment(request.user):
+            # A deactivated agency must never leak every OFW's live location.
+            pings_qs = pings_qs.none()
 
     emergency_only = request.GET.get('emergency') == '1'
     if emergency_only:
@@ -1992,7 +2067,7 @@ def location_tracker_live(request):
     if not (request.user.is_superuser or request.user.is_staff):
         return JsonResponse({'error': 'Management accounts only.'}, status=403)
 
-    from apps.users.agencies import agency_for_user
+    from apps.users.agencies import agency_for_user, has_agency_assignment
 
     profiles = list(
         _management_scope(request.user).select_related('user', 'agency_org')
@@ -2006,7 +2081,9 @@ def location_tracker_live(request):
         agency = agency_for_user(request.user)
         if agency is not None:
             latest_qs = latest_qs.filter(ofw__agency_org=agency)
-        # Agency-less staff are already covered by _management_scope (all OFWs).
+        elif has_agency_assignment(request.user):
+            # Deactivated-agency staff see nothing, not the global map.
+            latest_qs = latest_qs.none()
 
     if request.GET.get('emergency') == '1':
         latest_qs = latest_qs.filter(is_emergency=True)
@@ -2629,6 +2706,12 @@ def portal_sos_alert(request):
         )
         alert.save(update_fields=['level', 'message', 'updated_at'])
 
+    crud._write_audit(
+        request,
+        AuditLog.Action.CREATE if created else AuditLog.Action.UPDATE,
+        EmergencyAlert, obj=alert,
+        changes={'sos_pressed': True, 'status': alert.status},
+    )
     return JsonResponse({
         'status': 'ok',
         'alert_id': alert.pk,
@@ -2672,12 +2755,19 @@ def cancel_sos(request):
         messages.info(request, 'There is no open emergency alert to cancel.')
         return redirect('ofw:portal_emergency_sos')
 
+    previous_status = alert.status
     alert.status = EmergencyAlert.Status.RESOLVED
     alert.message = (
         f'{alert.message}\n\nCancelled by OFW (false alarm / safe now) — '
         f'{profile.full_name}.'
     )
     alert.save(update_fields=['status', 'message', 'updated_at'])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, EmergencyAlert, obj=alert,
+        changes={'status': {'from': previous_status,
+                            'to': EmergencyAlert.Status.RESOLVED},
+                 'cancelled_by': 'OFW'},
+    )
 
     notify_managers(
         title=f'SOS cancelled: {profile.full_name} is safe',
@@ -2792,6 +2882,15 @@ def safe_location_suggestion_approve(request, pk):
     suggestion.save(update_fields=[
         'status', 'reviewed_by', 'reviewed_at', 'updated_at',
     ])
+    crud._write_audit(
+        request, AuditLog.Action.CREATE, SafeLocation, obj=location,
+        changes={'name': location.name, 'country': location.country},
+    )
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, SafeLocationSuggestion, obj=suggestion,
+        changes={'status': {'from': SafeLocationSuggestion.Status.PENDING,
+                            'to': SafeLocationSuggestion.Status.APPROVED}},
+    )
 
     notify(
         suggestion.submitted_by,
@@ -2841,6 +2940,11 @@ def safe_location_suggestion_reject(request, pk):
     suggestion.save(update_fields=[
         'status', 'reviewed_by', 'reviewed_at', 'updated_at',
     ])
+    crud._write_audit(
+        request, AuditLog.Action.UPDATE, SafeLocationSuggestion, obj=suggestion,
+        changes={'status': {'from': SafeLocationSuggestion.Status.PENDING,
+                            'to': SafeLocationSuggestion.Status.REJECTED}},
+    )
 
     notify(
         suggestion.submitted_by,

@@ -5,7 +5,13 @@ from django.urls import reverse
 
 from apps.users.agencies import agency_for_user
 
-from .models import EmergencyAlert, Notification, OFWActivity, OFWLocationSharing
+from .models import (
+    EmergencyAlert,
+    Notification,
+    OFWActivity,
+    OFWLocationSharing,
+    SafeLocationSuggestion,
+)
 from .roles import is_ofw
 
 
@@ -45,6 +51,20 @@ def notifications(request):
             else:
                 alerts_qs = alerts_qs.none()
         ctx['open_emergency_alert_count'] = alerts_qs.count()
+
+        # Safe place suggestions waiting for a review decision.
+        suggestions_qs = SafeLocationSuggestion.objects.filter(
+            status=SafeLocationSuggestion.Status.PENDING
+        )
+        if not user.is_superuser:
+            agency = agency_for_user(user)
+            if agency is not None:
+                suggestions_qs = suggestions_qs.filter(
+                    submitted_by__ofw_profiles__agency_org=agency
+                ).distinct()
+            else:
+                suggestions_qs = suggestions_qs.none()
+        ctx['pending_safe_location_suggestions_count'] = suggestions_qs.count()
 
     return ctx
 
