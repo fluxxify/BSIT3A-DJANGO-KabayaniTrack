@@ -30,10 +30,17 @@ def notifications(request):
     # Inactive OFW count shown to management on the dashboard header
     if user.is_superuser or user.is_staff:
         from django.db.models import Q
+        # Count real OFW accounts only.  A stale activity row can survive on a
+        # management login (for example, an account that was promoted after it
+        # was created), and badge must match the Inactive OFWs page and the
+        # dashboard KPI, which are both profile-scoped.
         inactive_qs = OFWActivity.objects.filter(
             is_account_active=False,
             days_inactive__gte=OFWActivity.INACTIVE_THRESHOLD_DAYS,
-        )
+            user__is_staff=False,
+            user__is_superuser=False,
+            user__ofw_profiles__isnull=False,
+        ).distinct()
         if not user.is_superuser:
             agency = agency_for_user(user)
             if agency is not None:

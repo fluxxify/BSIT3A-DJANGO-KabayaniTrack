@@ -5547,6 +5547,24 @@ class ManagementConsoleGuardTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertNotContains(page, 'Ana Reyes')
 
+    def test_inactive_badge_ignores_management_accounts(self):
+        OFWActivity.objects.create(
+            user=self.admin, is_account_active=False, days_inactive=9,
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.context['inactive_ofw_count'], 0)
+
+        OFWActivity.objects.update_or_create(
+            user=self.ofw_user,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=5),
+                'last_activity_at': timezone.now() - timedelta(days=5),
+            },
+        )
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.context['inactive_ofw_count'], 1)
+
     def test_request_location_rejects_get_and_accepts_post(self):
         self.client.force_login(self.staff)
         url = reverse('ofw:request_ofw_location', args=[self.profile.pk])
