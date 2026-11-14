@@ -8,6 +8,7 @@ those views so the entity modules stay small and consistent.
 import csv
 import inspect
 import json
+import logging
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -30,6 +31,7 @@ from apps.users.agencies import agency_for_user, has_agency_assignment, is_globa
 from .models import AuditLog, EmergencyContact, MonitoringReport, OFWProfile
 
 PER_PAGE = 10
+logger = logging.getLogger(__name__)
 
 
 def _client_ip(request):
@@ -52,8 +54,9 @@ def _write_audit(request, action, model, *, obj=None, changes=None, object_id=''
             ip_address=_client_ip(request),
         )
     except Exception:
-        # Auditing must never break the action the user requested.
-        pass
+        # Auditing must never break the action the user requested, but a
+        # failure still has to be visible in the server log.
+        logger.exception('Could not write audit log entry for %s', model.__name__)
 
 
 def _scoped(user, model):

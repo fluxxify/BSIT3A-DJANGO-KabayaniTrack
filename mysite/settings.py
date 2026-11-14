@@ -90,7 +90,6 @@ INSTALLED_APPS = [
 
     'apps.core',
     'apps.users',
-    'apps.info',
     'apps.ofw',
 ]
 

@@ -3,7 +3,7 @@ branding."""
 
 from django.urls import reverse
 
-from apps.users.agencies import agency_for_user
+from apps.users.agencies import agency_for_user, has_agency_assignment
 
 from .models import (
     EmergencyAlert,
@@ -45,8 +45,11 @@ def notifications(request):
             agency = agency_for_user(user)
             if agency is not None:
                 inactive_qs = inactive_qs.filter(user__ofw_profiles__agency_org=agency).distinct()
-            else:
+            elif has_agency_assignment(user):
+                # A deactivated agency must never fall back to the global view.
                 inactive_qs = inactive_qs.none()
+            # Legacy staff without an AgencyStaff row keep the global view,
+            # matching _management_scope().
         ctx['inactive_ofw_count'] = inactive_qs.count()
 
         # Open emergency alerts count
@@ -55,7 +58,7 @@ def notifications(request):
             agency = agency_for_user(user)
             if agency is not None:
                 alerts_qs = alerts_qs.filter(ofw__agency_org=agency)
-            else:
+            elif has_agency_assignment(user):
                 alerts_qs = alerts_qs.none()
         ctx['open_emergency_alert_count'] = alerts_qs.count()
 
@@ -69,7 +72,7 @@ def notifications(request):
                 suggestions_qs = suggestions_qs.filter(
                     submitted_by__ofw_profiles__agency_org=agency
                 ).distinct()
-            else:
+            elif has_agency_assignment(user):
                 suggestions_qs = suggestions_qs.none()
         ctx['pending_safe_location_suggestions_count'] = suggestions_qs.count()
 

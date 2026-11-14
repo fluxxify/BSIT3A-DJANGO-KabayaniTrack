@@ -29,6 +29,7 @@ from apps.ofw.hotlines import (
     automatic_local_hotlines,
 )
 from apps.ofw.locations import COUNTRY_ALIASES, COUNTRY_CHOICES, canonical_country
+from apps.ofw.middleware import OFWActivityMiddleware
 from apps.ofw.models import (
     AuditLog,
     CheckIn,
@@ -5629,5 +5630,64 @@ class ManagementConsoleGuardTests(TestCase):
         response = self.client.get(reverse('dashboard'))
         self.assertContains(response, 'Monitoring Reports')
         self.assertContains(response, reverse('ofw:report_list'))
+
+    def test_legacy_staff_without_agency_keeps_global_badge(self):
+        legacy = User.objects.create_user(
+            username='guard_legacy_staff', password='Passw0rd!23',
+            is_staff=True,
+        )
+        OFWActivity.objects.update_or_create(
+            user=self.ofw_user,
+            defaults={
+                'last_login_at': timezone.now() - timedelta(days=5),
+                'last_activity_at': timezone.now() - timedelta(days=5),
+            },
+        )
+        self.client.force_login(legacy)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.context['inactive_ofw_count'], 1)
+
+
+class OFWActivityMiddlewareTests(TestCase):
+    """Portal activity must clear stale inactivity flags immediately."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='middleware_ofw', password='Passw0rd!23',
+        )
+        self.activity, _ = OFWActivity.objects.get_or_create(user=self.user)
+        self.activity.is_account_active = False
+        self.activity.days_inactive = 7
+        self.activity.warning_sent_at = timezone.now()
+        self.activity.followup_sent_at = timezone.now()
+        self.activity.escalated_to_police_at = timezone.now()
+        self.activity.save()
+
+    def test_portal_view_resets_inactivity_flags(self):
+        request = RequestFactory().get('/ofw/portal/contacts/')
+        request.user = self.user
+
+        OFWActivityMiddleware(lambda request: None).record_activity(request)
+
+        self.activity.refresh_from_db()
+        self.assertTrue(self.activity.is_account_active)
+        self.assertEqual(self.activity.days_inactive, 0)
+        self.assertIsNone(self.activity.warning_sent_at)
+        self.assertIsNone(self.activity.followup_sent_at)
+        self.assertIsNone(self.activity.escalated_to_police_at)
+        self.assertIsNotNone(self.activity.last_activity_at)
+
+    def test_management_pages_are_not_tracked(self):
+        staff = User.objects.create_user(
+            username='middleware_staff', password='Passw0rd!23', is_staff=True,
+        )
+        request = RequestFactory().get('/ofw/portal/contacts/')
+        request.user = staff
+
+        OFWActivityMiddleware(lambda request: None).record_activity(request)
+
+        self.assertFalse(
+            OFWActivity.objects.filter(user=staff).exists()
+        )
 
 

@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
+from django.views.generic import RedirectView
 from django.conf import settings
 
 from .media import serve_media
@@ -27,6 +28,9 @@ handler500 = 'apps.core.views.handler500'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('favicon.ico', RedirectView.as_view(
+        url='/static/img/kabayanitrack-logo.svg', permanent=True,
+    )),
     path('', include('apps.core.urls')),
     path('users/', include('apps.users.urls')),
     path('ofw/', include('apps.ofw.urls')),

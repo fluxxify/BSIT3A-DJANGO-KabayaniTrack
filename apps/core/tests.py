@@ -484,10 +484,19 @@ class AuthMessageTests(TestCase):
             dashboard, 'Are you sure you want to log out?'
         )
 
-        response = self.client.get(reverse('logout'), follow=True)
+        # Logout must be a CSRF-protected POST, not a followable GET link.
+        self.assertEqual(self.client.get(reverse('logout')).status_code, 405)
+        response = self.client.post(reverse('logout'), follow=True)
         self.assertContains(response, 'Logged out successfully.')
         self.assertContains(response, 'Sign in to start your session')
         self.assertContains(response, 'dh-auth-bg')
+
+    def test_favicon_redirects_to_the_logo(self):
+        response = self.client.get('/favicon.ico')
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(
+            response['Location'], '/static/img/kabayanitrack-logo.svg'
+        )
 
 
 class PasswordResetTests(TestCase):

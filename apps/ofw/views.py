@@ -2979,7 +2979,9 @@ def ofw_activity_page(request):
 
     profiles = _management_scope(request.user).select_related('user')
     refresh_activities_for_profiles(profiles)
-    activities = OFWActivity.objects.select_related('user').filter(
+    activities = OFWActivity.objects.select_related('user').prefetch_related(
+        'user__ofw_profiles'
+    ).filter(
         user__ofw_profiles__in=profiles
     ).distinct().order_by('-last_login_at', '-updated_at')
 

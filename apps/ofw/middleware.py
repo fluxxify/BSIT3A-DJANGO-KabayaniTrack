@@ -43,5 +43,17 @@ class OFWActivityMiddleware:
         activity, _ = OFWActivity.objects.get_or_create(user_id=user.pk)
         if activity.last_activity_at is not None and activity.last_activity_at >= cutoff:
             return
+        # Any portal page view is a sign of life.  Reset the inactivity flags
+        # immediately instead of waiting for the next management dashboard
+        # load, otherwise the badge and warnings stay stale for hours.
         activity.last_activity_at = now
-        activity.save(update_fields=['last_activity_at', 'updated_at'])
+        activity.is_account_active = True
+        activity.days_inactive = 0
+        activity.warning_sent_at = None
+        activity.followup_sent_at = None
+        activity.escalated_to_police_at = None
+        activity.save(update_fields=[
+            'last_activity_at', 'is_account_active', 'days_inactive',
+            'warning_sent_at', 'followup_sent_at', 'escalated_to_police_at',
+            'updated_at',
+        ])

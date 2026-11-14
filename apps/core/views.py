@@ -13,7 +13,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .models import LoginAttempt
 
@@ -152,7 +152,7 @@ def _validate_registration_data(data):
     return errors
 
 
-@require_http_methods(['GET', 'POST'])
+@require_http_methods(['GET', 'HEAD', 'POST'])
 def login_view(request, agency_slug=None):
     agency = _agency_for_slug(agency_slug)
     if request.user.is_authenticated:
@@ -205,6 +205,7 @@ def login_view(request, agency_slug=None):
     )
 
 
+@require_POST
 def logout_view(request):
     logout(request)
     messages.success(request, 'Logged out successfully.')
