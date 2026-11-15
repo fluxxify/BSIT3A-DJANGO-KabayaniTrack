@@ -126,12 +126,10 @@
   </div>
 
   <div class="card mb-3">
-    <div class="card-header">
-      <h3 class="card-title">
-        <i class="fas fa-clock-rotate-left text-secondary me-2"></i>Recent shared positions
-      </h3>
-      <div class="card-actions">
-        <span class="badge bg-secondary-lt text-secondary" style="white-space: normal; max-width: 240px; display: inline-block;">Only your agency and administrators can see these</span>
+    <div class="card-header d-flex flex-column flex-md-row align-items-md-start gap-2">
+      <div>
+        <h3 class="card-title mb-1"><i class="fas fa-clock-rotate-left text-secondary me-2"></i>Recent shared positions</h3>
+        <span class="badge bg-secondary-lt text-secondary text-wrap" style="max-width: 100%; display: block;">Only your agency and administrators can see these</span>
       </div>
     </div>
     {% if recent_pings %}
