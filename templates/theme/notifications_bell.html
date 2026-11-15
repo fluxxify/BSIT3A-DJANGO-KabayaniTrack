@@ -27,9 +27,9 @@
          class="dropdown-item dh-notif-item {% if not notification.is_read %}is-unread{% endif %}">
         <span class="dh-notif-dot dh-notif-dot--{{ notification.level }}"></span>
         <span class="min-w-0 flex-grow-1">
-          <span class="d-block fw-semibold text-truncate">{{ notification.title }}</span>
+          <span class="d-block fw-semibold">{{ notification.title }}</span>
           {% if notification.message %}
-          <span class="d-block text-muted small text-truncate">{{ notification.message }}</span>
+          <span class="d-block text-muted small">{{ notification.message }}</span>
           {% endif %}
           <span class="d-block text-muted dh-notif-time">{{ notification.created_at|timesince }} ago</span>
         </span>
