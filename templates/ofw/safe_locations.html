@@ -392,7 +392,9 @@
 
   var btn = document.getElementById('useMyLocationBtn');
   var statusEl = document.getElementById('nearMeStatus');
-  if (!btn || !statusEl) return;
+  // The "Use my location" card is only rendered for some users.  Card
+  // filtering below must still run when it is absent.
+  var nearMeEnabled = !!(btn && statusEl);
 
   var userMarker = null;
   var userCircle = null;
@@ -698,17 +700,19 @@
       });
   }
 
-  btn.addEventListener('click', locate);
+  if (nearMeEnabled) {
+    btn.addEventListener('click', locate);
 
-  // Try automatically once, so turning location on is enough (like Maps).
-  if (window.isSecureContext !== false) {
-    window.setTimeout(function () {
-      if (!btn.disabled) locate();
-    }, 600);
-  } else {
-    statusEl.className = 'sp-status sp-status-warn';
-    statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
-      'Location needs HTTPS. Open the live site to use this feature.';
+    // Try automatically once, so turning location on is enough (like Maps).
+    if (window.isSecureContext !== false) {
+      window.setTimeout(function () {
+        if (!btn.disabled) locate();
+      }, 600);
+    } else {
+      statusEl.className = 'sp-status sp-status-warn';
+      statusEl.innerHTML = '<i class="fas fa-triangle-exclamation me-1"></i>' +
+        'Location needs HTTPS. Open the live site to use this feature.';
+    }
   }
 })();
 </script>

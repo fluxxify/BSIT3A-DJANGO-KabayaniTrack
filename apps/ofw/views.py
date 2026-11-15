@@ -3267,3 +3267,76 @@ def all_activity_page(request):
         'page_title': 'All Activity',
         'page_pretitle': 'Administration',
     })
+
+
+# ---------------------------------------------------------------------------
+# Nemotron 3.5 Super AI integration (optional; degrades gracefully)
+# ---------------------------------------------------------------------------
+
+from .ai_integration import categorize_concern, ofw_chatbot, triage_welfare
+
+
+@login_required(login_url='login')
+@require_POST
+def concern_categorize_ajax(request):
+    """Auto-categorize a concern description via Nemotron 3.5 Super.
+
+    Returns ``{'ok': True, 'category': ..., 'severity': ..., 'reasoning': ...}``
+    or ``{'ok': False, 'error': ...}``.  Staff review and may override before
+    saving.  Returns 400 (not 500) when AI is unavailable so the UI can fall
+    back to manual entry.
+    """
+    description = (request.POST.get('description') or '').strip()
+    result = categorize_concern(description)
+    status = 200 if result.get('ok') else 400
+    return JsonResponse(result, status=status)
+
+
+@login_required(login_url='login')
+@require_POST
+def welfare_triage_ajax(request):
+    """Suggest a welfare status from check-in / assessment notes.
+
+    Returns ``{'ok': True, 'status': ..., 'reasoning': ...}`` or
+    ``{'ok': False, 'error': ...}``.
+    """
+    notes = (request.POST.get('notes') or '').strip()
+    current_status = (request.POST.get('current_status') or '').strip()
+    condition = (request.POST.get('condition') or '').strip() or None
+    if not current_status:
+        return JsonResponse(
+            {'ok': False, 'error': 'current_status is required.'}, status=400,
+        )
+    result = triage_welfare(notes, current_status, condition)
+    status = 200 if result.get('ok') else 400
+    return JsonResponse(result, status=status)
+
+
+@login_required(login_url='login')
+@require_POST
+def portal_chatbot_ajax(request):
+    """OFW portal chatbot: answers questions about the case, hotlines, portal.
+
+    Returns ``{'ok': True, 'answer': ...}`` or ``{'ok': False, 'error': ...}``.
+    Management users are redirected; this endpoint is for OFW accounts.
+    """
+    from .roles import is_ofw
+    if not is_ofw(request.user):
+        return JsonResponse({'error': 'OFW accounts only.'}, status=403)
+
+    question = (request.POST.get('question') or '').strip()
+    profile = OFWProfile.objects.filter(user=request.user).order_by('id').first()
+    context = {}
+    if profile:
+        context = {
+            'country': profile.country or '',
+            'city': profile.city_abroad or '',
+            'welfare_status': profile.welfare_status or '',
+            'open_concerns': Concern.objects.filter(
+                ofw=profile,
+                status__in=['open', 'in_progress', 'escalated'],
+            ).count(),
+        }
+    result = ofw_chatbot(question, context)
+    status = 200 if result.get('ok') else 400
+    return JsonResponse(result, status=status)

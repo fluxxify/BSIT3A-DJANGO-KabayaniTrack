@@ -194,6 +194,16 @@ html {
   border-radius: 100rem;
 }
 
+/* The Tabler bundle makes .alert a flex row with a 1rem gap.  Alerts in this
+   project are written as plain sentences with inline <strong>/<i> children, so
+   flex turns every text node into its own narrow column ("watak watak" text).
+   Render them as normal blocks instead.  Alerts that genuinely need a row add
+   the .d-flex utility class, which still wins.  .dh-flash is defined further
+   down and keeps its own flex layout. */
+.alert {
+  display: block;
+}
+
 .form-control,
 .form-select,
 .input-group-text,
@@ -365,7 +375,7 @@ button:focus-visible,
   padding-top: 0.55rem;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -969,7 +979,7 @@ button:focus-visible,
   flex: 1 1 auto;
   min-width: 0;
   padding-right: 0.25rem;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 @media (max-width: 575.98px) {
@@ -1054,7 +1064,7 @@ button:focus-visible,
     font-size: 0.8rem;
   }
   .table td {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 
   .badge {
@@ -1356,7 +1366,7 @@ button:focus-visible,
 .kt-contact-item__name {
   font-weight: 600;
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .kt-contact-item__meta {
@@ -1377,7 +1387,7 @@ button:focus-visible,
   margin-top: 0.2rem;
   font-size: 0.8rem;
   color: var(--tblr-secondary);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .kt-contact-item__detail--muted {
@@ -1396,7 +1406,7 @@ button:focus-visible,
   font-weight: 600;
   font-size: 0.95rem;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   text-decoration: none;
 }
 
@@ -1475,5 +1485,110 @@ button:focus-visible,
     width: auto;
     min-height: 44px;
     padding: 0.5rem;
+  }
+}
+
+/* ============================================================
+   Mobile hardening pass (phones, ~390px wide)
+   Fixes horizontal overflow and letter-by-letter ("watak watak")
+   text wrapping without changing desktop layouts.
+   ============================================================ */
+
+/* The Tabler bundle shipped in this project has no .min-w-0 utility, but the
+   mobile CRUD cards rely on it so long titles shrink instead of pushing the
+   row actions outside the card. */
+.min-w-0 {
+  min-width: 0 !important;
+}
+
+@media (max-width: 991.98px) {
+  /* Theme customiser floating button covers cards, form labels and map
+     controls on small screens. Desktop keeps it. */
+  .settings {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767.98px) {
+  /* Let long button labels wrap instead of being clipped. */
+  .btn:not(.btn-icon) {
+    white-space: normal;
+  }
+
+  /* Tables keep readable columns: scroll sideways instead of squeezing
+     labels into stacks of one or two words. */
+  .table-responsive .table th,
+  .table-responsive .table td {
+    min-width: 7rem;
+  }
+
+  .table-responsive .table th.text-center,
+  .table-responsive .table td.text-center {
+    min-width: 4.5rem;
+  }
+
+  /* Page headers stack: title first, actions below, nothing overlapping. */
+  .page-header > .row,
+  .page-header > .container-xl > .row {
+    flex-direction: column;
+    align-items: stretch !important;
+    row-gap: 0.75rem;
+  }
+
+  .page-header > .row > .col,
+  .page-header > .row > [class*="col-"],
+  .page-header > .container-xl > .row > .col,
+  .page-header > .container-xl > .row > [class*="col-"] {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .page-header .ms-auto {
+    margin-left: 0 !important;
+  }
+
+  .page-header .text-end {
+    text-align: left !important;
+  }
+
+  .page-header .d-flex {
+    flex-wrap: wrap;
+  }
+
+  /* Card headers wrap so long badges/actions never stretch the card. */
+  .card-header {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .card-header > .card-actions,
+  .card-header > .ms-auto {
+    margin-left: 0 !important;
+  }
+
+  .card-header .card-title {
+    min-width: 0;
+  }
+
+  /* Status chips keep their label on one line and never get squeezed. */
+  .badge {
+    flex-shrink: 0;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  /* Long explanatory chips in card headers may wrap instead of stretching
+     the card beyond the screen. */
+  .card-header .badge {
+    flex-shrink: 1;
+    white-space: normal;
+  }
+
+  /* Mobile CRUD cards reuse table cells that carry .text-nowrap to keep
+     desktop rows short. In the card view that pushes titles under the row
+     actions, so let them wrap there. */
+  #crudCards .text-nowrap {
+    white-space: normal !important;
   }
 }

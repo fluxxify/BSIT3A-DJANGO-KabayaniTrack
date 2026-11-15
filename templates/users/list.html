@@ -17,7 +17,7 @@
                 data-bs-toggle="modal"
                 data-bs-target="#editUserModal"
                 data-mode="create">
-          <i class="ti ti-plus me-1"></i> Add User
+          <i class="fas fa-plus me-1"></i> Add User
         </button>
       </div>
     </div>
@@ -91,7 +91,7 @@
         <div class="col-12 col-lg-4">
           <label class="form-label" for="userSearch">Search</label>
           <div class="input-group">
-            <span class="input-group-text"><i class="ti ti-search"></i></span>
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
             <input type="text"
                    id="userSearch"
                    name="q"
@@ -100,7 +100,7 @@
                    placeholder="Name, username, email, or agency">
           </div>
         </div>
-        <div class="col-6 col-md-3 col-lg-2">
+        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
           <label class="form-label" for="userAgency">Agency</label>
           <select name="agency" id="userAgency" class="form-select">
             <option value="">All agencies</option>
@@ -110,7 +110,7 @@
             {% endfor %}
           </select>
         </div>
-        <div class="col-6 col-md-3 col-lg-2">
+        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
           <label class="form-label" for="userRole">Role</label>
           <select name="role" id="userRole" class="form-select">
             <option value="">All roles</option>
@@ -119,7 +119,7 @@
             {% endfor %}
           </select>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-12 col-sm-6 col-md-2">
           <label class="form-label" for="userStatus">Status</label>
           <select name="status" id="userStatus" class="form-select">
             <option value="">All</option>
@@ -127,7 +127,7 @@
             <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
           </select>
         </div>
-        <div class="col-6 col-md-2">
+        <div class="col-12 col-sm-6 col-md-2">
           <label class="form-label" for="userSort">Sort</label>
           <select name="sort" id="userSort" class="form-select">
             {% for value, label in sort_choices %}
@@ -138,7 +138,7 @@
         <div class="col-12 col-md-2 d-flex gap-2">
           <button type="submit" class="btn btn-primary w-100">Apply</button>
           <a href="{% url 'users:user_list' %}" class="btn btn-outline-secondary" title="Clear filters">
-            <i class="ti ti-x"></i>
+            <i class="fas fa-xmark"></i>
           </a>
         </div>
       </div>
@@ -238,7 +238,7 @@
                         data-superuser="{{ u.is_superuser|yesno:'true,false' }}"
                         data-agency="{{ u.agency_staff.agency_id|default:'' }}"
                         title="Edit">
-                  <i class="ti ti-pencil me-1"></i>Edit
+                  <i class="fas fa-pen me-1"></i>Edit
                 </button>
                 {% if not u.is_superuser and u.id != user.id %}
                 <button type="button"
@@ -248,7 +248,7 @@
                         data-id="{{ u.id }}"
                         data-name="{{ u.username }}"
                         title="Delete">
-                  <i class="ti ti-trash me-1"></i>Delete
+                  <i class="fas fa-trash me-1"></i>Delete
                 </button>
                 {% endif %}
               </div>
@@ -282,7 +282,7 @@
         {% if users.has_previous %}
         <li class="page-item">
           <a class="page-link" href="?page={{ users.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">
-            <i class="ti ti-chevron-left"></i> prev
+            <i class="fas fa-chevron-left"></i> prev
           </a>
         </li>
         {% endif %}
@@ -294,7 +294,7 @@
         {% if users.has_next %}
         <li class="page-item">
           <a class="page-link" href="?page={{ users.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">
-            next <i class="ti ti-chevron-right"></i>
+            next <i class="fas fa-chevron-right"></i>
           </a>
         </li>
         {% endif %}

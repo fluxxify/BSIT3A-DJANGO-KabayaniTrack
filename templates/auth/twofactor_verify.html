@@ -1,0 +1,57 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>Two-Factor Verification - KabayaniTrack</title>
+  <link href="{% static 'css/tabler.css' %}" rel="stylesheet" />
+  <link href="{% static 'css/app-theme.css' %}" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="dh-auth-bg">
+  <script src="{% static 'js/tabler-theme.js' %}"></script>
+  <div class="page page-center">
+    <div class="container container-tight py-4">
+      <div class="card card-md">
+        <div class="card-body">
+          <div class="text-center mt-n4 mb-4">
+            <a class="navbar-brand" href="{% url 'login' %}">
+              <img src="{% static 'img/kabayanitrack-logo.svg' %}" width="28" class="me-1" alt="KabayaniTrack" />
+              KabayaniTrack
+            </a>
+          </div>
+          <h2 class="card-title text-center">Two-Factor Verification</h2>
+          <p class="text-center text-muted">
+            Enter the 6-digit code from your authenticator app to complete sign in.
+          </p>
+
+          {% if messages %}
+          {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+          {% endif %}
+
+          <form id="twofaForm" method="POST" action="{% url 'users:twofactor_login_verify' %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next|default:'/home/' }}">
+            <div class="mb-3">
+              <label class="form-label">Verification code</label>
+              <input type="text" name="code" class="form-control" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="123456" required autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Verify Code</button>
+          </form>
+
+          <div class="card-footer text-center">
+            <a href="{% url 'login' %}" class="text-muted text-decoration-none">Back to sign in</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{% static 'js/tabler.js' %}"></script>
+  <script src="{% static 'js/flash-messages.js' %}" defer></script>
+</body>
+</html>

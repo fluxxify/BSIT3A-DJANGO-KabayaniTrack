@@ -91,7 +91,7 @@ class OFWProfile(models.Model):
     middle_name = models.CharField(max_length=120, blank=True)
     last_name = models.CharField(max_length=120)
     suffix = models.CharField(max_length=30, blank=True, choices=SUFFIX_CHOICES)
-    passport_number = models.CharField(max_length=40, blank=True)
+    passport_number = models.CharField(max_length=40, blank=True, null=True, unique=True)
     birth_date = models.DateField(null=True, blank=True)
     age = models.PositiveIntegerField(
         null=True,

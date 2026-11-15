@@ -1,62 +1,77 @@
-# Email setup
+# Email Setup for KabayaniTrack
 
-KabayaniTrack sends password-reset links and (in future) emergency alerts by
-email. This page explains how to make those emails actually arrive.
+KabayaniTrack sends email for password resets, inactivity warnings, and
+administrator notifications. Local development uses the console backend
+(messages are printed to the terminal). Production on PythonAnywhere must use
+SMTP — Gmail is the only outbound SMTP host allowed on the free tier.
 
-## Why emails currently do not send
+## 1. Get a Gmail App Password
 
-* `smtp.pythonanywhere.com` **does not exist**. PythonAnywhere does not run an
-  SMTP server, so the old default could never work.
-* `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` were empty, so authentication
-  always failed.
-* The failure was caught and only written to the server log, so the page still
-  said "check your email".
+1. Go to https://myaccount.google.com/apppasswords
+2. Sign in with your Gmail account.
+3. Select app "Mail" and device "Other (custom name)" → enter "KabayaniTrack".
+4. Copy the 16-character app password.
 
-## Production checklist (PythonAnywhere)
+> Use an **App Password**, not your regular Gmail password. App Passwords
+> require 2-Step Verification to be enabled on the Google account.
 
-1. Create a dedicated Gmail account, e.g. `kabayanitrack.alerts@gmail.com`.
-   Do **not** reuse a personal account.
-2. Enable **2-Step Verification** on that account.
-3. Create an **App Password** (Google Account → Security → App passwords).
-   Copy the 16-character password.
-4. In the PythonAnywhere **Web** tab, add these environment variables, then
-   click **Reload**:
+## 2. Set environment variables
 
-   ```
-   EMAIL_HOST=smtp.gmail.com
-   EMAIL_PORT=587
-   EMAIL_USE_TLS=True
-   EMAIL_HOST_USER=kabayanitrack.alerts@gmail.com
-   EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx
-   DEFAULT_FROM_EMAIL=kabayanitrack.alerts@gmail.com
-   EMAIL_TIMEOUT=10
-   ```
+Copy `.env.example` to `.env` (production) or edit the local `.env`:
 
-5. Verify from a Bash console:
+```bash
+cp .env.example .env
+```
 
-   ```bash
-   cd ~/KabayaniTrack
-   source .venv/bin/activate
-   python manage.py sendtestemail YOUR_REAL_EMAIL@gmail.com
-   ```
+Fill in:
 
-   No output means it worked. Any traceback shows the exact SMTP error.
+| Variable | Example |
+|----------|---------|
+| `EMAIL_HOST_USER` | `yourname@gmail.com` |
+| `EMAIL_HOST_PASSWORD` | `abcd efgh ijkl mnop` (16 chars, no spaces) |
+| `DEFAULT_FROM_EMAIL` | `yourname@gmail.com` |
+| `EMAIL_HOST` | `smtp.gmail.com` |
+| `EMAIL_PORT` | `587` |
+| `EMAIL_USE_TLS` | `True` |
+| `EMAIL_TIMEOUT` | `10` |
 
-6. Test the real flow: open `/password-reset/`, enter a registered address and
-   confirm the email arrives (check spam).
+On PythonAnywhere, add these to the web app's **Environment variables** section
+in the Web tab, not in a `.env` file (PythonAnywhere does not load `.env`).
 
-## Local development
+## 3. Backend selection
 
-With `DEBUG=True` the console backend is used, so the message is printed in the
-terminal and the reset link is also shown on the page. Nothing is sent.
+`mysite/settings.py` chooses the backend automatically:
 
-To test real delivery locally, export the same variables (or set
-`EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`) before running
-`python manage.py runserver`.
+- `DEBUG=True` → `django.core.mail.backends.console.EmailBackend`
+  (prints messages to the console; reset links are shown on the page)
+- `DEBUG=False` → `django.core.mail.backends.smtp.EmailBackend`
+  (sends real email via Gmail SMTP)
 
-## Notes
+> Gmail rejects messages whose `From:` address is not the authenticated
+> account, so `DEFAULT_FROM_EMAIL` must match `EMAIL_HOST_USER`.
 
-* PythonAnywhere **free** accounts may only connect to Gmail's SMTP servers.
-  Other providers need a paid account, or an HTTPS-based email API.
-* Gmail limits a free account to roughly 500 recipients per day. That is fine
-  for password resets; use a transactional provider before sending bulk alerts.
+## 4. Test email
+
+```bash
+# Local development (console backend prints the message)
+python manage.py shell -c "from django.core.mail import send_mail; send_mail('Test', 'Hello', 'from@example.com', ['to@example.com'], fail_silently=False)"
+
+# Production (real email)
+# Trigger a password reset from the login page and check your inbox.
+```
+
+## 5. Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `AuthenticationFailed` | Use a Gmail App Password, not your account password. Enable 2-Step Verification first. |
+| `SMTPSocketError` / timeout | PythonAnywhere free tier only allows outbound SMTP to Gmail. Confirm `EMAIL_HOST=smtp.gmail.com` and `EMAIL_PORT=587`. |
+| Reset link not received | Check spam folder. Confirm `DEFAULT_FROM_EMAIL` matches `EMAIL_HOST_USER`. |
+| Link shown on page instead of emailed | You're on `DEBUG=True` with the console backend. Set `DJANGO_DEBUG=False` and configure SMTP. |
+
+## 6. Rate limits
+
+Gmail free accounts are limited to ~500 emails/day. KabayaniTrack sends
+password resets and inactivity warnings only, so this is sufficient for a
+small deployment. For higher volume, use a transactional email service
+(SendGrid, Mailgun, Amazon SES) and update `EMAIL_BACKEND` accordingly.

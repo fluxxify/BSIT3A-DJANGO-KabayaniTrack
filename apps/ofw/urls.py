@@ -147,4 +147,9 @@ urlpatterns = [
     # Administrator audit trail
     path('audit-log/', views.audit_log_page, name='audit_log'),
     path('all-activity/', views.all_activity_page, name='all_activity'),
+
+    # --- Nemotron 3.5 Super AI integration (optional) ---
+    path('concerns/categorize/', views.concern_categorize_ajax, name='concern_categorize_ajax'),
+    path('welfare/triage/', views.welfare_triage_ajax, name='welfare_triage_ajax'),
+    path('portal/chatbot/', views.portal_chatbot_ajax, name='portal_chatbot_ajax'),
 ]

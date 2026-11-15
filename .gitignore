@@ -17,6 +17,7 @@ seed_*.py
 media/
 staticfiles/
 deploy/pythonanywhere_wsgi.generated.py
+.env
 
 # IDE / OS
 .idea/

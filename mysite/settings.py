@@ -13,6 +13,13 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -32,12 +39,9 @@ def _env_bool(name, default=False):
 DEBUG = _env_bool('DJANGO_DEBUG', True)
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '').strip()
 if not SECRET_KEY:
-    if DEBUG:
-        SECRET_KEY = 'django-insecure-zsnno#^l!whuzs%55j6*366px#r09+borh$1^2mj*_ovz47!o_'
-    else:
-        raise ImproperlyConfigured(
-            'DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=0.'
-        )
+    raise ImproperlyConfigured(
+        'DJANGO_SECRET_KEY must be set (copy .env.example to .env and fill it in).'
+    )
 
 # Hosts allowed to serve the app. Dev defaults cover localhost plus any host
 # passed through the DJANGO_ALLOWED_HOSTS environment variable (e.g. a tunnel).
@@ -103,6 +107,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.ofw.middleware.OFWActivityMiddleware',
     'mysite.security.SecurityHeadersMiddleware',
+    'apps.users.middleware_2fa.TwoFactorMiddleware',
 ]
 
 # WhiteNoise is only needed when Django is not serving static files itself.
@@ -295,4 +300,19 @@ EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 
 # Password reset tokens expire after one hour by default.
 PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', '3600'))
+
+# --- Nemotron 3.5 Super (NVIDIA) text LLM integration -----------------------
+# Optional.  When NVIDIA_API_KEY is set, the system can auto-categorise
+# concerns, triage welfare status and power an OFW portal chatbot.  When the
+# key is absent those features degrade gracefully (staff fill fields by hand).
+NVIDIA_API_KEY = os.environ.get('NVIDIA_API_KEY', '').strip()
+# NVIDIA API catalog endpoint for Nemotron 3.5 Super (chat/completions).
+NVIDIA_API_BASE_URL = os.environ.get(
+    'NVIDIA_API_BASE_URL',
+    'https://integrate.api.nvidia.com/v1',
+).rstrip('/')
+NVIDIA_MODEL = os.environ.get('NVIDIA_MODEL', 'nvidia/nemotron-3.5-super').strip()
+# Timeout in seconds for each LLM request.  Keep short so a slow model never
+# blocks an OFW or management request for long.
+NVIDIA_API_TIMEOUT = int(os.environ.get('NVIDIA_API_TIMEOUT', '20'))
 

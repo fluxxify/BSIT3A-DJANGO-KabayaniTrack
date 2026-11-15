@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import views_2fa
 
 app_name = 'users'
 
@@ -19,4 +20,11 @@ urlpatterns = [
     path('ajax/get/<int:pk>/', views.user_get_ajax, name='user_get_ajax'),
     path('ajax/save/', views.user_save_ajax, name='user_save_ajax'),
     path('ajax/delete/<int:pk>/', views.user_delete_ajax, name='user_delete_ajax'),
+
+    # Two-factor authentication
+    path('2fa/setup/', views_2fa.twofactor_setup, name='twofactor_setup'),
+    path('2fa/verify/', views_2fa.twofactor_verify, name='twofactor_verify'),
+    path('2fa/disable/', views_2fa.twofactor_disable, name='twofactor_disable'),
+    path('2fa/login-verify/', views_2fa.twofactor_login_verify, name='twofactor_login_verify'),
+    path('2fa/status/', views_2fa.twofactor_status, name='twofactor_status'),
 ]

@@ -187,10 +187,15 @@ def _format_cell(value, column):
     if truncated:
         text = text[:limit].rstrip()
     rendered = escape(text) + ('…' if truncated else '')
+    if '@' in text:
+        # Long email addresses would otherwise drop a single stray character
+        # onto the next line in the narrow mobile card columns.  Give the
+        # browser a natural break point after the @ instead.
+        rendered = rendered.replace('@', '@<wbr>', 1)
     if truncated or column.get('nowrap'):
         # Keep long labels on one line so rows stay the same height.
         return f'<span class="text-nowrap" title="{escape(original)}">{rendered}</span>'
-    return escape(text)
+    return rendered
 
 
 def _badge(value, column):
