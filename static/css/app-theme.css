@@ -181,6 +181,15 @@ html {
   vertical-align: middle;
 }
 
+/* Long single-line values (addresses, notes) wrap inside their own cell.
+   Tables that carry .text-nowrap would otherwise let the value spill over
+   the neighbouring column. The minimum width keeps the wrapped text
+   readable instead of collapsing into a one-word column. */
+.cell-wrap {
+  white-space: normal !important;
+  min-width: 12rem !important;
+}
+
 .table tbody tr {
   transition: background-color 0.12s ease;
 }

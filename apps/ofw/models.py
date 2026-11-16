@@ -135,7 +135,7 @@ class OFWProfile(models.Model):
         ordering = ['last_name', 'first_name']
 
     def __str__(self):
-        parts = [self.last_name, ',']
+        parts = [f'{self.last_name},']
         if self.first_name:
             parts.append(self.first_name)
         if self.middle_name:
