@@ -16,17 +16,17 @@ October 2026
 
 ### Introduction
 
-Overseas Filipino Workers (OFWs) play an important role in supporting their families and contributing to the Philippine economy. However, OFWs may experience difficulties while working abroad, such as problems with their employment, welfare, safety, and access to reliable support information. When they need assistance, it may be challenging to find the appropriate government agencies, contact details, and available support services. Monitoring the situations and concerns of OFWs can also be difficult when information is scattered across different sources.
+   Overseas Filipino Workers (OFWs) play an important role in supporting their families and contributing to the Philippine economy. However, OFWs may experience difficulties while working abroad, such as problems with their employment, welfare, safety, and access to reliable support information. When they need assistance, it may be challenging to find the appropriate government agencies, contact details, and available support services. Monitoring the situations and concerns of OFWs can also be difficult when information is scattered across different sources.
 
-Currently, accessing information about OFWs and their concerns may require searching through different websites, contacting various offices, or relying on social media posts. This can make it difficult for OFWs, their families, and authorized personnel to find updated and reliable information quickly. Without a centralized system, monitoring relevant information and identifying the appropriate support services may become less organized and less convenient.
+   Currently, accessing information about OFWs and their concerns may require searching through different websites, contacting various offices, or relying on social media posts. This can make it difficult for OFWs, their families, and authorized personnel to find updated and reliable information quickly. Without a centralized system, monitoring relevant information and identifying the appropriate support services may become less organized and less convenient.
 
-To address these concerns, the researchers propose KabayaniTrack: An OFW Monitoring and Support Information System. The system focuses on providing a centralized platform for monitoring OFW-related information and accessing important support resources. It aims to organize relevant information, provide access to emergency hotlines and government agency contacts, and display registered locations through an interactive map when applicable. These features can help users locate relevant information more conveniently and identify appropriate channels for assistance.
+   To address these concerns, the researchers propose KabayaniTrack: An OFW Monitoring and Support Information System. The system focuses on providing a centralized platform for monitoring OFW-related information and accessing important support resources. It aims to organize relevant information, provide access to emergency hotlines and government agency contacts, and display registered locations through an interactive map when applicable. These features can help users locate relevant information more conveniently and identify appropriate channels for assistance.
 
-The development of KabayaniTrack is necessary because an Information Technology solution can make OFW-related information more accessible, organized, and easier to monitor. By providing a centralized source of monitoring information and support resources, the system aims to help OFWs and their families become better informed and make it easier to find appropriate assistance when needed. The system is intended to support information access and monitoring, rather than replace the official services and responsibilities of government agencies.
+   The development of KabayaniTrack is necessary because an Information Technology solution can make OFW-related information more accessible, organized, and easier to monitor. By providing a centralized source of monitoring information and support resources, the system aims to help OFWs and their families become better informed and make it easier to find appropriate assistance when needed. The system is intended to support information access and monitoring, rather than replace the official services and responsibilities of government agencies.
 
 ### Objectives of the Study
 
-The general objective of the study is to develop KabayaniTrack: An OFW Monitoring and Support Information System that provides a centralized platform for monitoring OFW-related information and accessing essential support resources. The system aims to make information more organized, accessible, and convenient for OFWs, their families, and authorized users.
+   The general objective of the study is to develop KabayaniTrack: An OFW Monitoring and Support Information System that provides a centralized platform for monitoring OFW-related information and accessing essential support resources. The system aims to make information more organized, accessible, and convenient for OFWs, their families, and authorized users.
 
 Specific Objectives
 
@@ -41,7 +41,7 @@ Specifically, this study aims to:
 
 ### Significance of the Study
 
-The development of KabayaniTrack is driven by the need to streamline monitoring, enhance safety, and ensure efficient support services for Overseas Filipino Workers (OFWs). The findings and practical output of this study will provide direct benefits to the following key stakeholders:
+   The development of KabayaniTrack is driven by the need to streamline monitoring, enhance safety, and ensure efficient support services for Overseas Filipino Workers (OFWs). The findings and practical output of this study will provide direct benefits to the following key stakeholders:
 
 1. Overseas Filipino Workers (OFWs)
 
